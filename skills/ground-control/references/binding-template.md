@@ -52,7 +52,7 @@ Two roles, usually one system: **work intake** (where tickets arrive) and **stat
 |---|---|
 | fetch <id> | <e.g. unblock MCP issue get; `bd show <id> --json` plus comments; Jira REST issue + comments + links; read the STATUS.md row and every doc it links> |
 | ready | <e.g. next unblocked row in STATUS.md; `bd ready`; a board query> |
-| claim | <e.g. flip the row to in progress; `bd update <id> --claim`> |
+| claim | <flip the row to in progress AND create the task branch, one act, e.g. `git switch -c t<id>-<slug>` plus the row edit, or `bd update <id> --claim`; no branch, no claim> |
 | update | <e.g. edit the row in the same commit as the work> |
 | close-on-merge | <e.g. flip the row to done on PR merge; `bd close <id>`> |
 

@@ -41,7 +41,7 @@ Every role slot defaults to the plugin agent of the same name; nothing overridde
 |---|---|
 | fetch <id> | read the task's STATUS.md row plus every doc it links |
 | ready | first unchecked task whose dependencies are all checked |
-| claim | mark the row in progress |
+| claim | mark the row in progress AND create the task branch t<id>-<slug> off main (one act; no branch, no claim) |
 | update | edit the row in the same commit as the work |
 | close-on-merge | local-only mode: check the row when the work and its gate land; Sam signs off |
 
