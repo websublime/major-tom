@@ -1,0 +1,6 @@
+date,amount_cents,category
+2026-07-01,1250,food
+2026-07-01,300,transport
+2026-07-02,4000,rent
+2026-07-02,-200,refund
+2026-07-03,999,misc
