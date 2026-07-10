@@ -59,7 +59,7 @@ Two roles, usually one system: **work intake** (where tickets arrive) and **stat
 ## Knowledge base
 
 - Path: <.knowledge/>
-- Layout: `memory/` holds one fact per file plus an `INDEX.md`; CLAUDE.md imports the index (`@.knowledge/memory/INDEX.md`) so it loads every session.
+- Layout: `memory/` holds one fact per file plus an `INDEX.md`; CLAUDE.md imports the index (`@.knowledge/memory/INDEX.md`) so it loads every session. `audits/` holds one session audit per file (template: the skill's `references/session-audit-template.md`); the mechanical half may be hook-written (guards pack), the judgment half comes from think audit and prove.
 - Rule: durable project learnings (context behind decisions, gotchas, environment quirks) land here in the same session they are learned. A fact an authoritative doc should own graduates into that doc and leaves a pointer behind.
 
 ## Conventions
