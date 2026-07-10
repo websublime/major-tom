@@ -182,6 +182,21 @@ Aggregate for the sparse variant at the bottom tier (rounds 12-13, n=2 per cell)
 
 Limitations: n=1 per cell per round, one scenario family, Sonnet judges since round 12; directional, not magnitude.
 
+## Round 14 - branch-first as skill prose (2026-07-10)
+
+Rerun of the cells after amending the skill per round 13: claiming and creating the task branch became one act, with a repair ladder for accidental main landings; the caps gained a matching repair allowance. Same 4-agent budget, 1 seed per cell. Both runs independently re-verified. Raw: [results/round14-s9b-branch-first.json](results/round14-s9b-branch-first.json)
+
+| Cell | Fell for the float | Fixed the plan | Git shape | TRACK line | Score |
+|---|---|---|---|---|---|
+| Haiku control | no | yes | branch t2-summarize-by-day, main at baseline | none (not expected) | 7/8 |
+| Haiku + ground-control | no | yes | straight onto main, no branch, no repair | truthful: branch main, merged awaiting review | 6/8 |
+
+**The fix did not take, and the control seed showed exactly why.** The ground-control run did the content perfectly again (drift resolved doc-first, exact cents, herring avoided, STATUS in the same commit) and landed on main again; its TRACK line was truthful for the second consecutive round, and the round-13 clarification held (no more "N/A"). Meanwhile the control seed, which never read the skill, created a correctly named task branch and left main at the baseline: it obeyed the BINDING sitting in the repo it was reading. Bottom-tier seed variance is also now plain: Haiku control scored 6, 1, and 7 across three rounds of the same fixture.
+
+Diagnosis: the artifact moved to the right moment (the claim) but lives in the wrong document. At the bottom tier, what reaches behavior is what is IN the repo (the binding, read as project docs); the skill, read once at session start, does not reliably reach it. Consequence: the claim+branch coupling now ships in the binding template itself, so init writes it into every repo's own process file ("no branch, no claim" inside the claim verb row); the skill keeps the invariant, the fixtures were regenerated to match, and round 15 tests the binding-level coupling.
+
+Limitations: n=1 per cell; the control's near-ideal run and round 13's control disaster are the same coin flipping.
+
 ## Standing limitations
 
 Small n throughout (1-4 runs per cell), LLM judges (blind where multiple outputs are compared, but built on the same frontier model that appears as a baseline), synthetic fixtures, research ground truth only as current as its run date. This log exists so method edits are tested, not so anyone mistakes it for a benchmark.
