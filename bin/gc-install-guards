@@ -1,0 +1,13 @@
+#!/bin/sh
+# ground-control: install the repo-level git guard (the actor-agnostic layer).
+# Copies the pre-commit guard into .githooks/ and points core.hooksPath at it.
+set -e
+root="$(cd "$(dirname "$0")/.." && pwd)"
+src="$root/skills/ground-control/references/guards/pre-commit"
+[ -f "$src" ] || { echo "gc-install-guards: guard source not found at $src" >&2; exit 1; }
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "gc-install-guards: not a git repo" >&2; exit 1; }
+mkdir -p .githooks
+cp "$src" .githooks/pre-commit
+chmod +x .githooks/pre-commit
+git config core.hooksPath .githooks
+echo "ground-control: guard installed (.githooks/pre-commit, core.hooksPath set). Record it in the binding."

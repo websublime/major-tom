@@ -2,6 +2,8 @@
 
 Hooks init offers when the harness is Claude Code. Each installs only with the owner's approval and is recorded in the binding. Scripts live in the repo (`.githooks/`) so they are versioned; `settings.json` wires them. Hooks enforce outside the model's attention budget (the eval's compliance-budget finding); rules (see rules-template.md) merely remind.
 
+When ground-control is installed as the major-tom plugin, hooks 1 and 3 ship automatically via the plugin's `hooks/hooks.json`, each script self-gated (it exits unless the repo carries a ground-control binding at `docs/PROCESS.md`), and a plugin monitor tails `.ground-control/violations.log` so guard blocks surface live in the session. This file remains the reference for standalone installs and for repos wanting the hooks without the plugin.
+
 ## 1. Branch guard, before the command even runs (PreToolUse)
 
 ```json

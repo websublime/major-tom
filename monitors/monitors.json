@@ -1,0 +1,7 @@
+[
+  {
+    "name": "gc-violations",
+    "command": "sh -c 'grep -q ground-control docs/PROCESS.md 2>/dev/null && mkdir -p .ground-control && touch .ground-control/violations.log && exec tail -F .ground-control/violations.log || exec tail -f /dev/null'",
+    "description": "ground-control guard violations (pre-commit blocks) surfaced live"
+  }
+]
