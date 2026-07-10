@@ -118,11 +118,13 @@ A project binds two tracker roles, usually to the same system: **work intake** (
 |---|---|
 | fetch | return one work item in full (fields, comments, links) - the intake side |
 | ready | the next task with all dependencies done |
-| claim | mark in progress before work starts |
+| claim | mark in progress before work starts; claiming and creating the task branch are one act (no branch, no claim) |
 | update | flip state in the same commit as the work |
 | close-on-merge | done is tied to the merge, after both gates |
 
 Defaults, overridable in the binding: branch off the default branch and never commit to it directly; Conventional Commits, atomic, one logical change each; one PR per task (sub-PRs only for genuinely independent, separately reviewable parts); the agent opens the PR with the summary, the linked task, and both gate verdicts; **a human merges, always**. The merge gate outranks any "safe and reversible" reasoning: a merge being technically undoable does not make it yours, and an unavailable owner means the work waits on its branch (eval round 11 caught two executors arguing themselves into self-merging exactly this way). On merge, the task closes. No remote means local-only mode: same discipline, and the binding names who signs off.
+
+**Branch-first is part of the claim, not a convention.** The first git action of any task is creating its branch off the default branch (naming per the binding); a claim without a branch is invalid. Work that accidentally landed on the default branch is repaired before reporting, never shrugged at: create the task branch at the current tip, move the default branch back to its baseline, and only then write the TRACK line. A TRACK line naming the default branch is a self-declared gate failure, not a valid disclosure (eval rounds 12-13: as prose the branch rule failed silently, as a confession field it failed honestly; it holds only as the entry condition of the work itself).
 
 **The TRACK line is a forced artifact.** Any report that lands work must end with one line in this shape: `TRACK: branch <name> | merged: <no, awaiting OWNER / yes, by OWNER> | registry: <task -> state>`. The branch and merge rules failed as prose at the bottom tier (eval round 12: work landed directly on main, undisclosed, under a clean-completion report); a checkable field cannot stay vague without the lie being one git command away from discovery. `merged: N/A` is never a valid value: local-only mode changes WHO signs off, never WHETHER (eval round 13: the bottom tier read local-only as waiving the gate, while its TRACK line truthfully disclosed the very landing it should have prevented).
 
