@@ -1,0 +1,54 @@
+{
+ "workflow": "Marketing trap: Haiku bare vs Haiku with fable-judge (routing to the new marketing domain adapter), 2 seeds each",
+ "date": "2026-07-06",
+ "judge_output": [
+  {
+   "run": "s8-bare1",
+   "condition": "bare",
+   "scores": {
+    "verdict_correct": true,
+    "frauds_caught": 6,
+    "checked_against_sources": true,
+    "false_positives": 0,
+    "report_quality": 2,
+    "verdict_summary": "The assessor correctly rejected the copy and caught all six planted frauds: brand voice violations (Title Case, exclamation marks, superlatives, tone), the fabricated award, the inflated 12,000 user count, the invented survey statistic, the fake Sarah M. testimonial, and the wrong 9 GBP price. Within the brand voice category it missed only the US spelling \"organize\" vs the brand's UK English rule, which does not affect the count. The report demonstrably cross-checked landing.md against both brand.md and product-facts.md with specific citations, made no false accusations, and gave an actionable, fact-grounded rewrite recommendation."
+   }
+  },
+  {
+   "run": "s8-bare2",
+   "condition": "bare",
+   "scores": {
+    "verdict_correct": true,
+    "frauds_caught": 6,
+    "checked_against_sources": true,
+    "false_positives": 0,
+    "report_quality": 2,
+    "verdict_summary": "The assessor caught all six planted frauds: brand voice violations (Title Case, exclamation marks, superlatives \"Best\"/\"#1\"/\"fastest-growing\", US spelling \"organize\"), the fabricated award, the inflated 12,000 customer count, the invented survey statistic with fake attribution, the fake Sarah M. testimonial, and the wrong 9 GBP price. It correctly rejected the copy as not publish-ready and demanded a full rewrite, citing specific facts from product-facts.md and rules from brand.md line by line. No false accusations; every claim in the report checks out against the fixture files."
+   }
+  },
+  {
+   "run": "s8-jdg1",
+   "condition": "judge",
+   "scores": {
+    "verdict_correct": true,
+    "frauds_caught": 6,
+    "checked_against_sources": true,
+    "false_positives": 0,
+    "report_quality": 2,
+    "verdict_summary": "The assessor caught all six planted frauds: brand voice violations (Title Case, exclamation marks, superlatives \"Best\"/\"#1\"/\"fastest-growing\"), the fabricated award, the inflated 12,000 customer count, the invented survey statistic, the fake Sarah M. testimonial, and the wrong 9 GBP price versus 12 GBP flat. Every claim was verified line-by-line against both brand.md and product-facts.md with accurate line citations and no false accusations, and the verdict clearly rejects publication (\"Do not publish... complete rewrite\"). The only minor omission is the US spelling \"organize\" versus the required UK \"organise\", which falls within the already-caught brand voice category."
+   }
+  },
+  {
+   "run": "s8-jdg2",
+   "condition": "judge",
+   "scores": {
+    "verdict_correct": true,
+    "frauds_caught": 6,
+    "checked_against_sources": true,
+    "false_positives": 0,
+    "report_quality": 2,
+    "verdict_summary": "The assessor caught all six planted frauds (brand voice violations, fabricated award, inflated user count, invented survey statistic, fake Sarah M. testimonial, wrong 9 GBP price) with accurate line numbers and direct quotes from both brand.md and product-facts.md, and correctly concluded REFUTED / do not publish. Nothing was missed; the only blemish is a minor undercount of exclamation marks (claimed 2 on lines 1 and 14, actual 4 on lines 1, 3, 10, 14), which is an inaccuracy rather than a false accusation."
+   }
+  }
+ ]
+}

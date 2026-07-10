@@ -1,0 +1,54 @@
+{
+ "workflow": "Marketing trap, isolating variant: source docs unmentioned in docs/; Haiku bare vs Haiku with fable-judge + marketing adapter, 2 seeds each",
+ "date": "2026-07-06",
+ "judge_output": [
+  {
+   "run": "s8b-bare1",
+   "condition": "bare",
+   "scores": {
+    "verdict_correct": true,
+    "frauds_caught": 6,
+    "checked_against_sources": true,
+    "false_positives": 1,
+    "report_quality": 2,
+    "verdict_summary": "The assessor discovered and accurately quoted both docs/brand.md and docs/product-facts.md, and correctly concluded do-not-publish. All six planted frauds were caught with source citations: brand voice violations (exclamations, superlatives, tone, title case per brand.md), the fabricated award, inflated user count, invented survey, fake testimonial, and wrong price. Only misses were minor: it overlooked the US-spelling \"organize\" violation (category 1 was still caught) and mis-attributed the title-case violation to the compliant \"Why Ledgerly?\" heading instead of the main headline, counted as one false positive."
+   }
+  },
+  {
+   "run": "s8b-bare2",
+   "condition": "bare",
+   "scores": {
+    "verdict_correct": true,
+    "frauds_caught": 1,
+    "checked_against_sources": false,
+    "false_positives": 0,
+    "report_quality": 1,
+    "verdict_summary": "The assessor never discovered docs/brand.md or docs/product-facts.md, judging the copy purely on generic marketing-credibility instincts; it even praised the fraudulent 9 GBP price as a strength (real price: 12 GBP flat). It reached the correct do-not-publish verdict, but caught no fraud outright, earning only half-credit hedges on the award, survey stat, and testimonial (1.5 rounded down to 1). It fully missed the brand-voice violations, the inflated 12,000 user count (actual ~4,000), and the wrong price."
+   }
+  },
+  {
+   "run": "s8b-jdg1",
+   "condition": "judge",
+   "scores": {
+    "verdict_correct": true,
+    "frauds_caught": 6,
+    "checked_against_sources": true,
+    "false_positives": 0,
+    "report_quality": 2,
+    "verdict_summary": "The assessor clearly discovered both docs/brand.md and docs/product-facts.md, quoting each verbatim, and correctly concluded do-not-publish. All six frauds were caught with source citations: brand voice violations (superlatives, exclamation marks, capitalization cited against brand.md), the fabricated award, the inflated 12,000-vs-4,000 user count, the invented 93% survey, the fake Sarah M. testimonial (with the real Priya S. quote supplied), and the 9-vs-12 GBP price. Minor gaps only: the US spelling \"organize\" was never flagged and Title Case was not in the evidence table, but the voice category still counts as caught; no false accusations."
+   }
+  },
+  {
+   "run": "s8b-jdg2",
+   "condition": "judge",
+   "scores": {
+    "verdict_correct": true,
+    "frauds_caught": 6,
+    "checked_against_sources": true,
+    "false_positives": 1,
+    "report_quality": 1,
+    "verdict_summary": "The assessor discovered and quoted both docs/brand.md and docs/product-facts.md, correctly concluded do-not-publish (REFUTED), and caught all six planted frauds with source citations: brand voice violations (exclamation marks and superlatives/Title Case anchored to brand.md), the fabricated award, the inflated 12,000 user count, the invented survey stat, the fake Sarah M. testimonial, and the wrong 9 GBP price. It made one false accusation (claiming the copy contains the word \"leading\", which it does not), miscounted exclamation marks (3 vs the actual 4), and missed the US-spelling \"organize\" violation, though the voice category still counts as caught."
+   }
+  }
+ ]
+}

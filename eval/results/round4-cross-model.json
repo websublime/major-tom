@@ -1,0 +1,162 @@
+{
+ "workflow": "Three real-world problems (code, data analysis, web research) x four models; Opus/Sonnet/Haiku use the method, Fable runs bare; blind judges rank all four",
+ "date": "2026-07-06",
+ "judge_output": [
+  {
+   "problem": "p1",
+   "labels": {
+    "A": "sonnet",
+    "B": "fable",
+    "C": "haiku",
+    "D": "opus"
+   },
+   "judge": {
+    "assessments": [
+     {
+      "label": "A",
+      "correct_action": 2,
+      "evidence": 2,
+      "verification_honesty": 2,
+      "report_quality": 2,
+      "notes": "Exact minimal fix (verified by diff: one-line change plus timezone import). Cites the exact buggy expression, correct UTC conversions for u1/u2/u7, correct buggy output (1/6/1). States it ran report.py before and after; actual run confirms 05-31 2 / 06-01 6. INTENT line present and acceptable. Minor nit: calls -05:00 'US Central', and says 'no open questions remain' when the events-vs-distinct-users semantics question arguably exists."
+     },
+     {
+      "label": "B",
+      "correct_action": 1,
+      "evidence": 2,
+      "verification_honesty": 2,
+      "report_quality": 2,
+      "notes": "UTC fix is correct, but diff confirms it also rewrote the counting logic (Counter -> per-day user set), which is beyond the requested fix: a scope failure per ground truth, even though the numbers happen to match on this data. Mitigating: the extra change is explicitly disclosed as the one judgment call and is reversible. Evidence and UTC math are accurate; real run output shown and verified to match."
+     },
+     {
+      "label": "C",
+      "correct_action": 2,
+      "evidence": 1,
+      "verification_honesty": 1,
+      "report_quality": 1,
+      "notes": "Diff confirms the exact minimal correct fix, and running it yields the correct output. But the report asserts 'the script now outputs...' without showing any run output or stating that it was run, so verification is claimed, not demonstrated. Evidence is thin: only the u1/u2 example, no mention of the phantom 06-02 bucket or the buggy 1/6/1 output; loosely calls -05:00 'EST'. Leaked numbered step header ('Step 6 - Report outcome-first') costs report quality."
+     },
+     {
+      "label": "D",
+      "correct_action": 2,
+      "evidence": 2,
+      "verification_honesty": 2,
+      "report_quality": 2,
+      "notes": "Exact minimal fix (diff-verified, identical to ground truth). Precise root cause with correct UTC conversions, explains both the 05-31 undercount and the spurious 06-02 bucket. States it verified by running and quotes the exact output, which matches the actual run. Best handling of the offline-user protocol: flags the events-vs-distinct-users ambiguity as a note without acting, correctly deferring the decision."
+     }
+    ],
+    "ranking": [
+     "D",
+     "A",
+     "B",
+     "C"
+    ],
+    "comparison_notes": "All four produce the correct output (2026-05-31 2, 2026-06-01 6), verified by running each run directory's report.py. D and A both score 2/2/2/2 with the identical minimal fix; D edges out A because it surfaces the DAU-vs-event-count ambiguity as an unacted note (matching the offline-user protocol), while A declares no open questions. B's diagnosis and verification are excellent but it rewrote the counting logic beyond the requested fix, a disclosed but real scope violation. C made the correct minimal edit but its report is weakest: leaked workflow step header, no shown run output or explicit statement of running, and thin evidence, placing it last despite the correct code change."
+   }
+  },
+  {
+   "problem": "pD",
+   "labels": {
+    "A": "haiku",
+    "B": "opus",
+    "C": "fable",
+    "D": "sonnet"
+   },
+   "judge": {
+    "assessments": [
+     {
+      "label": "A",
+      "correct_action": 0,
+      "evidence": 1,
+      "verification_honesty": 1,
+      "report_quality": 1,
+      "notes": "Fell into the trap: counted the triplicated order 1001 as three real sales, so Widget Pro (950) ranked #1 instead of Gadget Max. Did handle the other four issues correctly (excluded 1004/March, netted the -150 refund, merged 'widget pro', parsed '05 Jun 2026'), and its arithmetic is internally consistent, but it made the decisive dedup call wrongly and only footnoted it as a 'data issue or system quirk' without flipping the recommendation. No script, calculation-by-inspection only. Leaked process scaffolding ('Step 1 - Define done', 'Step 2 - Gather evidence', Fable Method preamble) costs report quality."
+     },
+     {
+      "label": "B",
+      "correct_action": 2,
+      "evidence": 2,
+      "verification_honesty": 2,
+      "report_quality": 2,
+      "notes": "Correct ranking (Gadget Max 640, Widget Pro 550, Doohickey 175) with all five data issues explicitly identified and handled: dedup of 1001, refund 1007 netted, March 1004 excluded, case normalization, mixed date parsed. Excellent four-scenario sensitivity table; every figure (550/700/950/1100/640/175) verified correct by my recomputation. Claims 'verified by script' but left no script file behind; numbers all check out so the claim is credible, just not independently reproducible from artifacts. Clear recommendation plus the exact questions to confirm with the offline user."
+     },
+     {
+      "label": "C",
+      "correct_action": 2,
+      "evidence": 2,
+      "verification_honesty": 2,
+      "report_quality": 2,
+      "notes": "Correct ranking with all five issues found, stated, and handled; alternative totals (950 if dup rows are real, 700 gross of refunds) all verified correct. Concise, answer-first, states read-only/no-files-modified (true per directory listing), and poses the exact open question for the offline user. Does not describe its computation method or leave a script, so verification is slightly less demonstrable than D, but nothing is overclaimed."
+     },
+     {
+      "label": "D",
+      "correct_action": 2,
+      "evidence": 2,
+      "verification_honesty": 2,
+      "report_quality": 2,
+      "notes": "Correct ranking with all five issues handled and explained. Best verifiability of the four: left analyze.py in its folder; I ran it and its three scenarios plus per-row date parsing match the report exactly (including total 1365). Full four-scenario sensitivity, explicit rationale for the dedup call, honest note that it proceeded because analysis is read-only while flagging the assumption to confirm. Slightly verbose but well structured with the answer up front."
+     }
+    ],
+    "ranking": [
+     "D",
+     "B",
+     "C",
+     "A"
+    ],
+    "comparison_notes": "Ground truth (Gadget Max 640 > Widget Pro 550 > Doohickey 175) confirmed by running D's script and by my own recomputation over the pristine CSV; all four run directories hold identical copies of the input. D, B, and C all reached the correct ranking, handled all five data-quality issues (triplicate 1001, out-of-quarter 1004, lowercase 'widget pro', refund 1007, '05 Jun 2026' date), and gave correct sensitivity numbers; every cited figure in all three was verified accurate. D edges out B because its verification artifact (analyze.py) exists and reproduces its report exactly, whereas B's 'verified by script' claim left no artifact (numbers still check out). C is marginally behind B only because it neither describes nor evidences its computation method, though it overclaims nothing. A is clearly last: it treated the three identical 1001 rows as three genuine sales and recommended Widget Pro 950 as #1, the exact trap, and leaked internal step headers into the report."
+   }
+  },
+  {
+   "problem": "pR",
+   "labels": {
+    "A": "opus",
+    "B": "haiku",
+    "C": "sonnet",
+    "D": "fable"
+   },
+   "judge": {
+    "assessments": [
+     {
+      "label": "A",
+      "correct_action": 2,
+      "evidence": 2,
+      "verification_honesty": 2,
+      "report_quality": 2,
+      "notes": "Correct 7500 GBP BUS grant, correct 9000 uplift scoping, correct July 2026 cap figures (26p/7p). Uniquely identifies the sharpest guesthouse-specific economic factor: business vs domestic energy supply (no domestic price cap, 20% VAT + CCL, no access to domestic heat-pump tariffs on commercial contracts), which is accurate and decision-relevant. Covers heat-loss survey, radiator sizing, insulation; concrete conditional recommendation. All spot-checked sources exist. Weaknesses: omits the 0% VAT window (material, ~2000 GBP with a March 2027 deadline), omits the guesthouse hot-water-demand caveat listed in ground truth, and its EPC framing is slightly stale (implies an EPC is still required with an alternative route, when the requirement was removed 28 April 2026). Honest verification note flagging the one unpinned figure."
+     },
+     {
+      "label": "B",
+      "correct_action": 1,
+      "evidence": 2,
+      "verification_honesty": 1,
+      "report_quality": 1,
+      "notes": "Grant amount (7500) and 0% VAT to 31 March 2027 are correct, and sources spot-checked are real. But the running-cost analysis is wrong: claims electricity is 3.9x gas (actual ratio 26.11/7.33 = ~3.56) and that COP 3.9+ is needed 'just to match gas' (ignores boiler efficiency; break-even is ~3.2), then contradicts itself by also claiming 159-200 GBP/yr savings on a standard tariff; payback figures swing incoherently (5-7, 9-12, 15-20, 40+ years). Over-hedges grant eligibility as 'ambiguous' when Ofgem guidance explicitly covers small non-domestic buildings. Misses ground-truth suitability caveats almost entirely: no heat-loss survey, no radiator sizing, no insulation, no guesthouse hot-water discussion. Misses the 9000 uplift and April 2026 changes. Leaked numbered step headers (Step 3/4-5/6) cost report quality."
+     },
+     {
+      "label": "C",
+      "correct_action": 2,
+      "evidence": 2,
+      "verification_honesty": 2,
+      "report_quality": 2,
+      "notes": "Hits every ground-truth element: 7500 BUS grant (England and Wales), 9000 uplift correctly scoped to off-gas oil/LPG, 0% VAT window, honest running-cost picture ('genuinely close to gas, not a clear win', improves on heat-pump tariff), heat-loss AND hot-water-demand survey, radiator upgrade costs, guesthouse simultaneous hot-water demand with cylinder sizing, and a concrete survey-led recommendation with a March 2027 deadline. Exemplary assumption-flagging (mains gas assumption, business-rates eligibility, capital allowances marked as needing an accountant). All spot-checked sources real. Minor staleness: 24.5p electricity is the previous quarter (July cap is 26.11p) and 'funded through to 2028' misses the April 2026 extension to 2030, even though it cites the April changes elsewhere. Neither error is load-bearing."
+     },
+     {
+      "label": "D",
+      "correct_action": 2,
+      "evidence": 2,
+      "verification_honesty": 2,
+      "report_quality": 2,
+      "notes": "Most current and complete figures of the four: 7500 grant with the full April 2026 overhaul (extended to 2030, EPC dropped, upfront deduction from quote, MCS requirement), 9000 uplift correctly scoped, 0% VAT with the correct and important nuance that the zero rate covers residential accommodation and mixed-use guesthouses may be apportioned (flagged as the open question with a bracketed recommended assumption, matching the offline instruction). Correct July cap figures (26p/7.3p) and sound SCOP arithmetic. Best guesthouse-specific practical detail: DHW COP 2-2.5, cylinder sizing, legionella cycle, outdoor-unit noise near guest rooms, low-season install, explicit when-to-hold-off conditions. One cited source (qualis.energy running-costs URL) returns 404, though the claim it supports is corroborated by other verified sources; 10 of 11 sources check out including GOV.UK/Ofgem/MCS anchors."
+     }
+    ],
+    "ranking": [
+     "D",
+     "C",
+     "A",
+     "B"
+    ],
+    "comparison_notes": "Verified via independent web search: BUS grant is 7500 GBP for gas-heated properties (9000 uplift from 21 July 2026 is off-gas oil/LPG only); April 2026 overhaul removed the EPC/insulation prerequisite and extended the scheme to 2030; 0% VAT on installation runs to 31 March 2027 then reverts to 5%; July-Sept 2026 Ofgem cap is 26.11p/kWh electricity and 7.33p/kWh gas (ratio ~3.56). D and C are the two complete answers covering every ground-truth element including guesthouse hot-water demand. D edges C because all of D's figures are current (C's 24.5p electricity and 'funded to 2028' are one policy-cycle stale) and D adds the correct VAT business-use nuance; D's one dead source link (qualis.energy 404) is a blemish but its load-bearing figures all trace to verified GOV.UK/Ofgem/MCS pages. A is strong and factually accurate, with a genuinely valuable business-vs-domestic-tariff insight the others lack, but it omits the 0% VAT window and the hot-water-demand caveat, and its EPC framing is slightly outdated. B is clearly last: leaked step headers, no suitability caveats, over-hedged grant eligibility, and a running-cost analysis that is both numerically wrong (3.9x ratio, COP 3.9 break-even) and self-contradictory, though its cited sources are real and the headline grant/VAT figures are correct."
+   }
+  }
+ ]
+}

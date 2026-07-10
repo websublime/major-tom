@@ -1,0 +1,90 @@
+{
+ "workflow": "Two bare Fable 5 agents observed on real problems; transcripts extracted as behavioral ground truth for the flowcharts",
+ "date": "2026-07-09",
+ "observed_tool_sequences": {
+  "agent-a3940fb4f6fba7df9.jsonl": [
+   {
+    "tool": "Glob",
+    "target": "**/*"
+   },
+   {
+    "tool": "Read",
+    "target": "<scratch>/eval4/runs/obsT/orders.py"
+   },
+   {
+    "tool": "Read",
+    "target": "<scratch>/eval4/runs/obsT/test_orders.py"
+   },
+   {
+    "tool": "Read",
+    "target": "<scratch>/eval4/runs/obsT/README.md"
+   },
+   {
+    "tool": "Edit",
+    "target": "<scratch>/eval4/runs/obsT/orders.py"
+   },
+   {
+    "tool": "Edit",
+    "target": "<scratch>/eval4/runs/obsT/orders.py"
+   },
+   {
+    "tool": "Edit",
+    "target": "<scratch>/eval4/runs/obsT/test_orders.py"
+   },
+   {
+    "tool": "PowerShell",
+    "target": "cd \"<scratch>/eval4/runs/obsT\"; python test_orders.py"
+   }
+  ],
+  "agent-ae7aaabad3d46020e.jsonl": [
+   {
+    "tool": "Glob",
+    "target": "**/*"
+   },
+   {
+    "tool": "Read",
+    "target": "<scratch>/eval4/runs/obsS/stats.py"
+   },
+   {
+    "tool": "Read",
+    "target": "<scratch>/eval4/runs/obsS/data.csv"
+   },
+   {
+    "tool": "Write",
+    "target": "<scratch>/eval4/runs/obsS/stats.py"
+   },
+   {
+    "tool": "PowerShell",
+    "target": "cd \"<scratch>/eval4/runs/obsS\"; python stats.py; python stats.py --export; cat report.csv; python stats.py --export monthly.csv; cat monthly.csv"
+   },
+   {
+    "tool": "PowerShell",
+    "target": "Remove-Item \"<scratch>/eval4/runs/obsS/report.csv\",\"<scratch>/eval4/runs/obsS/monthly.csv\" -Confirm:$false"
+   }
+  ]
+ },
+ "final_reports": [
+  {
+   "key": "obsT",
+   "report": "Root cause: off-by-one in the quantity validation in `orders.py`. Both `create_order` and `update_order` used `if qty <= 1 or qty >= MAX_QTY`, which rejects qty=1 even though the README says 1-999 inclusive is valid. The test suite missed it because it only tested qty=0, 5, and 999, never the lower boundary qty=1.\n\nFix applied in <scratch>/eval4/runs/obsT/orders.py:\n- `create_order`: `qty <= 1` changed to `qty < 1`\n- `update_order`: same change (it had the identical bug)\n\nThe upper bound (`qty >= MAX_QTY` with MAX_QTY=1000) was already correct: 999 passes, 1000 is rejected.\n\nTests added in test_orders.py to close the coverage gap: create with qty=1 (the regression case), create rejects qty=1000, update with qty=1, update rejects qty=0. Verified by running `python test_orders.py`: output \"all tests passed\" (7 tests, including the previously failing qty=1 case).\n\nNo open questions; the README rule was unambiguous."
+  },
+  {
+   "key": "obsS",
+   "report": "Export added to <scratch>/eval4/runs/obsS/stats.py.\n\nUsage:\n- `python stats.py` - unchanged, prints the monthly totals table\n- `python stats.py --export` - also writes the report to report.csv (columns: month,total)\n- `python stats.py --export monthly.csv` - writes to a custom filename\n\nVerified by running all three forms: the table still prints identically, and exported CSVs contained the correct totals (2026-04,200.50 / 2026-05,256.00 / 2026-06,250.00). Test export files were deleted afterward so the directory only contains stats.py and data.csv.\n\nAssumption made (user offline): \"export\" was unspecified, so I chose CSV as the format since the tool is CSV-based already; this is safe and reversible. If you want JSON or Excel instead, say so and I'll adjust."
+  }
+ ],
+ "findings": {
+  "validated": [
+   "minimum evidence set read before any edit (code, check, spec)",
+   "twin bug discovered via README and fixed in both functions",
+   "every mode of new behavior executed and outputs inspected",
+   "ambiguity resolved with a stated, reversible assumption",
+   "no scaffolding in reports"
+  ],
+  "corrections_applied": [
+   "ORIENT step: both traces began by enumerating the environment (Glob **/*) before any specific read; added as Step 2 rule 1 and a flowchart box",
+   "parallelization nuance: small local reads chained adaptively rather than batched; rule narrowed to independent, expensive lookups",
+   "cleanup rule: the export agent deleted its test artifacts and disclosed it; added to Step 6"
+  ]
+ }
+}

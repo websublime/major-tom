@@ -1,0 +1,59 @@
+{
+ "workflow": "One large multi-part research problem (UK home electrification, 25k budget) given to Opus/Sonnet/Haiku with the method and Fable bare; one blind judge verifies and ranks",
+ "date": "2026-07-06",
+ "judge_output": {
+  "labels": {
+   "A": "fable",
+   "B": "sonnet",
+   "C": "opus",
+   "D": "haiku"
+  },
+  "judge": {
+   "assessments": [
+    {
+     "label": "A",
+     "correct_action": 2,
+     "evidence": 2,
+     "verification_honesty": 2,
+     "report_quality": 2,
+     "completeness": 2,
+     "notes": "Best-verified answer. Uniquely current details all checked out: April 2026 BUS overhaul (EPC requirement removed, extended to 2030), exact Ofgem cap 26.11p/7.33p, ECG £3,750/£1,500 with Nov 2025 Budget top-up, chargepoint grant £500 with driveway-owner exclusion, VED £10/£200, ECS threshold raised to £50k for EVs 2026/27, 3p/mile eVED from April 2028, Warm Homes Plan loans (Jan 2026, staged rollout, honestly flagged as unverified-drawable), ECO4/WHLG correctly ruled out as means-tested. SEG 15p verified realistic (BG 15.1p, Good Energy 15p); the 24-25p 'exclusive' fixed deals could not be independently confirmed but are hedged as conditional. Payback arithmetic recomputed and correct: 1,360x26.11p=£355, 2,040x15p=£306, ~10y panels-only; 2,380x26.11p=£621, 1,020x15p=£153, ~11y with battery; self-consumption fractions stated, no double counting, honest about battery marginality. Budget plan (~£5.5k net heat pump + £10k solar/battery + used EV funded by remainder plus diesel proceeds, salary-sacrifice checked first) is arithmetically coherent and explicitly totaled to ~£25k. Deliverable 5 names genuinely unverifiable items (Solar Together round status, loan drawability, live SEG rates). Only quibble: the '£200-£400/yr cheaper on a heat pump tariff' claim is optimistic vs B's more cautious parity analysis, but it is conditioned on tariff switching. No dead schemes, no fabrications."
+    },
+    {
+     "label": "B",
+     "correct_action": 2,
+     "evidence": 2,
+     "verification_honesty": 2,
+     "report_quality": 2,
+     "completeness": 2,
+     "notes": "Very strong and rigorously honest. Verified: BUS £7,500, £9,000 uplift correctly scoped to off-gas oil/LPG from 21 July 2026, ECO4 extension to 31 Dec 2026 (confirmed, impressively current), ECG bands with the exact 9/36 model split, post-April-2026 chargepoint grant restrictions (with honest uncertainty flag on the on-street variant), Manchester CAZ scrapped for investment-led plan (confirmed), exact cap rates, VED £10/£200. All payback arithmetic recomputed and correct (£310.71+£331.50=£642, 10.5y; £532.64+£204=£737, 13.9y); the standalone-battery marginality analysis (£95/yr, 30-40y payback) is the most honest battery treatment of the four. Heat pump running-cost analysis (11,500 kWh gas = £843 vs ~£900-965 at SCOP 2.8-3.1 on cap rate) recomputed and sound. Plan stays within budget with an explicit cash buffer and flags the payback-vs-carbon values tradeoff. Minor flaws: calling 15p the 'mid-range of the typical 4-15p band' is internally inconsistent (it is the top); 167p/litre diesel is high for mid-2026 and the £500-£900 EV fuel-saving range understates (my recompute at off-peak charging is ~£1,100-1,250/yr); no BUS duration stated; garbled final sentence. None of these are fabrications or broken arithmetic."
+    },
+    {
+     "label": "C",
+     "correct_action": 2,
+     "evidence": 2,
+     "verification_honesty": 1,
+     "report_quality": 2,
+     "completeness": 2,
+     "notes": "Well-structured, budget-coherent plan (used EV ~£15k + solar/battery ~£10k = £25k, heat pump deliberately deferred with the grant funded years out) and internally consistent payback arithmetic (3,500 kWh gen, 1,800x27p=£486 + 1,700x15p=£255 = £741, 13.5y, recomputed correct). No dead or fabricated schemes. But it repeats stale rules as current, three times: BUS requiring 'a valid EPC with no outstanding insulation recommendations' is wrong as of the 28 April 2026 regulations (EPC precondition removed; the insulation-recommendations condition was dropped back in 2024), and it builds mistake #6 and a deliverable-5 item on this dead requirement. Also stale: BUS 'funded to 2028' (extended to 2030), expensive-car supplement 'over £40,000' (raised to £50k for EVs in 2026/27), and its Band 1 ECG list wrongly includes Skoda Elroq/Enyaq and Vauxhall Astra (Band 2 per current list). Heat pump net cost of £2,000-£4,000 is optimistic vs typical £3,000-£6,500. Gas at 6.3p vs the actual 7.33p cap (flagged as an assumption, but stale for July 2026). These are stale-figure errors rather than fabrications, so verification_honesty is 1, not 0. Deliverable 5 is genuinely useful."
+    },
+    {
+     "label": "D",
+     "correct_action": 1,
+     "evidence": 1,
+     "verification_honesty": 0,
+     "report_quality": 0,
+     "completeness": 1,
+     "notes": "Multiple verification failures. Fatal: states EV 'purchase grant for private buyers: None (ended 2022)' when the Electric Car Grant (up to £3,750, £37k cap, 45 eligible models) is live and central to this exact question; confidently denying a live scheme is as bad as recommending a dead one, capping verification_honesty at 0. Also wrong: VED '£0 first year, then £165/year' (actual: £10 then £200); 'you'll pay 20% VAT' after March 2027 (reverts to 5%). Payback arithmetic is physically impossible: claims 3,510 kWh self-consumed against the household's stated 3,100 kWh annual usage, with no EV/heat-pump load added to the model; 4,500 kWh/yr from a '4-5 kW' system implies up to 1,125 kWh/kWp, well above Manchester's ~850-950; EV cost of '4p/mile at 26p/kWh' implies 6.5 mi/kWh efficiency; 5p SEG low-balls the verified ~15p market. The plan's hinge on Warm Homes: Local Grant 'free solar' overpromises for an able-to-pay household (scheme details are real and income-gated, and D does ask for verification, which saves correct_action from 0; Scenario 2 Option B also fits the budget). Report leaks raw step scaffolding ('Step 3 - Decide and commit', 'Step 5 - Verify by observation', 'Step 6') and claims 'arithmetic verified step-by-step in the scratch file' when the arithmetic is provably impossible, a false verification claim. Sources are real URLs but several claims contradict the cited pages (the cited RAC page states current EV VED and grants). Grants deliverable materially wrong on EVs and omits the chargepoint grant landscape, so completeness 1."
+    }
+   ],
+   "ranking": [
+    "A",
+    "B",
+    "C",
+    "D"
+   ],
+   "comparison_notes": "Independently verified via web search: BUS £7,500 (April 2026 overhaul removed the EPC precondition and extended the scheme to 2030; £9,000 uplift is off-gas oil/LPG only, from 21 July 2026); 0% VAT on solar/battery/heat pumps to 31 March 2027 then 5%; Electric Car Grant live (£3,750/£1,500, £37k cap, 45 models, Nov 2025 Budget top-up); chargepoint grant £500/socket from April 2026 excluding driveway homeowners; Ofgem Jul-Sep 2026 cap exactly 26.11p/7.33p; EV VED £10/£200 with ECS threshold £50k for EVs and 3p/mile eVED from April 2028; best flat SEG ~15p; ECO4 extended to 31 Dec 2026; GM Clean Air Zone scrapped; Warm Homes: Local Grant means-tested (£36k/EPC D-G, up to £30k incl. solar). A and B both scored 10/10: every load-bearing figure verified and all payback arithmetic recomputed correctly, with honest deliverable-5 sections. A ranks above B on fineness of currency (ECS £50k, eVED, Warm Homes loans, BUS-to-2030, local GMCA routes) and a tighter, fully-totaled budget plan, whereas B has small internal slips (15p mislabeled as mid-range of 4-15p, understated EV fuel savings, 167p/l diesel). C is a solid, budget-coherent plan with consistent arithmetic but repeats the pre-April-2026 BUS EPC/insulation-recommendations rule as current (three times), plus stale ECS threshold, wrong ECG band assignments, and 'funded to 2028', earning verification_honesty 1. D fails verification outright: it denies the live Electric Car Grant exists ('ended 2022'), gets VAT reversion (20% vs 5%) and VED wrong, and its solar payback self-consumes 3,510 kWh against a stated 3,100 kWh annual usage, an impossibility it then claims was 'verified step-by-step in the scratch file', while also leaking Step 3/5/6 scaffolding into the report. Neither the classic FIT trap nor a fabricated national solar grant appeared in any output; D's failure mode was the inverse (denying a live scheme) plus impossible arithmetic."
+  }
+ }
+}

@@ -1,0 +1,16 @@
+order_id,date,product,amount_gbp
+1001,2026-04-03,Widget Pro,200
+1001,2026-04-03,Widget Pro,200
+1001,2026-04-03,Widget Pro,200
+1002,2026-04-10,Widget Pro,150
+1003,2026-05-02,Widget Pro,150
+1004,2026-03-15,Widget Pro,300
+1005,2026-05-20,widget pro,100
+1006,2026-06-11,Widget Pro,100
+1007,2026-06-18,Widget Pro,-150
+1010,2026-04-05,Gadget Max,250
+1011,2026-04-22,Gadget Max,180
+1012,05 Jun 2026,Gadget Max,90
+1013,2026-05-14,Gadget Max,120
+1020,2026-04-30,Doohickey,80
+1021,2026-06-02,Doohickey,95
