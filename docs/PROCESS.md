@@ -37,7 +37,7 @@ Every role slot defaults to the plugin agent of the same name; domain specialist
 
 - Branch naming: t<slug>, off main; claim = branch (no branch, no claim)
 - Commits: Conventional Commits, atomic
-- Merges: local-only mode while no remote exists; Miguel signs off. Once a remote is configured (github.com/websublime/major-tom), the flow upgrades per the skill: push the task branch, open the PR with gh, Miguel merges
+- Merges: **the Verify gate is mandatory before any merge request or PR**; the request carries the verdict. Local-only mode while no remote exists; Miguel signs off. Once a remote is configured (github.com/websublime/major-tom), the flow upgrades per the skill: push the task branch, open the PR with gh carrying the gate verdicts, Miguel merges
 - Guards installed: `.githooks/pre-commit` blocks commits to main (enable per clone: `git config core.hooksPath .githooks`); SessionEnd audit stub via `.claude/settings.json`
 - Eval rounds: at most 4 agents per launch unless Miguel raises the budget
 
