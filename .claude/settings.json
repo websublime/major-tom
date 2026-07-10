@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh .githooks/session-audit-stub.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
