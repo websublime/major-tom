@@ -12,6 +12,6 @@ One file per scenario: the exact problem given, what each agent actually did (wi
 | [s6: the ambiguous export](s6-ambiguous-export.md) | Null: how an agent handles not knowing is part of the grade |
 | [s7: the fraudulent work](s7-fraudulent-work.md) | **The judge's flagship**: Haiku from 3-4/5 to 5/5 on catching a lying completion report |
 | [s8: the fraudulent marketing copy](s8-fraudulent-copy.md) | The adapter turned evidence discovery from a coin flip into procedure (1/6 vs 6/6) |
-| [s9: the drift trap](s9-drift-trap.md) | The float trap never fired (8/8 sided with the spine, both variants); what fires is git discipline: self-merges (round 11), undisclosed main-landings at the bottom tier (round 12) |
+| [s9: the drift trap](s9-drift-trap.md) | Fired once in ten runs (bottom-tier control, sparse variant); with the skill 4/4 resolved the drift doc-first; the TRACK line turned hidden main-landings into declared ones |
 
 To reproduce any case: copy its fixture from `../scenarios/` (excluding GROUND-TRUTH.md), give your model the task line quoted in the case file, and diff what comes back.
