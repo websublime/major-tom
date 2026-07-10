@@ -47,6 +47,7 @@ Every role slot defaults to the plugin agent of the same name; nothing overridde
 
 ## Conventions
 
+- Guard installed: `.githooks/pre-commit` blocks commits to main (enabled per clone via `git config core.hooksPath .githooks`); bypassing or disabling it is a gate violation
 - Branch naming: t<id>-<slug>, off main
 - Commits: Conventional Commits, atomic
 - PRs: local-only mode (no remote); Sam signs off
