@@ -1,0 +1,19 @@
+{
+  "name": "major-tom",
+  "description": "Claude Fable 5's working method as four skills (think / act / prove / ground-control), with the eval that keeps them honest.",
+  "owner": {
+    "name": "miguelramos",
+    "url": "https://github.com/websublime"
+  },
+  "plugins": [
+    {
+      "name": "major-tom",
+      "source": "./",
+      "description": "The Fable Workflow: think, act, prove, ground-control. The problem-solving loop, its orchestration, an adversarial work-verifier, and the project-scale process that conducts them, with the eval that keeps them honest.",
+      "version": "0.0.0",
+      "author": {
+        "name": "Miguel Ramos"
+      }
+    }
+  ]
+}
