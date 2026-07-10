@@ -197,6 +197,36 @@ Diagnosis: the artifact moved to the right moment (the claim) but lives in the w
 
 Limitations: n=1 per cell; the control's near-ideal run and round 13's control disaster are the same coin flipping.
 
+## Round 15 - the binding-level claim, and the compliance budget (2026-07-10)
+
+The claim+branch coupling moved from the skill into the fixture's own binding ("no branch, no claim" inside the claim verb row), per round 14's placement lesson. Same cells, same 4-agent budget. Both runs independently re-verified (outputs, git, and the PRD's actual D6 text). Raw: [results/round15-s9b-binding-claim.json](results/round15-s9b-binding-claim.json)
+
+| Cell | Fell for the float | Fixed the plan | Git shape | TRACK line | Score |
+|---|---|---|---|---|---|
+| Haiku control | no | no (drift noted in prose only) | straight onto main, no branch | none | 6/8 |
+| Haiku + ground-control | **yes** | no | **branch t2-summarize-by-day, main at baseline** | present and accurate | 1/8 |
+
+**The placement lesson is confirmed, and its cost is now measured.** For the first time a ground-control run branched exactly per the process (task branch, main untouched, TRACK line accurate against git): the binding's claim row did what three rounds of skill prose could not. The same seed then implemented the drifted plan verbatim (floats, verified), never mentioned the contradiction, and fabricated a gloss of D6 ("integer cents throughout, floats only in euro output") that the PRD's actual text flatly contradicts: the family's first fabrication, its first ground-control float fall, and leaked scaffolding on top ("Step 6: Report outcome-first").
+
+Aggregate for the sparse variant at the bottom tier, now 4 seeds per condition (rounds 12-15):
+
+| Discipline | Haiku control | Haiku + ground-control |
+|---|---|---|
+| Avoided the float | 3/4 | 3/4 |
+| Fixed the plan | 1/4 | 3/4 |
+| Task branch used | 1/4 | 1/4 |
+| TRACK truthful when present | n/a | 3/3 |
+
+**Reading: at the bottom tier, attention is conserved.** Every seed drops something, and which thing it drops moves around: when this seed finally held the git discipline, it dropped the doc hierarchy that the previous four ground-control seeds had all held. Forced artifacts reallocate bottom-tier attention; they do not add capacity. The skill's stable, replicated gains at this tier are doc-first repair (3/4 vs 1/4) and truthful disclosure (TRACK accurate in every run that carried it); the trap itself shows no separation at these numbers.
+
+Consequences, deliberately restrained:
+
+1. **No new prose artifact.** The lever set (rule, then forced artifact, then placement) is exhausted at this tier; a fourth artifact would trade against the three that exist.
+2. **init now offers mechanical guards**: a gate rule the eval shows failing as prose gets mechanized where the repo allows it (e.g. a pre-commit hook refusing direct commits to the default branch), not restated louder.
+3. The structural lever remains untested and is the process's own thesis: at rungs 1-2 each agent holds few constraints (the implementer implements, the Track team lands, the gate refutes). That is the orchestration round, blocked on budget.
+
+Limitations: the 4-seed aggregate accumulates single-seed rounds under an evolving ground-control condition (12 pre-TRACK, 13 TRACK, 14 skill branch rule, 15 binding claim row), so it is directional; the float-avoidance column is the fairest (the trap never changed); Sonnet judges throughout.
+
 ## Standing limitations
 
 Small n throughout (1-4 runs per cell), LLM judges (blind where multiple outputs are compared, but built on the same frontier model that appears as a baseline), synthetic fixtures, research ground truth only as current as its run date. This log exists so method edits are tested, not so anyone mistakes it for a benchmark.
