@@ -40,6 +40,7 @@ Every role slot defaults to the plugin agent of the same name; domain specialist
 - Merges: **the Verify gate is mandatory before any merge request or PR**; the request carries the verdict. Current state: remote `origin` is configured (github.com/websublime/major-tom) but nothing has been pushed yet, so merges stay local with Miguel signing off; the first push activates the full flow (push the task branch, open the PR with gh carrying the gate verdicts, Miguel merges). Pushing is publishing: only on Miguel's explicit go
 - Guards installed: `.githooks/pre-commit` blocks commits to main (enable per clone: `git config core.hooksPath .githooks`, or run `gc-install-guards`); SessionEnd audit stub (`scripts/session-audit-stub.sh`, wired twice on purpose: `.claude/settings.json` for plugin-less sessions and the plugin's `hooks/hooks.json`; the stub dedups by filename); plugin PreToolUse branch guard (`scripts/pretool-branch-guard.sh`); `gc-violations` monitor (experimental, Claude Code v2.1.105+)
 - Eval rounds: at most 4 agents per launch unless Miguel raises the budget
+- Releases: bump `version` in both `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` inside the PR branch (CI checks they agree) when the merge changes what installs; semver by commit type (fix/docs = patch, feat = minor, breaking = major); after the merge, tag `vX.Y.Z` on the merge commit and push the tag (tags are not commits, so the main guard does not apply)
 
 ## Hard-rule additions
 
