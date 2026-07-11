@@ -164,4 +164,4 @@ Discipline that survives weak executors is mechanical, not prose. The plugin shi
 
 ## Status
 
-Version 0.0.0, pre-release. Artifacts in English; no em or en dashes in repo files (CI-enforced, including this README). License: MIT.
+Pre-1.0. The version lives in one place: [`.claude-plugin/plugin.json`](.claude-plugin/plugin.json), mirrored by the git tags (`vX.Y.Z` on each release's merge commit); this README deliberately does not restate it. Artifacts in English; no em or en dashes in repo files (CI-enforced, including this README). License: MIT.
