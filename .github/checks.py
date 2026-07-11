@@ -57,7 +57,11 @@ for skill in ["think", "act", "prove", "ground-control"]:
         if not head.startswith("---") or f"name: {skill}" not in head or "description:" not in head:
             fail(f"skills/{skill}/SKILL.md: frontmatter missing name/description")
         else:
-            ok(f"skills/{skill}/SKILL.md frontmatter valid")
+            m = re.search(r"^description: (.+)$", head, re.M)
+            if m and not m.group(1).startswith(('"', "'")) and ": " in m.group(1):
+                fail(f"skills/{skill}/SKILL.md: unquoted colon inside description breaks YAML")
+            else:
+                ok(f"skills/{skill}/SKILL.md frontmatter valid")
     except Exception as e:
         fail(f"skills/{skill}/SKILL.md: {e}")
 

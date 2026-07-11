@@ -29,10 +29,10 @@ Every role slot defaults to the plugin agent of the same name (coordinator, arch
 
 | Slot | Resolved to |
 |---|---|
-| domain specialist | <fetched by init; per component when a monorepo: component -> agent> |
+| domain specialist | <added via the agent mode (init calls it for detected stacks); per component when a monorepo: component -> agent> |
 | <any overridden slot> | <agent, or a harness built-in> |
 
-Agents directory (where init fetches specialists): <default: https://github.com/ayush-that/sub-agents.directory>
+Agents directory (where the agent mode fetches specialists): <default: https://github.com/ayush-that/sub-agents.directory>
 
 An unbound slot falls back to the strongest generalist agent available; the report must say when that happened.
 
