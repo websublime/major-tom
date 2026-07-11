@@ -1,6 +1,6 @@
 ---
 name: ground-control
-description: Project-scale operating process - a change lifecycle with adversarial gates, an orchestrator that delegates instead of implementing, a decision register with drift discipline, and a per-repo binding that maps abstract roles (documents, team slots, tracker verbs) onto whatever the project actually has. Use when work spans sessions, milestones, or multiple components, when a repo carries a process binding, or when the user says "/ground-control", "run the process", or "set up the process". Subcommands - init (interview the repo and write its binding), status (report where the project stands), gate (run a design review or verify gate now), ticket (pull a tracker ticket, e.g. Jira, into a docs workspace: context, plan, spec, design-gated).
+description: Project-scale operating process - a change lifecycle with adversarial gates, an orchestrator that delegates instead of implementing, a decision register with drift discipline, and a per-repo binding that maps abstract roles (documents, team slots, tracker verbs) onto whatever the project actually has. Use when work spans sessions, milestones, or multiple components, when a repo carries a process binding, or when the user says "/ground-control", "run the process", or "set up the process". Subcommands - init (mechanical: bind the process to the repo), product (develop the product truth with the owner, design-gated), spec <milestone> (the active milestone's spec pack, design-gated), agent <need> (add a specialist anytime), status (report where the project stands), gate (run a design review or verify gate now), ticket (pull a tracker ticket, e.g. Jira, into a docs workspace: context, plan, spec, design-gated).
 ---
 
 # Ground Control
@@ -137,14 +137,36 @@ Defaults, overridable in the binding: branch off the default branch and never co
 
 ## Modes
 
-**init** - bind the process to this repo.
+One mode, one pattern: a mode is either mechanical (a transformer or router over repo state) or judgment (a facilitator or workflow that ends at a validator gate), never both. The split is what keeps init repeatable and the product thinking gated.
+
+**init** - bind the process to this repo (transformer: repo state in, binding out; no judgment, no product content).
 
 1. Detect, do not ask: the stacks and components; existing docs that can fill each document role; trackers and ticket sources already present (a status file, `bd`, `unblock`, `gh`, a Jira or Linear MCP); the harness rung (orchestration and isolation tools available).
 2. Ask the owner only what detection cannot settle, in ONE batch: owner name; conversation and artifact languages; **the trackers** - which system is the work intake and which the status registry (usually the same one: a status file, beads, unblock, GitHub issues, Jira, Linear) and each one's access (MCP server, CLI, or REST base URL plus credential env var NAMES, never secret values); the docs layout (default: process artifacts under `docs/`, ticket workspaces under `docs/tickets/`); whether to keep a knowledge base (default `.knowledge/`); branch and naming conventions; extra hard rules; north star if not the default.
-3. **Resolve domain specialists from the agents directory** (a binding slot; default `https://github.com/ayush-that/sub-agents.directory`, agents at `content/<category>/<name>.md`, fetchable raw). Match the detected stacks against it, show the owner the shortlist with one line each, and only on approval fetch the files into the project's `.claude/agents/` and bind the slots. A fetched agent is third-party prompt material: review it for instructions that conflict with the process or leak data, exactly as you would review third-party code. Never fetch silently, never auto-trust.
+3. **Resolve domain specialists via the `agent` mode** (below), one call per detected stack: shortlist shown, owner approves, fetch and bind. init never fetches silently.
 4. Write the binding from `references/binding-template.md` (default location `docs/PROCESS.md`) and add its @import to the project's CLAUDE.md; create the knowledge base directory and its CLAUDE.md import when accepted. Keep the binding pointers, not prose: it loads every session.
 5. **Offer mechanical guards.** A gate rule the eval record shows failing as prose gets mechanized where the repo allows it, never just restated. The pack lives in `references/guards/`: a repo-level `pre-commit` (blocks commits to the default branch, any actor), harness hooks (PreToolUse branch guard, Stop TRACK reminder, SessionEnd audit stub), and rules compiled from the binding (`rules-template.md`, path-scoped to the SSOT and the plans). Install only with the owner's approval, and record each installed guard in the binding. When ground-control runs as the installed plugin, the harness hooks already ship with it (`hooks/hooks.json`, each script root-anchored and self-gated on the repo's binding), `gc-install-guards` on the PATH installs the repo git layer, and a plugin monitor surfaces guard violations live (experimental, Claude Code v2.1.105+); init then only records the guards in the binding.
-5. **Cold start.** When roles have no docs to bind, offer the two honest options: seed a minimal product truth + status registry (one page each), or run degraded on the decision register and session task lists alone. Never fabricate a doc topology the project does not have, and never claim a binding exists when it does not.
+6. **Cold start stays mechanical.** When roles have no docs to bind, bind them as unbound (degraded, declared) and point the owner at the `product` mode for the product truth and `spec` for milestone plans. init never writes product content: judgment work belongs to the modes that end at a gate.
+
+**product** - develop the product truth with the owner (facilitator, then a validator gate).
+
+1. Elicit before writing: the idea, who it serves, what it displaces, the constraints that bind, in batches the owner can actually answer. The product-validator attacks genuine forks; an option-dump instead of a recommendation is a fraud.
+2. Every real decision lands in the decision register with an id and a one-line rationale as it is made, not reconstructed after.
+3. Draft the product truth via act at the current rung: what and why, requirements, non-functional bars, domain model, milestones. Milestones stay direction, not specs: the just-in-time rule holds.
+4. **Design gate**: prove aimed at the draft (every claim traces to an elicited answer or evidence; no invented users, no unpriced constraints). On PASS, mark it APPROVED vX, bind the product-truth role in the binding, and stop: specs are the next mode's job.
+
+**spec <milestone>** - the spec pack for ONE milestone (workflow, then a validator gate).
+
+1. Refuse anything beyond the active milestone (lock versions just-in-time); the roadmap or the product truth's milestone section names which one is active.
+2. Produce or update only what this milestone touches: the SSOT sections for its interfaces (each contract decision gets a register id), the milestone implementation plan (task DAG with ids and failable acceptance criteria), and component plans where a component is genuinely new.
+3. **Design gate**: prove aimed at the pack (plan consistent with the SSOT, every criterion failable, no scope borrowed from future milestones).
+4. On PASS, the project-manager decomposes the plan into the status registry via the tracker verbs; implementation starts only from ready tasks.
+
+**agent <need>** - add a specialist at any time (router over the agents directory, then a mechanical bind).
+
+1. Search the binding's agents directory for the need; show the owner a shortlist with one line each.
+2. Only on approval, fetch into the project's `.claude/agents/` and review it as third-party prompt material (instructions that conflict with the process or leak data), exactly as you would review third-party code.
+3. Bind the slot in the roster and record the addition in the binding. init calls this mode for detected stacks; mid-project stacks arrive the same way.
 
 **status** - read the binding and the registry; report the active version, in-flight tasks, the last gate verdicts, and any unresolved drift.
 

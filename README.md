@@ -26,7 +26,7 @@ Installing brings: the four skills (namespaced: `/major-tom:think`, `/major-tom:
 | `/major-tom:think` | The per-task loop: classify the ask, define done, gather evidence, decide, act surgically, verify by observation, report outcome-first. Domain adapters for marketing, research, data, business, finance, legal, design. | `plan` (stop after the plan), `audit` (grade finished work against the loop), `report` (rewrite an answer outcome-first) |
 | `/major-tom:act` | The orchestrated version of think for non-trivial tasks: parallel evidence subagents, one committed plan, execution with an intent gate, adversarial verification agents. | one loop, four stages |
 | `/major-tom:prove` | The judge. Treats any "done" as a set of claims: re-runs the claimed verifications, diffs what actually changed, hunts the fraud tables, returns VERIFIED / VERIFIED WITH CAVEATS / REFUTED. | `suite <target>` (run the trap suite against a skill or model) |
-| `/major-tom:ground-control` | The project-scale process: lifecycle with adversarial gates, an orchestrator that delegates instead of implementing, tracker adapters (MCP > CLI > REST > file), forced artifacts (TRACK line), mechanical guards. | `init` (bind a repo), `status`, `gate review/verify`, `ticket <id>` |
+| `/major-tom:ground-control` | The project-scale process: lifecycle with adversarial gates, an orchestrator that delegates instead of implementing, tracker adapters (MCP > CLI > REST > file), forced artifacts (TRACK line), mechanical guards. | `init` (bind a repo, mechanical), `product` (develop the PRD, gated), `spec <milestone>` (one milestone's pack, gated), `agent <need>` (add a specialist anytime), `status`, `gate review/verify`, `ticket <id>` |
 
 The three scales nest: think governs a rule, act governs a task, ground-control governs a project. Each implementer inside a ground-control team still follows think.
 
@@ -52,22 +52,23 @@ flowchart LR
 ### 2. Start a product (PRD and process)
 
 ```
-/major-tom:ground-control init
+/major-tom:ground-control init          # mechanical: binding, guards, knowledge base
+/major-tom:ground-control product       # facilitated PRD with a decision register, design-gated
+/major-tom:ground-control spec M1       # the ACTIVE milestone's spec pack, design-gated
 ```
 
-init interviews the repo before asking you anything: stacks, existing docs, trackers, harness capabilities. It writes a binding (the project-specific half of the process: document roles, team roster, tracker verbs, conventions) and offers the mechanical guards. On an empty idea, the cold start is honest: seed a one-page product truth and a status registry, or run degraded and say so. The lifecycle then runs understand, decide, spec/plan, and the design gate attacks the spec before any code exists.
+Three modes, three patterns, on purpose. `init` is a pure transformer: it detects stacks, docs, trackers and harness capabilities, writes the binding, and offers the guards; it never writes product content. `product` is a facilitator: it elicits the idea with you in answerable batches, records every real decision with an id as it is made, drafts the product truth, and ends at a design gate (prove aimed at the PRD) before the document earns APPROVED status. `spec <milestone>` is a bounded workflow: SSOT deltas, task DAG with failable acceptance criteria, component plans where genuinely new, one milestone at a time, and it refuses to spec beyond the active one. Need a stack specialist mid-project? `agent <need>` fetches and binds one anytime.
 
 ```mermaid
 flowchart TD
-    A[Idea] --> B[ground-control init]
-    B --> C{Docs exist?}
-    C -->|no| D[Cold start: seed product truth<br/>+ status registry, one page each]
-    C -->|yes| E[Bind roles: product truth,<br/>SSOT, plans, registry]
-    D --> F[Understand, Decide, Spec/Plan]
-    E --> F
-    F --> G[Design gate: prove aimed at the spec]
-    G -->|VERIFIED| H[Tasks with failable acceptance<br/>criteria, ready in the registry]
-    G -->|REFUTED| F
+    A[Repo or empty idea] --> B[init: binding, guards,<br/>knowledge base. Mechanical only]
+    B --> C[product: elicit with the owner,<br/>decisions get register ids]
+    C --> D[Design gate:<br/>prove aimed at the PRD]
+    D -->|APPROVED vX| E[spec M1: SSOT deltas + task DAG,<br/>the active milestone only]
+    E --> F[Design gate:<br/>prove aimed at the pack]
+    F -->|VERIFIED| G[Tasks ready in the registry]
+    D -->|REFUTED| C
+    F -->|REFUTED| E
 ```
 
 ### 3. Work a ticket
