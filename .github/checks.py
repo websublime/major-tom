@@ -87,7 +87,8 @@ count = 0
 for root, dirs, files in os.walk(ROOT):
     dirs[:] = [d for d in dirs if d not in (".git", "temp")]
     for f in files:
-        if not f.endswith((".md", ".js", ".json", ".py", ".sh", ".ps1", ".yml", ".csv")):
+        extensionless_dirs = root.endswith(("/bin", "/.githooks")) or f == "pre-commit"
+        if not (f.endswith((".md", ".js", ".json", ".py", ".sh", ".ps1", ".yml", ".csv")) or extensionless_dirs):
             continue
         p = os.path.join(root, f)
         try:

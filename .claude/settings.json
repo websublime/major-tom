@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh .githooks/session-audit-stub.sh"
+            "command": "sh scripts/session-audit-stub.sh"
           }
         ]
       }

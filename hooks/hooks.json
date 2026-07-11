@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh ${CLAUDE_PLUGIN_ROOT}/scripts/pretool-branch-guard.sh"
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/pretool-branch-guard.sh\""
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh ${CLAUDE_PLUGIN_ROOT}/scripts/session-audit-stub.sh"
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/session-audit-stub.sh\""
           }
         ]
       }

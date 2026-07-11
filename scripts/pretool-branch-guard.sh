@@ -1,15 +1,27 @@
 #!/bin/sh
 # ground-control plugin hook (PreToolUse, Bash): block git commit on the default branch.
-# Self-gated: exits unless the repo carries a ground-control binding at docs/PROCESS.md.
-grep -q ground-control docs/PROCESS.md 2>/dev/null || exit 0
+# Self-gated and root-anchored: acts only inside a git repo whose root carries a
+# ground-control binding (docs/PROCESS.md starting with "# Process binding").
+root="$(git rev-parse --show-toplevel 2>/dev/null)"
+[ -n "$root" ] || exit 0
+grep -q "^# Process binding" "$root/docs/PROCESS.md" 2>/dev/null || exit 0
 input="$(cat)"
-cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null)"
-case "$cmd" in *"git commit"*)
+if command -v jq >/dev/null 2>&1; then
+  cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null)"
+else
+  cmd=""
+fi
+# Fallback without jq (or on parse failure): crude extraction of the command field,
+# so the guard fails closed instead of open on minimal hosts.
+[ -n "$cmd" ] || cmd="$(printf '%s' "$input" | sed -n 's/.*"command"[[:space:]]*:[[:space:]]*"\(.*\)".*/\1/p')"
+# Match git commit in command position (start or after ; & | Q), not as quoted prose.
+# Heuristic by design; the repo-level pre-commit hook is the backstop.
+if printf '%s\n' "$cmd" | grep -qE '(^|[;&|(][[:space:]]*)git[[:space:]]+commit([[:space:]]|$)'; then
   b="$(git symbolic-ref --short HEAD 2>/dev/null)"
   d="$(git config ground-control.defaultBranch || echo main)"
   if [ "$b" = "$d" ]; then
     echo "ground-control: no commits on $d; claim = branch (git switch -c t<id>-<slug>)" >&2
     exit 2
-  fi ;;
-esac
+  fi
+fi
 exit 0
