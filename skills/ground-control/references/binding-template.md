@@ -34,7 +34,7 @@ Every role slot defaults to the plugin agent of the same name (coordinator, arch
 
 Agents directory (where the agent mode fetches specialists): <default: https://github.com/ayush-that/sub-agents.directory>
 
-An unbound slot falls back to the strongest generalist agent available; the report must say when that happened.
+An unbound slot falls back to the strongest generalist agent available; the report must say when that happened. Lifecycle artifacts end with the skill's PRODUCED line and gate verdicts carry its ATTACKED BY field; both shapes live in the skill, not here.
 
 ## Trackers
 
@@ -68,6 +68,7 @@ Two roles, usually one system: **work intake** (where tickets arrive) and **stat
 - Commits: <default: Conventional Commits, atomic>
 - PRs: one per task, opened by the agent with gate verdicts; merged by <owner or approver>. Local-only mode (no remote): <who signs off>
 - Security lens on Verify when: <the project's triggers: input handling, storage, sync, permissions, ...>
+- Agent budget: max <N, minimum 3> concurrent agents per team phase; lineups above the budget run as sequential batches; the gate minimum of 3 perspectives is not removable
 
 ## Hard-rule additions
 
