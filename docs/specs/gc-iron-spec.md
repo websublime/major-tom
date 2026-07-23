@@ -215,6 +215,15 @@ Acceptance criteria:
 - AC-4-4: running the fixture's own test suite inside a pristine copy passes (the code module ships green), so any red test in a judged run is executor-caused. Fails if the pristine fixture's tests fail.
 - AC-4-5: `workflow-s10.js` contains the calibration precondition: a smoke run whose transcript is checked for visible subagent spawn events before any scored run, with an explicit BLOCKED outcome that aborts the round. Fails if scored runs can start without the calibration having passed.
 
+### Calibration result (2026-07-23, probed ahead of the build)
+
+The precondition was run early, on this environment (claude 2.1.209), and PASSED: a headless `claude -p` session spawned a general-purpose subagent and the spawn was visible in the stream-json transcript. Concrete parameters the WS4 build must use, learned from the probe:
+- Pass `--allowedTools Agent` (defensively also `Task`) explicitly. This environment sets `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB`, which forces the permission mode to default and ignores `--permission-mode bypassPermissions`; without an explicit allowlist the spawn tool would prompt and, headless, be denied. Alternative: `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=0`.
+- The spawn appears as one stream event `{"type":"tool_use","name":"Agent","input":{"subagent_type":..., "prompt":...}}`. The judge detects a spawn by matching `"name":"Agent"` and maps it to a lifecycle phase by reading `input.prompt`. Detection does not use `isSidechain` (absent in the headless stream); the subagent's own internal steps are not streamed to the parent transcript, only its spawn call and returned result, which is enough for provenance verification.
+- Redirect stdin from `/dev/null` to skip a 3s stdin-wait warning.
+
+This closes the headless-permissions question empirically, not just by design. The heavy scored rounds stay unrun pending owner go on quota.
+
 ## WS5: knowledge base
 
 New fact file `.knowledge/memory/delegation-as-prose.md`: the 2026-07-14 field failure (repo fe-seller-center, Sonnet 4.6, ticket DCPSSS-7401: full ticket lifecycle inline in 5 minutes, self-authored gate verdict, no rung disclosure, DRAFT header above a verdict, and init dropping unblock from a summarized menu) and the lever-ladder diagnosis (prose fails; forced artifact at the decision point works, INTENT and TRACK precedents, eval rounds 2-3 and 12-13; placement works better, rounds 14-15; mechanical verification works best, round 16). Consequences recorded: PRODUCED lines, ATTACKED BY, sheet-driven init, agent budget floor 3, scenario s10. Absolute dates throughout; the style and length of the existing `compliance-budget.md`.
