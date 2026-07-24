@@ -49,7 +49,7 @@ except Exception as e:
     fail(f"version check: {e}")
 
 # 3. All skills exist with frontmatter name + description
-for skill in ["think", "act", "prove", "ground-control"]:
+for skill in ["think", "act", "prove", "onboard"]:
     path = os.path.join(ROOT, "skills", skill, "SKILL.md")
     try:
         with io.open(path, encoding="utf-8") as f:

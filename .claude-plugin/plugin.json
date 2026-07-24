@@ -1,7 +1,7 @@
 {
   "name": "major-tom",
-  "description": "The Fable Workflow: think, act, prove, ground-control. The problem-solving loop, its orchestration, an adversarial work-verifier, and the project-scale process that conducts them, with the eval that keeps them honest. Evidence-backed: ships its own eval, failures included.",
-  "version": "0.3.0",
+  "description": "major-tom: think, act, prove, plus the onboard command. A problem-solving loop, its orchestration, an adversarial work-verifier, and a command that binds the workflow to a repo, with the eval that keeps them honest. Evidence-backed: ships its own eval, failures included.",
+  "version": "0.4.0",
   "author": {
     "name": "Miguel Ramos"
   },
