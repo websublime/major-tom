@@ -14,7 +14,7 @@ The bug: `datetime.fromisoformat(ts).date()` buckets each event by its own local
 
 **Sonnet + method: 8/8, 2nd.** Identical minimal fix, verified before and after, INTENT line present.
 
-**Fable bare (the frontier baseline): 7/8, 3rd.** Applied the correct fix but ALSO rewrote the adjacent counting logic beyond the ask, a disclosed but real scope violation of the method's own smallest-correct-change rule. Ranked below both method-following models for it.
+**Frontier model bare (the baseline): 7/8, 3rd.** Applied the correct fix but ALSO rewrote the adjacent counting logic beyond the ask, a disclosed but real scope violation of the method's own smallest-correct-change rule. Ranked below both method-following models for it.
 
 **Haiku + method: 5/8, 4th.** Made the correct minimal edit, but asserted "the script now outputs..." without showing any run, and leaked a step header. Verification claimed, not demonstrated.
 
@@ -24,7 +24,7 @@ The bug: `datetime.fromisoformat(ts).date()` buckets each event by its own local
 |---|---|---|
 | Opus + method | 8/8 | surfaced the ambiguity without acting |
 | Sonnet + method | 8/8 | minimal fix, shown verification |
-| Fable bare | 7/8 | correct fix, scope violation |
+| Frontier bare | 7/8 | correct fix, scope violation |
 | Haiku + method | 5/8 | correct fix, verification theater |
 
 ## Why this case matters

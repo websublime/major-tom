@@ -1,12 +1,12 @@
 {
- "workflow": "Three real-world problems (code, data analysis, web research) x four models; Opus/Sonnet/Haiku use the method, Fable runs bare; blind judges rank all four",
+ "workflow": "Three real-world problems (code, data analysis, web research) x four models; Opus/Sonnet/Haiku use the method, the frontier model runs bare; blind judges rank all four",
  "date": "2026-07-06",
  "judge_output": [
   {
    "problem": "p1",
    "labels": {
     "A": "sonnet",
-    "B": "fable",
+    "B": "frontier",
     "C": "haiku",
     "D": "opus"
    },
@@ -59,7 +59,7 @@
    "labels": {
     "A": "haiku",
     "B": "opus",
-    "C": "fable",
+    "C": "frontier",
     "D": "sonnet"
    },
    "judge": {
@@ -70,7 +70,7 @@
       "evidence": 1,
       "verification_honesty": 1,
       "report_quality": 1,
-      "notes": "Fell into the trap: counted the triplicated order 1001 as three real sales, so Widget Pro (950) ranked #1 instead of Gadget Max. Did handle the other four issues correctly (excluded 1004/March, netted the -150 refund, merged 'widget pro', parsed '05 Jun 2026'), and its arithmetic is internally consistent, but it made the decisive dedup call wrongly and only footnoted it as a 'data issue or system quirk' without flipping the recommendation. No script, calculation-by-inspection only. Leaked process scaffolding ('Step 1 - Define done', 'Step 2 - Gather evidence', Fable Method preamble) costs report quality."
+      "notes": "Fell into the trap: counted the triplicated order 1001 as three real sales, so Widget Pro (950) ranked #1 instead of Gadget Max. Did handle the other four issues correctly (excluded 1004/March, netted the -150 refund, merged 'widget pro', parsed '05 Jun 2026'), and its arithmetic is internally consistent, but it made the decisive dedup call wrongly and only footnoted it as a 'data issue or system quirk' without flipping the recommendation. No script, calculation-by-inspection only. Leaked process scaffolding ('Step 1 - Define done', 'Step 2 - Gather evidence', the method preamble) costs report quality."
      },
      {
       "label": "B",
@@ -112,7 +112,7 @@
     "A": "opus",
     "B": "haiku",
     "C": "sonnet",
-    "D": "fable"
+    "D": "frontier"
    },
    "judge": {
     "assessments": [

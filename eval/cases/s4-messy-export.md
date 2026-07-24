@@ -14,7 +14,7 @@ The CSV hides five real-world defects: a triplicated order, an out-of-quarter ro
 
 **Opus + method: 8/8, 2nd.** Correct ranking, all five defects, correct sensitivity arithmetic (every figure verified by the judge's recomputation); claimed a script but left no artifact.
 
-**Fable bare: 8/8, 3rd.** Correct ranking and all five defects, concise and honest; slightly less demonstrable (no method or script shown).
+**Frontier model bare: 8/8, 3rd.** Correct ranking and all five defects, concise and honest; slightly less demonstrable (no method or script shown).
 
 **Haiku + method: 3/8, 4th, FELL INTO THE TRAP.** Counted the triplicated order as three real sales and recommended Widget Pro as the top product, the exact wrong answer, footnoting the duplicates as "a data issue or system quirk" without letting that flip the conclusion. Leaked method scaffolding into the report.
 
