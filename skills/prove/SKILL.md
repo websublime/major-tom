@@ -1,6 +1,6 @@
 ---
 name: prove
-description: Adversarial verification of finished work. Treats any "done" as a set of claims, then re-runs the claimed verifications, diffs what actually changed, detects weakened tests and false completion claims, and delivers an evidence-based verdict (VERIFIED / VERIFIED WITH CAVEATS / REFUTED). Use after any agent or model claims work is complete - "/prove", "judge this work", "verify what it did", "did that actually work?". Also runs the think trap suite against a skill or model via "/prove suite <target>".
+description: Adversarial verification of finished work - treats any "done" as a set of claims, re-runs the claimed verifications, diffs what actually changed, hunts weakened tests and false completion, and delivers an evidence-based verdict (VERIFIED / VERIFIED WITH CAVEATS / REFUTED). Use on "/prove", or proactively when the answer to any of these is yes. Did an agent or model just claim work is complete? Do the passing-tests or build-green claims need re-running rather than trusting? Could the tests have been weakened to pass? Did the change stay inside the ask, or quietly grow? Does the finished work match the spec and the docs? Also runs the think trap suite against a skill or model via "/prove suite <target>".
 ---
 
 # The prove
