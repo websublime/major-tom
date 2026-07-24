@@ -1,7 +1,7 @@
 [
   {
-    "name": "gc-violations",
-    "command": "sh -c 'r=\"$(git rev-parse --show-toplevel 2>/dev/null)\"; if [ -n \"$r\" ] && grep -q \"^# Process binding\" \"$r/docs/PROCESS.md\" 2>/dev/null; then mkdir -p \"$r/.ground-control\" && touch \"$r/.ground-control/violations.log\" && exec tail -F \"$r/.ground-control/violations.log\"; else exec tail -f /dev/null; fi'",
-    "description": "ground-control guard violations surfaced live (experimental component; Claude Code v2.1.105+)"
+    "name": "guard-violations",
+    "command": "sh -c 'r=\"$(git rev-parse --show-toplevel 2>/dev/null)\"; if [ -n \"$r\" ] && grep -q \"^# Process binding\" \"$r/docs/PROCESS.md\" 2>/dev/null; then mkdir -p \"$r/.major-tom\" && touch \"$r/.major-tom/violations.log\" && exec tail -F \"$r/.major-tom/violations.log\"; else exec tail -f /dev/null; fi'",
+    "description": "branch-guard violations surfaced live (experimental component; Claude Code v2.1.105+)"
   }
 ]

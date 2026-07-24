@@ -1,7 +1,7 @@
 #!/bin/sh
-# ground-control plugin hook (PreToolUse, Bash): block git commit on the default branch.
+# major-tom plugin hook (PreToolUse, Bash): block git commit on the default branch.
 # Self-gated and root-anchored: acts only inside a git repo whose root carries a
-# ground-control binding (docs/PROCESS.md starting with "# Process binding").
+# major-tom binding (docs/PROCESS.md starting with "# Process binding").
 root="$(git rev-parse --show-toplevel 2>/dev/null)"
 [ -n "$root" ] || exit 0
 grep -q "^# Process binding" "$root/docs/PROCESS.md" 2>/dev/null || exit 0
@@ -18,9 +18,9 @@ fi
 # Heuristic by design; the repo-level pre-commit hook is the backstop.
 if printf '%s\n' "$cmd" | grep -qE '(^|[;&|(][[:space:]]*)git[[:space:]]+commit([[:space:]]|$)'; then
   b="$(git symbolic-ref --short HEAD 2>/dev/null)"
-  d="$(git config ground-control.defaultBranch || echo main)"
+  d="$(git config major-tom.defaultBranch || git config ground-control.defaultBranch || echo main)"  # ground-control.defaultBranch: intentional migration fallback, do not remove
   if [ "$b" = "$d" ]; then
-    echo "ground-control: no commits on $d; claim = branch (git switch -c t<id>-<slug>)" >&2
+    echo "major-tom: no commits on $d; claim = branch (git switch -c t<id>-<slug>)" >&2
     exit 2
   fi
 fi
