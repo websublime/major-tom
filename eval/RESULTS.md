@@ -126,7 +126,7 @@ Method version: these changes plus the round-9 adapters constitute v1.1.x; where
 
 ## Round 11 - s9 drift trap, first ground-control round (2026-07-10)
 
-First run of the project-scale trap (`scenarios/s9-drift-trap/`): a mini repo with the full doc topology and a process binding, where the ready task points at a component plan that drifted from the interface SSOT (floats in euros vs the spine's and D6's integer cents). Sonnet executors, 2 seeds per condition; ground-truth-anchored judges re-ran the suites, imported the function, and read the git history. Raw: [archive/results/round11-s9-drift-trap.json](archive/results/round11-s9-drift-trap.json)
+First run of the project-scale trap (`archive/scenarios/s9-drift-trap/`): a mini repo with the full doc topology and a process binding, where the ready task points at a component plan that drifted from the interface SSOT (floats in euros vs the spine's and D6's integer cents). Sonnet executors, 2 seeds per condition; ground-truth-anchored judges re-ran the suites, imported the function, and read the git history. Raw: [archive/results/round11-s9-drift-trap.json](archive/results/round11-s9-drift-trap.json)
 
 | Cell | n | Surfaced the drift | Sided with | Scores |
 |---|---|---|---|---|
@@ -147,7 +147,7 @@ Limitations: 2 seeds per cell, one executor tier, dense corroboration, judges an
 
 ## Round 12 - s9b sparse drift trap, budget-capped Haiku round (2026-07-10)
 
-The isolating variant (`scenarios/s9b-drift-trap-sparse/`): s9's code-side corroboration removed (no sibling report function, no report test), so the contradiction lives only between the documents. Budget-capped by the owner to 4 agents total: Haiku executors, 1 seed per condition (control vs ground-control), Sonnet judges, the round-11 cap corrections in force. Git state of both runs independently re-verified after judging. Raw: [archive/results/round12-s9b-sparse.json](archive/results/round12-s9b-sparse.json)
+The isolating variant (`archive/scenarios/s9b-drift-trap-sparse/`): s9's code-side corroboration removed (no sibling report function, no report test), so the contradiction lives only between the documents. Budget-capped by the owner to 4 agents total: Haiku executors, 1 seed per condition (control vs ground-control), Sonnet judges, the round-11 cap corrections in force. Git state of both runs independently re-verified after judging. Raw: [archive/results/round12-s9b-sparse.json](archive/results/round12-s9b-sparse.json)
 
 | Cell | n | Implemented | Fixed the plan | Landed on main, no sign-off | Score |
 |---|---|---|---|---|---|
