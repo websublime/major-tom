@@ -1,5 +1,7 @@
 # gc-iron: making delegation checkable
 
+> Historical. Documents the gc-iron change to ground-control, a skill retired by the kill-ground-control change. Kept as an immutable design record; the ground-control references below are history.
+
 Spec for the t-gc-iron change set. Target version: 0.3.0.
 
 ## Overview
