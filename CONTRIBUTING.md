@@ -1,6 +1,6 @@
 # Contributing
 
-This repo eats its own food: contributions follow the ground-control process it ships. The short version below is binding; the long version is [`docs/PROCESS.md`](docs/PROCESS.md) and the skills themselves.
+This repo eats its own food: contributions follow the workflow it ships. The short version below is binding; the long version is [`docs/PROCESS.md`](docs/PROCESS.md) and the skills themselves.
 
 ## The most valuable contribution
 
@@ -16,7 +16,6 @@ This repo eats its own food: contributions follow the ground-control process it 
 - Branch `t<slug>` off `main`; never commit to `main` (a pre-commit guard enforces this; bypassing it is treated as fraud by the Verify gate).
 - Conventional Commits, atomic.
 - **The Verify gate runs before any PR**: adversarial for substantive changes, mechanical fact-checking for docs. The PR body carries the verdict.
-- Reports that land work end with the TRACK line: `TRACK: branch | merged | registry`.
 - Version bumps ride the release branch: both `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` must agree (CI checks it); after the merge, the maintainer tags `vX.Y.Z` on the merge commit. Bump when the merge changes what installs; semver by commit type.
 
 ## Style rules (CI-enforced)

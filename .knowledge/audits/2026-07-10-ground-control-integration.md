@@ -11,6 +11,6 @@
 
 - Method audit: evidence gathered before every change (fixtures verified by running them); verification by observation on all eval claims (git states, function outputs, PRD text re-read against the fabricated gloss); one skipped step: no adversarial gate was run on the ground-control drafts themselves (solo review only).
 - Gate verdicts issued: rounds 11-16 judged by ground-truth-anchored judges; every judge claim spot-checked mechanically before logging.
-- Drift found and resolved same-session: checks.py stale fable-* names (CI was red), manifests saying "three skills", s5/s6 broken result links, RESULTS naming notes.
+- Drift found and resolved same-session: checks.py stale old skill names (CI was red), manifests saying "three skills", s5/s6 broken result links, RESULTS naming notes.
 - Caveats open: rungs 1-2 and the orchestration value case unmeasured (budget); root README/LICENSE/CONTRIBUTING missing; round 16 (guard bypass) in flight; single-seed rounds are directional only.
 - Highest-value fix next session: the root README (the repo's front door still does not exist).

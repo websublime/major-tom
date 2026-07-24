@@ -1,48 +1,61 @@
 # Process binding - major-tom
 
-The project-specific half of ground-control: the skill holds the invariants, this file holds the slots. Pointers over prose.
+The project-specific half of the workflow: the skills hold the invariants, this file holds the slots. Imported from CLAUDE.md via @ so every session loads it: pointers over prose. Keep the first line exactly `# Process binding` so the branch guard self-gates on it.
 
 ## Project
 
 - North star: evidence-backed correctness; failures published
 - Owner (genuine forks and escalations go here): Miguel Ramos
-- Conversation language: Portuguese / Artifact language: English
-- Capability rung: 1 (Workflow + worktree isolation available)
+- Conversation language: Portuguese / Artifact language (code, docs, commits): English
 
-## Document roles
+## Working model
 
-| Role | Bound to |
+team. The coordinator orchestrates; writers run in isolated worktrees when they could touch the same files (Workflow and worktree isolation are available here).
+
+| Working model | Delegation | Isolation | Orchestrator |
+|---|---|---|---|
+| team | specialists in parallel | isolated worktrees | coordinator |
+| subagents-only | discrete tasks, one writer at a time | single branch | coordinator |
+
+## Agents
+
+The roster the coordinator delegates to; the plugin ships the nine below. No stack specialists are fetched for this repo (it is docs and eval, not an application stack).
+
+| Agent | Scope |
 |---|---|
-| Product truth | `.claude-plugin/plugin.json` description + `eval/README.md` (the method's claims) |
-| Decision register | unbound: decisions live in `eval/RESULTS.md` consequences and commit messages |
-| Interface SSOT | the four `skills/*/SKILL.md` files (each skill's contract) |
-| Component plans | unbound |
-| Status registry | unbound (degraded, declared): session task lists + `.knowledge/audits/` carry state |
-| Roadmap | unbound |
-| Knowledge base | `.knowledge/` |
+| coordinator | orchestrates, spawns and coordinates, synthesizes, does not write |
+| architect | system design, interface stewardship, records decisions, attacks designs |
+| researcher | investigation, evidence, library and API verification with citations |
+| project-manager | decomposition into tasks with failable acceptance criteria |
+| product-validator | adversarial product lens on value, scope, and evidence |
+| code-reviewer | code review against acceptance criteria and quality |
+| qa | tests, quality, verification by observation |
+| refactor-specialist | behavior-preserving restructuring, same checks green before and after |
+| vcs-operator | branch, atomic Conventional commits, PRs carrying verdicts |
 
-Downstream docs for the decision-change checklist: `eval/README.md`, `eval/RESULTS.md`, `eval/cases/`, `.github/checks.py`, `.claude-plugin/*.json`.
+Agents directory (where onboard fetches specialists): https://github.com/ayush-that/sub-agents.directory
 
-## Team roster
+## Tracker
 
-Every role slot defaults to the plugin agent of the same name; domain specialist: unbound.
+none. Work intake is the conversation with Miguel; in-flight state lives in the session task lists and `.knowledge/audits/`.
 
-## Trackers
+## Knowledge base
 
-- Work intake: the conversation (Miguel)
-- Status registry: unbound (degraded mode)
-- Ticket workspaces: not applicable
+- Path: `.knowledge/`
+- Layout: `memory/` holds one fact per file plus an `INDEX.md`; CLAUDE.md imports the index (`@.knowledge/memory/INDEX.md`) so it loads every session. `audits/` holds one session audit per file.
 
 ## Conventions
 
 - Branch naming: t<slug>, off main; claim = branch (no branch, no claim)
 - Commits: Conventional Commits, atomic
-- Merges: **the Verify gate is mandatory before any merge request or PR**; the request carries the verdict. Current state: remote `origin` is configured (github.com/websublime/major-tom) but nothing has been pushed yet, so merges stay local with Miguel signing off; the first push activates the full flow (push the task branch, open the PR with gh carrying the gate verdicts, Miguel merges). Pushing is publishing: only on Miguel's explicit go
-- Guards installed: `.githooks/pre-commit` blocks commits to main (enable per clone: `git config core.hooksPath .githooks`, or run `gc-install-guards`); SessionEnd audit stub (`scripts/session-audit-stub.sh`, wired twice on purpose: `.claude/settings.json` for plugin-less sessions and the plugin's `hooks/hooks.json`; the stub dedups by filename); plugin PreToolUse branch guard (`scripts/pretool-branch-guard.sh`); `gc-violations` monitor (experimental, Claude Code v2.1.105+)
-- Eval rounds: at most 4 agents per launch unless Miguel raises the budget
-- Releases: bump `version` in both `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` inside the PR branch (CI checks they agree) when the merge changes what installs; semver by commit type (fix/docs = patch, feat = minor, breaking = major); after the merge, tag `vX.Y.Z` on the merge commit and push the tag (tags are not commits, so the main guard does not apply)
+- Merges: the Verify gate is mandatory before any merge request or PR; the request carries the verdict. Remote `origin` is configured (github.com/websublime/major-tom); the PR flow is push the task branch, open the PR with gh carrying the gate verdicts, Miguel merges. Pushing is publishing: only on Miguel's explicit go.
+- Guards installed: `.githooks/pre-commit` blocks commits to main (enable per clone: `git config core.hooksPath .githooks`, or run `install-guards`); plugin PreToolUse branch guard (`scripts/pretool-branch-guard.sh`); `guard-violations` monitor (experimental, Claude Code v2.1.105+).
+- Eval rounds: at most 4 agents per launch unless Miguel raises the budget.
+- Releases: bump `version` in both `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` inside the PR branch (CI checks they agree) when the merge changes what installs; semver by commit type (fix/docs = patch, feat = minor, breaking = major); after the merge, tag `vX.Y.Z` on the merge commit and push the tag (tags are not commits, so the main guard does not apply).
 
 ## Hard-rule additions
+
+The skills' shipped hard rules always apply and cannot be removed here. Project rules add below:
 
 - `temp/` is scratch: never read or use it.
 - No em or en dashes in any repo file (CI enforces).
