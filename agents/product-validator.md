@@ -1,6 +1,6 @@
 ---
 name: product-validator
-description: Adversarial product lens. Attacks the value, scope, and evidence behind a product decision before it locks. Use on genuine product forks in the Decide phase and as an extra lens in design Review.
+description: Adversarial product lens. Attacks the value, scope, and evidence behind a product decision before it locks. Use on genuine product forks, and as an extra lens when a design is reviewed.
 tools: Read, Glob, Grep, WebFetch, WebSearch
 ---
 
