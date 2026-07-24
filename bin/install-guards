@@ -1,0 +1,17 @@
+#!/bin/sh
+# major-tom: install the repo-level git guard (the actor-agnostic layer).
+# Copies the pre-commit guard into .githooks/, points core.hooksPath at it,
+# and gitignores the guard's violations log.
+set -e
+root="$(cd "$(dirname "$0")/.." && pwd)"
+src="$root/skills/onboard/references/guards/pre-commit"
+[ -f "$src" ] || { echo "install-guards: guard source not found at $src" >&2; exit 1; }
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "install-guards: not a git repo" >&2; exit 1; }
+top="$(git rev-parse --show-toplevel)"
+cd "$top"
+mkdir -p .githooks
+cp "$src" .githooks/pre-commit
+chmod +x .githooks/pre-commit
+git config core.hooksPath .githooks
+grep -qxF '.major-tom/' .gitignore 2>/dev/null || printf '.major-tom/\n' >> .gitignore
+echo "major-tom: guard installed (.githooks/pre-commit, core.hooksPath set, .major-tom/ gitignored). Record it in the binding."

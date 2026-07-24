@@ -1,12 +1,12 @@
 #!/bin/sh
-# ground-control guard: no commits to the default branch.
+# major-tom guard: no commits to the default branch.
 # Enable once per clone: git config core.hooksPath .githooks
 b="$(git symbolic-ref --short HEAD 2>/dev/null)"
-d="$(git config ground-control.defaultBranch || echo main)"
+d="$(git config major-tom.defaultBranch || git config ground-control.defaultBranch || echo main)"  # ground-control.defaultBranch: intentional migration fallback, do not remove
 if [ "$b" = "$d" ]; then
-  mkdir -p .ground-control
-  echo "$(date +%FT%T) pre-commit blocked a commit on $d" >> .ground-control/violations.log
-  echo "ground-control: direct commits to '$d' are blocked. claim = branch: git switch -c t<id>-<slug>" >&2
+  mkdir -p .major-tom
+  echo "$(date +%FT%T) pre-commit blocked a commit on $d" >> .major-tom/violations.log
+  echo "major-tom: direct commits to '$d' are blocked. claim = branch: git switch -c t<id>-<slug>" >&2
   echo "Bypassing this guard (--no-verify, unsetting core.hooksPath, editing .githooks) is a gate violation the Verify gate treats as fraud." >&2
   exit 1
 fi
