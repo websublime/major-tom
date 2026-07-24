@@ -1,6 +1,6 @@
 ---
 name: think
-description: A step-by-step problem-solving loop (classify the ask, define done, gather evidence, decide, act surgically, verify by observation, report outcome-first). Use when the user says "/think", "use the fable method", or "approach this like Fable", or proactively when starting any multi-step task that no task-specific skill covers. Subcommands - plan (stop after the plan), audit (grade finished work against the loop), report (rewrite an answer outcome-first).
+description: A single-thread problem-solving loop - classify the ask, define done, gather evidence, decide, act surgically, verify by observation, report outcome-first. The rules, without orchestration. Use on "/think", or proactively when the answer to any of these is yes. Is this a multi-step task no task-specific skill already covers? Is the scope or the definition of done unclear enough to pin down before acting? Do I need to weigh the evidence I have and commit to one direction before acting? Could a wrong assumption here be costly or hard to reverse? Does confirming it worked need observation, not assumption? Subcommands - plan (stop after the plan), audit (grade finished work against the loop), report (rewrite an answer outcome-first).
 user_invocable: true
 ---
 

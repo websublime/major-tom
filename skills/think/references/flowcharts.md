@@ -107,9 +107,7 @@ flowchart TD
     A -->|yes| NONE["No skill. Do it, check it, report"]
     A -->|no| B{"Finished work someone<br/>claims is done?"}
     B -->|yes| J["prove"]
-    B -->|no| C{"A multi-phase project<br/>with milestones?"}
-    C -->|yes| G["ground-control,<br/>with think rules inside phases"]
-    C -->|no| D{"Non-trivial and multi-step,<br/>worth subagents and<br/>adversarial verification?"}
+    B -->|no| D{"Non-trivial and multi-step,<br/>worth subagents and<br/>adversarial verification?"}
     D -->|yes| L["act"]
     D -->|no| M["think inline"]
 ```
@@ -120,4 +118,4 @@ Follow the arrows literally; a diamond is a decision you must actually make, not
 
 ## Provenance
 
-These charts began as introspection and were then checked against observed behavior: bare Fable 5 agents run on real problems with their full tool-call transcripts extracted (eval round 10). The observation validated the core paths (spec read before any edit, twin bug found via the README, verification of every mode, assumption stated on ambiguity) and corrected the charts in three places: the ORIENT box at the start of evidence gathering, the expensive-vs-chained nuance on parallelization, and the cleanup rule in the report step. Where introspection and observation disagreed, observation won.
+These charts began as introspection and were then checked against observed behavior: bare frontier-model agents run on real problems with their full tool-call transcripts extracted (eval round 10). The observation validated the core paths (spec read before any edit, twin bug found via the README, verification of every mode, assumption stated on ambiguity) and corrected the charts in three places: the ORIENT box at the start of evidence gathering, the expensive-vs-chained nuance on parallelization, and the cleanup rule in the report step. Where introspection and observation disagreed, observation won.

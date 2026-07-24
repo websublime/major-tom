@@ -1,6 +1,6 @@
 ---
 name: act
-description: End-to-end orchestrated workflow that runs a task the way Fable ran sessions - parallel evidence subagents, one committed plan, surgical execution with an intent gate, adversarial verification agents, honest outcome-first report. Use for non-trivial multi-step tasks when the user says "/act", "run the fable loop", or "do this the way Fable would". For the rules alone without orchestration, use think; for project-scale multi-session work, ground-control owns the phases and this loop runs inside them.
+description: An end-to-end orchestrated workflow for one task - parallel evidence subagents, one committed plan, surgical execution behind an intent gate, adversarial verification agents, an honest outcome-first report. It runs think's rules with delegation and attack added; for the rules alone, use think. Use on "/act", or proactively when the answer to any of these is yes. Is this a non-trivial task to plan and carry end-to-end, not just answer? Would evidence gathered in parallel across code, docs, and the web materially speed it? Is the change consequential enough to be worth attacking before it ships? Does the work produce or edit real artifacts, not only reasoning? Is a committed plan plus a verified result worth more here than a quick reply?
 ---
 
 # The Act Loop
@@ -42,7 +42,6 @@ This skill orchestrates the think: read its SKILL.md first; its rules govern eve
 
 - Trivial tasks (the gate handles them).
 - Pure questions with no multi-step work: plain think covers the shape.
-- Inside an already-orchestrated ground-control phase: ground-control owns the stages there; apply think rules within them instead of nesting loops.
 
 ## Model economy
 
