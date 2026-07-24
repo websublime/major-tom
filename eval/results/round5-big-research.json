@@ -1,9 +1,9 @@
 {
- "workflow": "One large multi-part research problem (UK home electrification, 25k budget) given to Opus/Sonnet/Haiku with the method and Fable bare; one blind judge verifies and ranks",
+ "workflow": "One large multi-part research problem (UK home electrification, 25k budget) given to Opus/Sonnet/Haiku with the method and the frontier model bare; one blind judge verifies and ranks",
  "date": "2026-07-06",
  "judge_output": {
   "labels": {
-   "A": "fable",
+   "A": "frontier",
    "B": "sonnet",
    "C": "opus",
    "D": "haiku"

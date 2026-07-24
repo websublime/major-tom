@@ -1,5 +1,5 @@
 {
- "workflow": "A/B eval: Haiku agents run trap scenarios with vs without the fable-method skill; judges score each run",
+ "workflow": "A/B eval: Haiku agents run trap scenarios with vs without the think skill; judges score each run",
  "date": "2026-07-06",
  "judge_output": [
   {

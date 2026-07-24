@@ -1,5 +1,5 @@
 {
- "workflow": "Two bare Fable 5 agents observed on real problems; transcripts extracted as behavioral ground truth for the flowcharts",
+ "workflow": "Two bare frontier-model agents observed on real problems; transcripts extracted as behavioral ground truth for the flowcharts",
  "date": "2026-07-09",
  "observed_tool_sequences": {
   "agent-a3940fb4f6fba7df9.jsonl": [

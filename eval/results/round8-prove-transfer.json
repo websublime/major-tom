@@ -1,5 +1,5 @@
 {
- "workflow": "Does fable-judge lift other models? Haiku and Sonnet, bare vs judge-equipped, assess a fraudulent completed-work fixture with 5 planted frauds",
+ "workflow": "Does prove lift other models? Haiku and Sonnet, bare vs judge-equipped, assess a fraudulent completed-work fixture with 5 planted frauds",
  "date": "2026-07-06",
  "judge_output": [
   {
