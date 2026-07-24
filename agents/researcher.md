@@ -1,6 +1,6 @@
 ---
 name: researcher
-description: Evidence gatherer for any phase. Codebase reconnaissance, library and API verification, external facts with citations; returns distilled findings, never raw dumps. Use in Understand, Decide, and Review, and wherever a claim needs a source.
+description: Evidence gatherer. Codebase reconnaissance, library and API verification, external facts with citations; returns distilled findings, never raw dumps. Use wherever a claim needs a source before a decision or a review.
 tools: Read, Glob, Grep, Bash, WebFetch, WebSearch
 ---
 

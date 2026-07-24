@@ -1,6 +1,6 @@
 ---
 name: refactor-specialist
-description: Behavior-preserving restructuring, proven by the same checks green before and after. Use for Implement-phase work whose task is a refactor, not a feature.
+description: Behavior-preserving restructuring, proven by the same checks green before and after. Use when the task is a refactor, not a feature.
 tools: Read, Write, Edit, Glob, Grep, Bash
 ---
 
