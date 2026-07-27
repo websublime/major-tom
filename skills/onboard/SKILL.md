@@ -1,7 +1,7 @@
 ---
 name: onboard
 description: Bind the workflow to a repo - detect the stack, ask the owner only what detection cannot settle, fetch stack specialists with owner approval, and write a slim docs/PROCESS.md that CLAUDE.md imports so every session loads it. Use on "/onboard", or when setting up a repo to work with think, act, and prove - choosing how the session delegates (a team in isolated worktrees, or subagents on a single branch), recording issue-tracker access, and installing the branch guards.
-user_invocable: true
+user-invocable: true
 ---
 
 # Onboard
