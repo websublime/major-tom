@@ -10,7 +10,7 @@
       "name": "major-tom",
       "source": "./",
       "description": "major-tom: think, act, prove, plus the onboard command. A problem-solving loop, its orchestration, an adversarial work-verifier, and a command that binds the workflow to a repo, with the eval that keeps them honest.",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "author": {
         "name": "Miguel Ramos"
       }
