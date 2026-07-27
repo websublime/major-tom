@@ -25,7 +25,7 @@ Installing brings: the three skills (namespaced: `/major-tom:think`, `/major-tom
 /major-tom:onboard
 ```
 
-Run this once per repo, before anything else. Every mechanical guard ships self-gated on the binding: the branch guard, the repo pre-commit hook and the violations monitor all exit immediately unless the repo root carries `docs/PROCESS.md` starting with `# Process binding`. Without onboard you get the skills as prose and none of the mechanics, and prose alone is the configuration the eval measured as failing at the weak-executor tier (rounds 15 and 16).
+Run this once per repo, before anything else. The harness branch guard and the violations monitor are self-gated on the binding: both exit immediately unless the repo root carries `docs/PROCESS.md` starting with `# Process binding`. (The repo `pre-commit` hook is gated differently, by the `core.hooksPath` opt-in that `install-guards` sets; once installed it blocks default-branch commits whether or not a binding exists.) Without onboard there is no binding, so the harness guard and the monitor stay inert and what remains is the skills as prose, which is the configuration the eval measured as failing at the weak-executor tier (round 14; rounds 15 and 16 are where binding placement and the live guard fixed it).
 
 ## The commands
 
