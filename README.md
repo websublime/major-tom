@@ -19,6 +19,14 @@ claude --plugin-dir path/to/major-tom
 
 Installing brings: the three skills (namespaced: `/major-tom:think`, `/major-tom:act`, `/major-tom:prove`), the `/major-tom:onboard` command, nine role agents the working model delegates to, and the discipline hooks. **Disclosure**: the hooks are self-gated; they act only inside git repos whose root carries a binding (`docs/PROCESS.md` starting with `# Process binding`) and stay inert everywhere else. The `guard-violations` monitor is an experimental Claude Code component (v2.1.105+). `jq` is optional: the branch guard falls back to a conservative parser and fails closed without it.
 
+### Required first step: bind the repo
+
+```
+/major-tom:onboard
+```
+
+Run this once per repo, before anything else. Every mechanical guard ships self-gated on the binding: the branch guard, the repo pre-commit hook and the violations monitor all exit immediately unless the repo root carries `docs/PROCESS.md` starting with `# Process binding`. Without onboard you get the skills as prose and none of the mechanics, and prose alone is the configuration the eval measured as failing at the weak-executor tier (rounds 15 and 16).
+
 ## The commands
 
 | Command | What it is | Modes |
