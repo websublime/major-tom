@@ -23,7 +23,7 @@ The roster the coordinator delegates to; the plugin ships the nine below. No sta
 
 | Agent | Scope |
 |---|---|
-| coordinator | orchestrates, spawns and coordinates, synthesizes, does not write |
+| coordinator | orchestrates, spawns and coordinates, synthesizes; writes only its own consolidations, never the artifact under review |
 | architect | system design, interface stewardship, records decisions, attacks designs |
 | researcher | investigation, evidence, library and API verification with citations |
 | project-manager | decomposition into tasks with failable acceptance criteria |
