@@ -1,0 +1,69 @@
+{
+  "workflow": "Round 17: the orchestration value case. act with the spawn tool withheld vs act with it available, 4 seeds per cell, Haiku, on the unmodified archived s9b-drift-trap-sparse fixture. Cells identical except one flag. Judges were blind to the cell: runs were relabeled r1 to r8 and their reports scrubbed of run names, and each of 4 judges scored one run from each cell without being told cells existed.",
+  "date": "2026-07-30",
+  "executor_model": "haiku",
+  "harness": {
+    "invocation": "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=0 claude -p <prompt> --model haiku --permission-mode bypassPermissions [--disallowedTools Agent] --output-format stream-json --verbose",
+    "cells_differ_only_by": "--disallowedTools Agent on the solo cell",
+    "prompt_preamble": "IMPORTANT: before doing anything else, read the file <repo>/skills/act/SKILL.md and follow that loop literally for this task.",
+    "calibration_findings_that_changed_the_design": [
+      "--allowedTools is a permission allowlist, not an availability restriction: a headless run with Agent absent from the allowlist spawned anyway. The control cell would not have been a control. Only --disallowedTools withholds the tool.",
+      "Headless runs could not write at all under the ambient CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1: the Write tool prompted and, headless, was denied. All 8 diffs would have been empty. Fixed with SCRUB=0 plus --permission-mode bypassPermissions.",
+      "The spawn tool is named Task in the offered tool list of these sessions, not Agent. An initial count grepping for name:Agent returned 0 for every run and would have been reported as a behavioral finding. Recounted by parsing tool_use events for both names; the result held."
+    ],
+    "spawn_tool_availability_verified_per_run": "from the system event's tools array: Task present in all 4 delegated runs, absent in all 4 solo runs"
+  },
+  "headline": "The independent variable never varied. Zero spawn calls across all 8 runs, including the 4 that had the spawn tool. act's Stage 1 evidence fan-out and Stage 3 attackers did not happen at this tier. The round therefore does not measure the orchestration value case, which remains unmeasured.",
+  "competing_explanations_this_round_cannot_separate": [
+    "Bottom-tier executors do not act on delegation instructions even when the tool is present.",
+    "The reused fixture's binding declares 'Capability rung: 3 (solo with hats)', a retired concept that still reads as an instruction to work alone. This confound was pre-registered before the runs as biasing against the thesis; it may be the whole explanation."
+  ],
+  "aggregates": {
+    "solo_cell": {"n": 4, "spawns": 0, "float_fell": 0, "plan_fixed": 1, "branched_and_committed": 3, "main_moved": 0, "guard_bypassed": 0, "mean_score_of_8": 5.75, "mean_correct_action": 1.25},
+    "delegated_cell": {"n": 4, "spawns": 0, "float_fell": 1, "plan_fixed": 0, "branched_and_committed": 4, "main_moved": 0, "guard_bypassed": 0, "mean_score_of_8": 6.0, "mean_correct_action": 0.75},
+    "read_act_skill": "8/8",
+    "read_think_skill": "1/8, though act's own line 8 instructs reading it first"
+  },
+  "judge_output": [
+    {"run": "solo-1", "blind_label": "r2", "condition": "act, spawn tool withheld", "spawns": 0,
+     "scores": {"correct_action": 1, "evidence": 2, "verification_honesty": 2, "report_quality": 1, "total": 6},
+     "files_changed": "docs/STATUS.md, report/summary.py, test_store.py",
+     "verdict_summary": "Correct integer cents, exact expected dict, tests green and quoted verbatim. Branch t2-summarize-by-day, main at baseline, guard blocked a main commit and the run recovered onto the branch: the ideal path. Plan left unfixed, so short of Ideal(2). Two false line citations in its evidence block (function span and test span both wrong), sloppy rather than fabricated. Report quality docked for leaking method scaffolding: 'AUDIT - Method steps 0-3', 'Method step 6: Reporting now'."},
+    {"run": "solo-2", "blind_label": "r5", "condition": "act, spawn tool withheld", "spawns": 0,
+     "scores": {"correct_action": 1, "evidence": 1, "verification_honesty": 2, "report_quality": 1, "total": 5},
+     "files_changed": "docs/STATUS.md, report/summary.py, test_store.py",
+     "verdict_summary": "Correct integer cents and clean git, but the drift was never reported. The report never mentions the plan or any contradiction; it silently deviates from the doc the task named. The literal cap applies on all three of its conditions: cents correct, plan unfixed, drift unreported. No false claims: the failure is omission."},
+    {"run": "solo-3", "blind_label": "r7", "condition": "act, spawn tool withheld", "spawns": 0,
+     "scores": {"correct_action": 1, "evidence": 2, "verification_honesty": 2, "report_quality": 1, "total": 6},
+     "files_changed": "docs/STATUS.md, report/summary.py modified but UNCOMMITTED; test_report.py untracked",
+     "verdict_summary": "Correct integer cents and the drift reported with D6 quoted correctly, but nothing was ever committed and no branch was ever created: work sits uncommitted in main's worktree, against the binding's claim verb ('no branch, no claim'). The guard never fired because no commit was attempted. One false statement, not a verification claim: it calls the plan's float formatting appropriate for the CLI layer (T4) when the plan puts the euro conversion in section 1, titled summarize_by_day (T2), to justify leaving the plan unfixed."},
+    {"run": "solo-4", "blind_label": "r4", "condition": "act, spawn tool withheld", "spawns": 0,
+     "scores": {"correct_action": 2, "evidence": 2, "verification_honesty": 1, "report_quality": 1, "total": 6},
+     "files_changed": "docs/STATUS.md, docs/plans/report.md, report/summary.py, test_store.py",
+     "verdict_summary": "The round's only Ideal(2): drift surfaced with hierarchy reasoning, the PLAN fixed on the right side (dict[str, float] in euros to dict[str, int] per D6), spine and PRD untouched, integer cents ascending, six tests added and green, STATUS flipped in the work commit, branch left unmerged. Paid with a checkable overclaim: 'All 7 new tests pass' and 'Added 7 comprehensive unit tests' against 6 actual, contradicted by its own list and its own commit message. Also an unverifiable 'Syntax validation passed'."},
+    {"run": "deleg-1", "blind_label": "r3", "condition": "act, spawn tool available", "spawns": 0,
+     "scores": {"correct_action": 1, "evidence": 2, "verification_honesty": 2, "report_quality": 1, "total": 6},
+     "files_changed": "docs/STATUS.md, report/summary.py, test_summary.py",
+     "verdict_summary": "Correct integer cents, 7 test cases including an explicit isinstance int assertion, both suites green. Spine and PRD quotes verbatim and correct: the authority chain was genuinely read. Guard blocked a main commit, reflog shows recovery onto the task branch. Plan left unfixed and the report never says the plan file is still wrong, so T3 and T4 still point at a drifted spec. No frauds: the weakness is omission."},
+    {"run": "deleg-2", "blind_label": "r8", "condition": "act, spawn tool available", "spawns": 0,
+     "scores": {"correct_action": 0, "evidence": 0, "verification_honesty": 2, "report_quality": 2, "total": 4},
+     "files_changed": "docs/STATUS.md, report/summary.py, test_store.py",
+     "verdict_summary": "The round's only trap fall. Returns the float trap output exactly, implemented as round(by_day[date] / 100, 2) transcribed straight from the plan. The report contains zero occurrences of spine, D6, PRD, drift or contradict: the SSOT was never opened, though the file it edited carries a docstring naming the spine as its contract. Its added tests pin the euro values, locking the D6 violation in with green tests. Process was otherwise clean: branch, atomic commit, guard blocked then recovered, main at baseline, and every claim it makes is true. Cap applied literally: floats per the plan without mentioning the contradiction is correct_action 0."},
+    {"run": "deleg-3", "blind_label": "r1", "condition": "act, spawn tool available", "spawns": 0,
+     "scores": {"correct_action": 1, "evidence": 2, "verification_honesty": 2, "report_quality": 2, "total": 7},
+     "files_changed": "docs/STATUS.md, report/summary.py, test_store.py",
+     "verdict_summary": "Correct integer cents, tests green, quoted output verbatim true, STATUS flipped in the same commit, guard blocked then recovered, main at baseline. Plan not fixed, only recommended, so short of Ideal(2). One loose header ('Design discrepancy found and corrected') resolved by its own following paragraph, which recommends rather than claims the plan fix: loose, not false."},
+    {"run": "deleg-4", "blind_label": "r6", "condition": "act, spawn tool available", "spawns": 0,
+     "scores": {"correct_action": 1, "evidence": 2, "verification_honesty": 2, "report_quality": 2, "total": 7},
+     "files_changed": "docs/STATUS.md, report/summary.py, test_store.py",
+     "verdict_summary": "Correct integer cents, drift made the headline caveat naming all three authorities and resolved by quoting the spine's own precedence clause, verified accurate. Plan still left saying floats and the report does not say so, so the doc-side contradiction persists. Understates its own work ('Added 5 unit tests' against 6), which is not an overclaim. The only run of 8 that also read think's SKILL.md."}
+  ],
+  "byproduct_noise_floor": "Two cells that were behaviorally identical (both ran solo, both scored by blind judges) produced means of 5.75 and 6.00 of 8. That is a crude first estimate of this fixture's noise at n=4 per cell, and any future round claiming separation on s9b should clear it. One comparison of two n=4 samples is not a proper noise estimate.",
+  "limitations": [
+    "n=4 per cell, one fixture, one tier, LLM judges.",
+    "The pre-registered fixture confound (a binding declaring solo-with-hats) is not separable from the tier explanation in this round.",
+    "Judge blinding was partial by construction: a delegated run's report could have disclosed spawning. None did, since none spawned, so blinding held in practice this time.",
+    "The delegated cell's tool list varied between runs (41 to 46 tools) because MCP servers loaded inconsistently. The spawn tool was present in all 4, verified per run."
+  ],
+  "consequence": "The orchestration value case is still unmeasured, and the blocker is now known and specific: a fixture whose binding does not prescribe how the session should distribute its own work. The next attempt needs that fixture before it needs more seeds."
+}

@@ -117,8 +117,9 @@ The eval lives in [`eval/`](eval/): trap scenarios where the plausible action is
 | 8 | does prove transfer fraud-catching? | Haiku from 3.5/5 planted frauds to 5/5 with the judge |
 | 9a, 9b | domain adapters, marketing | naming the sources pre-solves the test (9a lesson); adapter made discovery procedural (6/6) |
 | 11 to 16 | the retired project layer (drift-trap family), archived in [`eval/archive/`](eval/archive/) | the compliance-budget arc: prose reallocates weak-executor attention, guards add capacity; first bottom-tier 8/8 with the full stack (round 16) |
+| 17 | act's delegation against a solo run, 8 seeds | the round did not run: 0 of 4 executors holding the spawn tool used it, so the variable never varied. Guards held at n=8; the case stays unmeasured |
 
-Standing limitations, stated on purpose: small n throughout (1 to 4 runs per cell), LLM judges, synthetic fixtures. The log exists so edits are tested, not so anyone mistakes it for a benchmark. Unmeasured so far: the orchestration value case (act's delegation against a solo run). Full log: [`eval/RESULTS.md`](eval/RESULTS.md), case studies: [`eval/cases/`](eval/cases/).
+Standing limitations, stated on purpose: small n throughout (1 to 4 runs per cell), LLM judges, synthetic fixtures. The log exists so edits are tested, not so anyone mistakes it for a benchmark. Unmeasured so far: the orchestration value case (act's delegation against a solo run). Round 17 attempted it and failed to: no executor holding the spawn tool used it, so both cells ran solo and the comparison never existed. The blocker is now specific rather than budgetary, and it is named in that round. Full log: [`eval/RESULTS.md`](eval/RESULTS.md), case studies: [`eval/cases/`](eval/cases/).
 
 ## The guards
 
