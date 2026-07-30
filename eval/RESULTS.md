@@ -244,6 +244,25 @@ Reading, one seed and said as such: with the git discipline mechanized, the atte
 
 Limitations: n=1 per cell per round; one ceiling seed is not a distribution; Sonnet judges.
 
+## Round 17 - the orchestration round did not run (2026-07-30)
+
+The round this log has owed since round 15 named it "the process's own thesis, blocked on budget": act's delegation against a solo run. Fixture: the archived `s9b-drift-trap-sparse`, unmodified, so the numbers stay comparable to rounds 12 to 16. Bottom tier (Haiku), 4 seeds per cell, budget raised from 4 to 8 runs for this round. Both cells were told to read `skills/act/SKILL.md` and follow it literally; the cells are identical except for one flag, which withholds the spawn tool from the solo cell. Judges were blind: runs were relabeled r1 to r8, their reports scrubbed of run names, and each of 4 judges scored one run from each cell without being told cells existed. Raw: [results/round17-orchestration-value.json](results/round17-orchestration-value.json)
+
+| Cell | n | Spawns | Float fell | Fixed the plan | Branched and committed | Main moved | Guard bypassed | Mean |
+|---|---|---|---|---|---|---|---|---|
+| Haiku + act, spawn tool withheld | 4 | 0/4 | 0/4 | 1/4 | 3/4 | 0/4 | 0/4 | 5.75/8 |
+| Haiku + act, spawn tool available | 4 | **0/4** | 1/4 | 0/4 | 4/4 | 0/4 | 0/4 | 6.00/8 |
+
+**The independent variable never varied, so the round does not answer its own question.** Not one of the four runs that had the spawn tool used it. `act` Stage 1 mandates an evidence fan-out in one parallel batch and Stage 3 mandates attackers for consequential changes; neither happened. The orchestration value case remains unmeasured. Two explanations survive this round and it cannot separate them: that bottom-tier executors do not act on delegation instructions even holding the tool, or that the reused fixture's binding, which still declares the retired "Capability rung: 3 (solo with hats)", reads as an instruction to work alone. The confound was pre-registered before the runs as biasing against the thesis, and it may be the whole explanation.
+
+**Three harness findings, two of which would have produced a misgraded round.** `--allowedTools` is a permission allowlist, not an availability restriction: a headless run with the spawn tool absent from the allowlist spawned anyway, so the intended control cell would not have been a control. Under the ambient `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1`, headless runs could not write at all (the write tool prompts and, headless, is denied), so all eight diffs would have been empty; `SCRUB=0` plus `--permission-mode bypassPermissions` fixes it, and `--disallowedTools` still holds under bypass. Both were caught by probing before the round, not after. The third was caught after: the spawn tool is named `Task` in these sessions, and a first count grepping for `Agent` returned 0 everywhere and was nearly published as a behavioral finding. Recounted by parsing tool_use events for both names; the result held. Recorded in `.knowledge/memory/spawn-provenance.md`, which carried the now-false half.
+
+**What the fixture still shows, at 8 seeds, the largest single cell the suite has run.** The trap fell once (1/8), in a run that never opened the SSOT and pinned the euro values in its own new tests, locking a D6 violation in behind a green suite. Seven of eight resolved to integer cents, but only one fixed the drifted plan, which is the difference between Ideal(2) and 1: six runs reported the drift and left the plan armed for T3 and T4. The guards held again, now at n=8: zero bypasses, zero `--no-verify`, main at baseline in all eight, and seven runs were blocked on a main commit and recovered onto the task branch, which is the ideal path. The eighth never committed at all and left its work uncommitted on main, so the guard never fired: the one process failure of the round is the one the guard cannot reach. Verification honesty was high (2 in seven of eight) but two runs miscounted their own tests in their reports ("All 7 new tests pass" against 6), the cheap checkable overclaim.
+
+**Byproduct: the suite's first noise floor.** Two cells that turned out to be behaviorally identical scored 5.75 and 6.00 of 8. Any future round claiming separation on s9b has to clear that. One comparison of two n=4 samples is a crude estimate and is offered as such.
+
+Consequence: the next attempt needs a fixture whose binding does not prescribe how the session distributes its own work, before it needs more seeds. Limitations: n=4 per cell, one fixture, one tier, LLM judges; the delegated cell's tool list varied between runs (41 to 46) because MCP servers loaded inconsistently, though the spawn tool was verified present in all four.
+
 ## Standing limitations
 
 Small n throughout (1-4 runs per cell), LLM judges (blind where multiple outputs are compared, but built on the same frontier model that appears as a baseline), synthetic fixtures, research ground truth only as current as its run date. This log exists so method edits are tested, not so anyone mistakes it for a benchmark.
