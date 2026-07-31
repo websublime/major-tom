@@ -9,10 +9,10 @@
       "docs/PROCESS.md: the line 'Capability rung: 3 (solo with hats)'",
       "docs/PROCESS.md: the whole 'Team roster' section, which ended 'rung 3 means hats anyway' and repeated the same steer"
     ],
-    "verified": "diff -r against the archived original shows docs/PROCESS.md as the only changed file and those two blocks as the only changes"
+    "verified": "diff -r against the archived original reports docs/PROCESS.md as the only changed file, with those two blocks as the only changes, plus the expected 'Only in the archive: GROUND-TRUTH.md' line, since the answer sheet is excluded from run copies here exactly as it was in round 17"
   },
   "comparability": {
-    "prompt": "verified byte-identical to round 17's: same act preamble, same task line, same offline clause",
+    "prompt": "verified identical to round 17's except for the working directory it names: the act preamble, the task template and the offline clause are byte-identical between the two runner scripts, and the task line interpolates the run directory, which differs run to run inside either arm anyway. Established from the runner scripts, not from the transcripts: headless -p does not echo its input, so the prompt as delivered is not recoverable from the stream.",
     "flags": "identical; round 17's delegated cell also ran without --disallowedTools",
     "spawn_tool_offered": "Task present in the init tools array of all 4 probe runs"
   },

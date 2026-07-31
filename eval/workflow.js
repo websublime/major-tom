@@ -1,7 +1,9 @@
 // Trap-suite eval harness, as a Claude Code Workflow script. Conditions: control, method (think).
 // Setup before running:
 //   1. Set BASE to a scratch directory.
-//   2. Copy each scenario from eval/scenarios/ to ${BASE}/pristine/<id>, excluding GROUND-TRUTH.md.
+//   2. Copy each scenario from eval/scenarios/ to ${BASE}/pristine/<id>, excluding GROUND-TRUTH.md
+//      and RUNNER.md where present. This script covers the trap suite (s1 to s8) only; s11 carries
+//      its own RUNNER.md and needs different flags, so a suite run over scenarios/ skips it.
 //   3. For every entry in RUNS, copy the scenario's pristine dir to ${BASE}/runs/<run>.
 //   4. Set SKILL to the think SKILL.md path.
 //   5. Pick the round's cells in RUNS; comment out the rest.
