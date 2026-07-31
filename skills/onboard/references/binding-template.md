@@ -10,18 +10,18 @@ The project-specific half of the workflow: the skills hold the invariants, this 
 
 ## Document roles
 
-Which document carries which authority in this project. Paths only: the order between the roles is an invariant the skills and `agents/architect.md` hold, not a project slot.
+Which document carries which authority in this project. Paths only: the order between them is fixed everywhere and is not a project slot. That order is **product truth, then interface SSOT, then component plans**, and `agents/architect.md` rule 1 holds it.
 
-A role with no document is **unbound**. Unbound degrades, it never blocks: the work proceeds and says which degraded mode it is in, rather than inventing a document or pretending the role is bound. Leave a role unbound rather than pointing it at something that is not actually authoritative.
+A role with no document is **unbound**. Unbound degrades, it never blocks: the work proceeds and says which degraded mode it is in, rather than inventing a document or pretending the role is bound. Leave a role unbound rather than pointing it at something that is not actually authoritative; a role can be bound later by re-running onboard.
 
 | Role | Bound to |
 |---|---|
 | Product truth | <path, or "unbound"> |
-| Decision register | <path, or a path plus section, or "unbound"> |
+| Decision register | <path to one file, or "unbound"> |
 | Interface SSOT | <path, or "unbound"> |
-| Component plans | <path or directory, or "unbound"> |
+| Component plans | <pattern, e.g. docs/plans/<component>.md, or "unbound"> |
 
-When the decision register and the interface SSOT are both bound, `.github/checks.py` in the major-tom repo verifies that every decision id cited in the SSOT resolves to a register entry and that no register entry is uncited. Ids are `D` followed by digits, and a register entry is a table row whose first cell is that id.
+Decision ids are `D` followed by digits, and a register entry is a table row whose first cell is that id. Bind the register to a single file, not to a section of one: nothing downstream can read a section qualifier, so a cell like `docs/PRD.md section 4` means the whole file.
 
 ## Working model
 

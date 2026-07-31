@@ -63,7 +63,7 @@ flowchart LR
 /major-tom:onboard
 ```
 
-onboard is a transformer: it detects stacks, docs, any tracker, and the harness delegation tools; asks the owner only what detection cannot settle, in one batch; fetches stack specialists from the agents directory with the owner's per-item approval; and writes a slim `docs/PROCESS.md` that CLAUDE.md imports. The binding records the working model (a team in isolated worktrees, or subagents on a single branch, with the coordinator orchestrating either way), the agent roster, and how the session reaches your issue tracker. It writes no product content and runs no lifecycle.
+onboard is a transformer: it detects stacks, docs, any tracker, and the harness delegation tools; asks the owner only what detection cannot settle, in one batch; fetches stack specialists from the agents directory with the owner's per-item approval; and writes a slim `docs/PROCESS.md` that CLAUDE.md imports. The binding records the working model (a team in isolated worktrees, or subagents on a single branch, with the coordinator orchestrating either way), which document carries which authority (a role with nothing to bind stays unbound, which degrades rather than blocks), the agent roster, and how the session reaches your issue tracker. It writes no product content and runs no lifecycle.
 
 ```mermaid
 flowchart TD
@@ -140,7 +140,7 @@ Discipline that survives weak executors is mechanical, not prose. The plugin shi
 
 **Do I need `jq`?** No. With `jq` the branch guard parses the tool input properly; without it, a conservative fallback still extracts the command and the guard fails closed, not open.
 
-**What is a "binding"?** A slim generated file (`docs/PROCESS.md`) that `onboard` writes and CLAUDE.md imports, recording the working model, the agent roster, and how the session reaches your issue tracker. It loads every session and carries no lifecycle. This repo eats its own food: see [`docs/PROCESS.md`](docs/PROCESS.md).
+**What is a "binding"?** A slim generated file (`docs/PROCESS.md`) that `onboard` writes and CLAUDE.md imports, recording the working model, which document carries which authority, the agent roster, and how the session reaches your issue tracker. It loads every session and carries no lifecycle. This repo eats its own food: see [`docs/PROCESS.md`](docs/PROCESS.md).
 
 **What is the INTENT line?** A forced artifact at the decision point: `INTENT: code does X; check expects Y; spec says Z` before behavior changes. It exists because the rule failed as prose and held as an artifact (rounds 2 to 3).
 

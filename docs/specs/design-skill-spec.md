@@ -2,7 +2,11 @@
 
 Status: REFUTED at the design review gate, 2026-07-31. The skill is not built and this spec does not license building it. The verdict and its findings are in section 11, written by attackers who did not author this file.
 
-What the verdict DID license, and what has since been built per its own closing paragraph: the binding's Document roles slot, the question that fills it, and the register check, with the two checks merged into one because the path-existence half is meaningless separately. The skill body, its references, the eval fixture and the version bump remain unbuilt. Section 7's inventory is therefore partly done and partly forbidden; section 11 says which is which.
+Section 7's inventory is now part built and part forbidden, so read it against this split rather than as a plan:
+
+- **Built**, under the closing paragraph of the verdict: the binding template's Document roles slot, the question sheet entry that fills it, this repo's own binding, and the README rows that describe it. The register check landed as ONE check, not the two section 6 proposed, because verifying a path exists is meaningless apart from verifying what it contains. It also lost half its rule: failing on register entries the SSOT does not cite turned out to be wrong, since a register legitimately holds product and process decisions no interface cites.
+- **Forbidden and unbuilt**: `skills/design/SKILL.md`, its `references/`, and the eval fixture. The skill does not exist and this document does not license it.
+- **Required by the binding, not by this spec**: the version bump, because the built rows ship with the plugin.
 
 ## 1. Overview
 
@@ -118,5 +122,7 @@ Nothing in section 7 may be built. The findings that carry that verdict, each ve
 5. **GATE cannot be built as written.** No stage produces the document GATE consumes; `prove` is a skill and cannot be spawned; `prove` routes non-code work to a `think` domain adapter and none exists for design contracts; the agent implied for the verdict edit lacks Edit; REFUTED has no defined behavior.
 6. **Both mechanical checks are unimplementable as stated.** `.github/checks.py` hardcodes four skill names and has no binding parser, and the spec supplies no id grammar. On landing day both checks would guard zero files.
 7. **The delta over what exists is a convention.** Five of six fraud rows are sourced to `agents/architect.md`, which already carries the authority order, register entries with ids and dismissed alternatives, just-in-time detail, and the review lens. Genuinely new: the binding slot, the CI check, and a non-discretionary gate. None requires a new skill body.
+
+Editorial note, 2026-07-31, outside the verdict and not part of it: finding 6's last sentence, "On landing day both checks would guard zero files", is refuted by the work the verdict itself licensed. Three archived fixture bindings already bound both roles before any of this branch existed, and a fourth arrived with s11, so the landed check guards four bindings on the day it lands. The rest of finding 6 stands and was acted on: there was no id grammar and `.github/checks.py` had no binding parser, and both were written before the check could run. The attackers' text above is left exactly as they wrote it.
 
 Consequence recorded here so the next attempt inherits it: build the convention first (the binding slot, the two checks once they are implementable, one documented flow through `think plan`, `architect` and `prove`), run one real design task through it, and write the skill only if that recorded run fails in a way that can be named. The owner's decision that this is a skill rather than a mode stands; what this verdict changes is when it gets written, not what it is.

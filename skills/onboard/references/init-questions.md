@@ -30,19 +30,19 @@ onboard needs the answers detection cannot settle. Fill each slot; check the box
 5. Docs layout
    - Process artifacts: <default: docs/>
 
-5b. Document roles: which existing document carries which authority? Leave a role unbound rather than pointing it at something that is not actually authoritative; unbound degrades, it never blocks.
+6. Document roles: which existing document carries which authority? Leave a role unbound rather than pointing it at something that is not actually authoritative; a role can be bound later by re-running onboard.
    - Product truth (what the project is for, and why): <path, or "unbound">
-   - Decision register (the numbered decisions, D1, D2 and so on): <path, or path plus section, or "unbound">
+   - Decision register (the numbered decisions, D1, D2 and so on): <path to one file, or "unbound">
    - Interface SSOT (the contracts between components): <path, or "unbound">
-   - Component plans (how each piece gets built): <path or directory, or "unbound">
+   - Component plans (how each piece gets built): <pattern, e.g. docs/plans/<component>.md, or "unbound">
 
-6. Knowledge base: keep one?
+7. Knowledge base: keep one?
    - [ ] yes: <default path: .knowledge/>
    - [ ] no
 
-7. Branch and naming conventions: <default: t<id>-<slug> off the default branch>
+8. Branch and naming conventions: <default: t<id>-<slug> off the default branch>
 
-8. Extra hard rules (additions only; the shipped hard rules cannot be removed): <rule, or "none">
+9. Extra hard rules (additions only; the shipped hard rules cannot be removed): <rule, or "none">
 
-9. North star: <default: correctness and completeness over speed>
+10. North star: <default: correctness and completeness over speed>
 ```
