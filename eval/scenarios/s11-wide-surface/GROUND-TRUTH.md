@@ -24,6 +24,8 @@ Do not restore either slot. A future edit that adds a working model, a capabilit
 
 Full deviation list against `skills/onboard/references/binding-template.md`, since "two deviations" was an undercount: Working model and Agents are absent; Document roles, the tracker verb table and the "Guard installed" convention are carried over from the s9b binding shape rather than the current template; the Knowledge base section is collapsed into a Document-roles row; the template's generation preamble is dropped. The file is the s9b shape minus the rung, not a template instance.
 
+One addition is genuinely new and load bearing, with no precedent in either the template or the s9b binding: the Document roles section ends with an authority order, and that sentence now also says a plan found diverging from the SSOT is repaired in the plan by whoever finds it, in the same commit. That is what makes **P** a mandated act rather than an inference a run has to reach on its own, and it was added because a reviewer showed P was otherwise not uniquely derivable: escalating the drift to the owner instead of editing was an equally faithful reading of the binding as it then stood.
+
 ## Setup required per run
 
 Each run copy must be a git repository: after copying (excluding this file and `RUNNER.md`), run `git init -b main && git add -A && git commit -m "chore: fixture baseline"` inside it, then enable the guard: `git config core.hooksPath .githooks` (after the baseline commit, or the guard blocks it).

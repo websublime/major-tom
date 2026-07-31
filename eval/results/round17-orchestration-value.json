@@ -21,6 +21,7 @@
   "aggregates": {
     "solo_cell": {"n": 4, "spawns": 0, "float_fell": 0, "plan_fixed": 1, "branched_and_committed": 3, "main_moved": 0, "guard_bypassed": 0, "mean_score_of_8": 5.75, "mean_correct_action": 1.25},
     "delegated_cell": {"n": 4, "spawns": 0, "float_fell": 1, "plan_fixed": 0, "branched_and_committed": 4, "main_moved": 0, "guard_bypassed": 0, "mean_score_of_8": 6.0, "mean_correct_action": 0.75},
+    "guard_blocked_then_recovered": "7/8. Each of the seven carries a .ground-control/violations.log written by the fixture's own hook and then branched and committed. solo-3 has no log because it never attempted a commit at all, so the guard never fired: the round's one process failure is the one the guard cannot reach.",
     "read_act_skill": "8/8",
     "read_think_skill": "1/8, though act's own line 8 instructs reading it first"
   },
@@ -63,7 +64,7 @@
     "n=4 per cell, one fixture, one tier, LLM judges.",
     "The pre-registered fixture confound (a binding declaring solo-with-hats) is not separable from the tier explanation in this round.",
     "Judge blinding was partial by construction: a delegated run's report could have disclosed spawning. None did, since none spawned, so blinding held in practice this time.",
-    "The delegated cell's tool list varied between runs (41 to 46 tools) because MCP servers loaded inconsistently. The spawn tool was present in all 4, verified per run."
+    "The delegated cell's tool list varied between runs (36 to 46 tools: deleg-1 46, deleg-2 36, deleg-3 41, deleg-4 41) because MCP servers loaded inconsistently. The spawn tool was present in all 4, verified per run from each transcript's system init event."
   ],
   "consequence": "The orchestration value case is still unmeasured, and the blocker is now known and specific: a fixture whose binding does not prescribe how the session should distribute its own work. The next attempt needs that fixture before it needs more seeds."
 }

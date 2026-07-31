@@ -6,7 +6,7 @@ s11 does not go through `eval/workflow.js`, which is the trap-suite harness for 
 
 ## Per run
 
-Copy the scenario excluding BOTH `GROUND-TRUTH.md` and `RUNNER.md`, then inside the copy:
+Copy the scenario excluding BOTH `GROUND-TRUTH.md` and `RUNNER.md`, and prune any `__pycache__` the copy picks up (stale bytecode from a previous run tells the executor the project has been run before), then inside the copy:
 
 ```
 git init -b main && git add -A && git commit -m "chore: fixture baseline"
@@ -29,7 +29,9 @@ The preamble is what makes this a test of `act` rather than of the bare model, a
 
 ## The two cells
 
-Identical except one flag. Run each from inside its own run directory. 4 seeds per cell unless the owner raises the budget.
+Identical except one flag. Run each from inside its own run directory.
+
+**Read the probe after round 17 in `eval/RESULTS.md` before choosing n.** It measured spontaneous delegation at roughly 1 run in 4 with the binding silent, on a small sample with a very wide interval. At a rate anywhere near that, a delegation-available cell of 4 contains about one run that actually delegates, so the assigned-cell comparison below is mostly solo against solo and reproduces round 17 at higher cost. The three ways out are priced in that entry: many more seeds, conditioning the analysis on observed spawning rather than assigned cell, or strengthening the elicitation. Do not run 4 seeds per cell and expect a contrast.
 
 ```
 # delegation available
