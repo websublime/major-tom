@@ -8,6 +8,19 @@ The project-specific half of the workflow: the skills hold the invariants, this 
 - Owner (genuine forks and escalations go here): Miguel Ramos
 - Conversation language: Portuguese / Artifact language (code, docs, commits): English
 
+## Document roles
+
+Paths only; the order between the roles is an invariant the skills hold. Unbound degrades, it never blocks: say which degraded mode you are in rather than pretending a role is bound.
+
+| Role | Bound to |
+|---|---|
+| Product truth | README.md |
+| Decision register | unbound |
+| Interface SSOT | unbound |
+| Component plans | unbound |
+
+Three of four are unbound and that is honest: this repo is docs and eval, it ships no application interfaces, and its decisions live in `docs/specs/` and `.knowledge/memory/` as prose rather than as a numbered register. The eval fixtures under `eval/` carry their own bindings and do bind these roles, which is what the register check in `.github/checks.py` currently guards.
+
 ## Working model
 
 team. The coordinator orchestrates; writers run in isolated worktrees when they could touch the same files (Workflow and worktree isolation are available here).

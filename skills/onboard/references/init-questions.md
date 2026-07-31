@@ -30,6 +30,12 @@ onboard needs the answers detection cannot settle. Fill each slot; check the box
 5. Docs layout
    - Process artifacts: <default: docs/>
 
+5b. Document roles: which existing document carries which authority? Leave a role unbound rather than pointing it at something that is not actually authoritative; unbound degrades, it never blocks.
+   - Product truth (what the project is for, and why): <path, or "unbound">
+   - Decision register (the numbered decisions, D1, D2 and so on): <path, or path plus section, or "unbound">
+   - Interface SSOT (the contracts between components): <path, or "unbound">
+   - Component plans (how each piece gets built): <path or directory, or "unbound">
+
 6. Knowledge base: keep one?
    - [ ] yes: <default path: .knowledge/>
    - [ ] no
