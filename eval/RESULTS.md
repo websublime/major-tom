@@ -263,6 +263,25 @@ The round this log has owed since round 15 named it "the process's own thesis, b
 
 Consequence: the next attempt needs a fixture whose binding does not prescribe how the session distributes its own work, before it needs more seeds. Limitations: n=4 per cell, one fixture, one tier, LLM judges; the delegated cell's tool list varied between runs (41 to 46) because MCP servers loaded inconsistently, though the spawn tool was verified present in all four.
 
+## Probe after round 17 - does the tier delegate when nothing forbids it? (2026-07-31)
+
+Not a scored round: no judges, no rubric. Round 17 ended with two explanations it could not separate, and this probe attacks the cheaper one. Treatment arm only, 4 runs on the archived s9b fixture with two blocks cut from its binding: the `Capability rung: 3 (solo with hats)` line, and the `Team roster` section, which ended "rung 3 means hats anyway" and repeated the same steer where nobody had looked. The patch went into the run copies only; `diff -r` confirms `docs/PROCESS.md` was the sole changed file. The control is round 17's delegated cell, which needed no re-running: same fixture unpatched, same tier, same n, and a prompt verified byte-identical. Raw: [results/round17b-spawn-probe.json](results/round17b-spawn-probe.json)
+
+| Arm | Binding on how to distribute the work | n | Spawned | Trap held | Plan fixed |
+|---|---|---|---|---|---|
+| round 17 control | "Capability rung: 3 (solo with hats)" | 4 | 0/4 | 3/4 | 0/4 |
+| probe | says nothing | 4 | **1/4** | 2/4 | 0/4 |
+
+**1 of 4 against 0 of 4 is Fisher exact two-tailed p = 1.000, so this does not show the binding caused round 17's null.** What it does settle is the binary question that was blocking everything: spontaneous delegation at this tier under this prompt is not impossible. It happens, and when it happens it is the instructed shape: the one spawn was a single Explore subagent early in the PLAN stage, asking for the model, the store and the test structure, which is act Stage 1's "an Explore agent per distinct area" performed correctly.
+
+**The base rate is the useful number, and it breaks the next round's design.** Near 25 percent, a delegation-available cell of n=4 holds roughly one delegating run against three that do not, so an assigned-cell A/B is mostly solo against solo: round 17 again, at higher cost. Three ways out, none free. Many more seeds (about 32 runs in the available cell to reach 8 delegating ones). Or condition the analysis on observed spawning rather than assigned cell, which is far cheaper and honestly observational, with no causal claim. Or strengthen the elicitation, which then measures compliance with an instruction rather than spontaneous structure, a different question.
+
+**The one direct observation points away from the hypothesis.** The run that delegated fell for the float; two of the three that did not delegate held it. n=1 on that arm, no statistical content, and it is not evidence that delegation hurts. It is recorded because it is the only such observation the program has. A hypothesis worth replicating, not a finding: that run aimed its fan-out at code structure, and this trap lives in a contradiction between documents, so a fan-out pointed at the wrong surface may redistribute attention away from the trap. That would be the compliance-budget result restated for structure instead of prose.
+
+One measurement note, because it has now cost two near-misses. The spawn was emitted as a `tool_use` named `Agent` while the same session's init event listed the tool as `Task`. Counting by either name alone returns zero for this probe, exactly as it did for round 17's first count. Parse both names.
+
+Limitations: n=4, one fixture, one tier; the comparison is across rounds rather than randomized within one; the trap outcomes are mechanical observations, not judged scores.
+
 ## Standing limitations
 
 Small n throughout (1-4 runs per cell), LLM judges (blind where multiple outputs are compared, but built on the same frontier model that appears as a baseline), synthetic fixtures, research ground truth only as current as its run date. This log exists so method edits are tested, not so anyone mistakes it for a benchmark.
