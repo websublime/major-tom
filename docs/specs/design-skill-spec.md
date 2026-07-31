@@ -1,6 +1,6 @@
 # Spec: the `design` skill
 
-Status: DRAFT, pending the design review gate. The verdict section at the end is empty by construction and must be filled by an attacker who did not write this file. See fraud 6 below: a spec signed by its own author is the exact failure that retired the previous project layer.
+Status: REFUTED at the design review gate, 2026-07-31. Nothing in section 7 may be built. The verdict and its findings are in section 11, written by attackers who did not author this file.
 
 ## 1. Overview
 
@@ -103,4 +103,18 @@ Neither can catch frauds 1 to 4. Those stay with the gate.
 
 ## 11. Design Review Verdict
 
-Empty. To be filled by attackers who did not write this file, naming each lens used, per fraud 1 and `agents/architect.md:15`. Until then this spec is a draft and nothing in section 7 may be built.
+**REFUTED** (design gate, 2026-07-31)
+
+ATTACKED BY: three lenses, none of them the author of this spec. Structural (is this the retired spec mode renamed), value and build order, and buildability. All three returned REFUTED independently. The author transcribed this block; the verdict and its findings are theirs.
+
+Nothing in section 7 may be built. The findings that carry that verdict, each verified against the repo by a fourth pass:
+
+1. **The one forced artifact is spent on the least damaging fraud.** Section 5 spends it on BOUND, which enforces fraud 6, ranked last in this spec's own damage order. Fraud 1, which section 3 calls the one that "has to be structural", receives one sentence of prose. That is the pre-gc-iron state verbatim, and `.knowledge/memory/delegation-as-prose.md` names it as the cause of the 2026-07-14 field failure. The retired layer's answer to this exact fraud, the `ATTACKED BY` field, survives nowhere in the live surface.
+2. **Risk 1 difference (c) is false, not merely unproven.** The retired mode had a falsifying fixture specified in normative detail (`eval/archive/scenarios/s10-delegation-trap/GROUND-TRUTH.md`), whose caps are aimed at fraud 1: "The design gate verdict authored by the spec's author, or ATTACKED BY missing ... = the gate did not run". It was built and never run. What it lacked was a run, which is exactly what s12 lacks.
+3. **A passed design gate is not evidence that a thing should exist.** `docs/specs/gc-iron-spec.md` records VERIFIED WITH CAVEATS from a three-lens panel on 2026-07-23. `c21e5b1` deleted the skill on 2026-07-24. This spec was one gate away from claiming the same license.
+4. **Four of four stages map onto the retired `spec <milestone>` mode**, three of them onto consecutive numbered steps. Risk 1 is confirmed, not mitigated.
+5. **GATE cannot be built as written.** No stage produces the document GATE consumes; `prove` is a skill and cannot be spawned; `prove` routes non-code work to a `think` domain adapter and none exists for design contracts; the agent implied for the verdict edit lacks Edit; REFUTED has no defined behavior.
+6. **Both mechanical checks are unimplementable as stated.** `.github/checks.py` hardcodes four skill names and has no binding parser, and the spec supplies no id grammar. On landing day both checks would guard zero files.
+7. **The delta over what exists is a convention.** Five of six fraud rows are sourced to `agents/architect.md`, which already carries the authority order, register entries with ids and dismissed alternatives, just-in-time detail, and the review lens. Genuinely new: the binding slot, the CI check, and a non-discretionary gate. None requires a new skill body.
+
+Consequence recorded here so the next attempt inherits it: build the convention first (the binding slot, the two checks once they are implementable, one documented flow through `think plan`, `architect` and `prove`), run one real design task through it, and write the skill only if that recorded run fails in a way that can be named. The owner's decision that this is a skill rather than a mode stands; what this verdict changes is when it gets written, not what it is.
