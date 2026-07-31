@@ -1,6 +1,8 @@
 # Spec: the `design` skill
 
-Status: REFUTED at the design review gate, 2026-07-31. Nothing in section 7 may be built. The verdict and its findings are in section 11, written by attackers who did not author this file.
+Status: REFUTED at the design review gate, 2026-07-31. The skill is not built and this spec does not license building it. The verdict and its findings are in section 11, written by attackers who did not author this file.
+
+What the verdict DID license, and what has since been built per its own closing paragraph: the binding's Document roles slot, the question that fills it, and the register check, with the two checks merged into one because the path-existence half is meaningless separately. The skill body, its references, the eval fixture and the version bump remain unbuilt. Section 7's inventory is therefore partly done and partly forbidden; section 11 says which is which.
 
 ## 1. Overview
 

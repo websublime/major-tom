@@ -114,6 +114,73 @@ for name in sorted(os.listdir(scen_dir)):
     else:
         ok(f"eval/scenarios/{name} ({len(entries)} entries)")
 
+# 8. Decision registers: every id cited in an interface SSOT resolves, and no entry is uncited.
+# Runs over every binding in the repo that carries a Document roles slot, this repo's own and
+# every eval fixture's. A role left unbound is reported as skipped with its reason, never
+# silently passed: an unbound role degrades, it does not disappear.
+ROLE_ROW = re.compile(r"^\|\s*(Decision register|Interface SSOT)\s*\|\s*([^|]+?)\s*\|", re.M)
+ENTRY_ROW = re.compile(r"^\|\s*(D\d+)\s*\|", re.M)
+FENCE = re.compile(r"```.*?```", re.S)
+ID_REF = re.compile(r"\bD\d+\b")
+
+
+def role_path(repo_root, value):
+    """Resolve a Document roles cell to a file, or None when unbound. Cells may carry a
+    trailing qualifier such as 'docs/PRD.md section 4'; the file is the first token."""
+    value = value.strip()
+    if value.lower().startswith("unbound") or value.lower() == "none":
+        return None
+    token = value.split()[0].strip("`")
+    candidate = os.path.join(repo_root, token)
+    return candidate if os.path.isfile(candidate) else False
+
+
+bindings = []
+for root, dirs, files in os.walk(ROOT):
+    dirs[:] = [d for d in dirs if d not in (".git", "node_modules", "temp", "__pycache__")]
+    if "PROCESS.md" in files and os.path.basename(root) == "docs":
+        p = os.path.join(root, "PROCESS.md")
+        with io.open(p, encoding="utf-8") as fh:
+            text = fh.read()
+        if text.startswith("# Process binding"):
+            bindings.append((os.path.dirname(root), p, text))
+
+for repo_root, binding_path, text in sorted(bindings):
+    label = os.path.relpath(binding_path, ROOT)
+    roles = {m.group(1): m.group(2) for m in ROLE_ROW.finditer(text)}
+    if not roles:
+        continue
+    resolved, unbound, missing = {}, [], []
+    for role in ("Decision register", "Interface SSOT"):
+        if role not in roles:
+            unbound.append(f"{role} (no row)")
+            continue
+        path = role_path(repo_root, roles[role])
+        if path is None:
+            unbound.append(role)
+        elif path is False:
+            missing.append(f"{role} -> {roles[role].strip()}")
+        else:
+            resolved[role] = path
+    for m in missing:
+        fail(f"{label}: bound path does not exist: {m}")
+    if len(resolved) < 2:
+        if not missing:
+            ok(f"{label}: register check skipped, unbound: {', '.join(unbound)}")
+        continue
+    with io.open(resolved["Decision register"], encoding="utf-8") as fh:
+        entries = set(ENTRY_ROW.findall(fh.read()))
+    with io.open(resolved["Interface SSOT"], encoding="utf-8") as fh:
+        cited = set(ID_REF.findall(FENCE.sub("", fh.read())))
+    dangling = sorted(cited - entries)
+    uncited = sorted(entries - cited)
+    if dangling:
+        fail(f"{label}: SSOT cites {', '.join(dangling)} with no register entry")
+    if uncited:
+        fail(f"{label}: register entries never cited by the SSOT: {', '.join(uncited)}")
+    if not dangling and not uncited:
+        ok(f"{label}: {len(entries)} decision ids, register and SSOT agree")
+
 print()
 if failures:
     print(f"{len(failures)} check(s) failed")
