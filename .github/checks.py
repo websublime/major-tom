@@ -118,21 +118,41 @@ for name in sorted(os.listdir(scen_dir)):
 # Runs over every binding in the repo that carries a Document roles slot, this repo's own and
 # every eval fixture's. A role left unbound is reported as skipped with its reason, never
 # silently passed: an unbound role degrades, it does not disappear.
-ROLE_ROW = re.compile(r"^\|\s*(Decision register|Interface SSOT)\s*\|\s*([^|]+?)\s*\|", re.M)
+ROLE_ROW = re.compile(r"^\|\s*(decision register|interface ssot)\s*\|\s*([^|]*?)\s*\|", re.M | re.I)
 ENTRY_ROW = re.compile(r"^\|\s*(D\d+)\s*\|", re.M)
 FENCE = re.compile(r"```.*?```", re.S)
 ID_REF = re.compile(r"\bD\d+\b")
+MD_LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+
+# Only the dangling direction is a defect. A register legitimately holds product and process
+# decisions an interface SSOT never cites: s11's D5 is deliberately absent from its spine, which
+# is that fixture's whole design. Failing on uncited entries would force the artifact to be bent
+# to satisfy the check, which is the fraud this repo hunts, run backwards.
+
+
+def read_text(path):
+    with io.open(path, encoding="utf-8") as fh:
+        return fh.read()
 
 
 def role_path(repo_root, value):
-    """Resolve a Document roles cell to a file, or None when unbound. Cells may carry a
-    trailing qualifier such as 'docs/PRD.md section 4'; the file is the first token."""
-    value = value.strip()
-    if value.lower().startswith("unbound") or value.lower() == "none":
+    """Resolve a Document roles cell. Returns None when unbound, or (path, reason):
+    reason is None when the path is a usable file."""
+    value = value.strip().strip("`\"'")
+    m = MD_LINK.search(value)
+    if m:
+        value = m.group(1).strip()
+    if not value or value.lower().startswith(("unbound", "none", "<")):
         return None
-    token = value.split()[0].strip("`")
-    candidate = os.path.join(repo_root, token)
-    return candidate if os.path.isfile(candidate) else False
+    token = value.split()[0].strip("`\"'")
+    candidate = os.path.normpath(os.path.join(repo_root, token))
+    if not candidate.startswith(os.path.realpath(ROOT)) and not candidate.startswith(ROOT):
+        return (token, "escapes the repository")
+    if os.path.isdir(candidate):
+        return (token, "is a directory, expected a file")
+    if not os.path.isfile(candidate):
+        return (token, "does not exist")
+    return (candidate, None)
 
 
 bindings = []
@@ -140,46 +160,51 @@ for root, dirs, files in os.walk(ROOT):
     dirs[:] = [d for d in dirs if d not in (".git", "node_modules", "temp", "__pycache__")]
     if "PROCESS.md" in files and os.path.basename(root) == "docs":
         p = os.path.join(root, "PROCESS.md")
-        with io.open(p, encoding="utf-8") as fh:
-            text = fh.read()
-        if text.startswith("# Process binding"):
-            bindings.append((os.path.dirname(root), p, text))
+        try:
+            text = read_text(p)
+        except Exception as e:
+            fail(f"{os.path.relpath(p, ROOT)}: unreadable ({e})")
+            continue
+        if text.lstrip("﻿ \t\r\n").startswith("# Process binding"):
+            bindings.append((os.path.dirname(root), p, FENCE.sub("", text)))
 
 for repo_root, binding_path, text in sorted(bindings):
     label = os.path.relpath(binding_path, ROOT)
-    roles = {m.group(1): m.group(2) for m in ROLE_ROW.finditer(text)}
+    roles = {m.group(1).lower(): m.group(2) for m in ROLE_ROW.finditer(text)}
     if not roles:
+        ok(f"{label}: no Document roles table, register check not applicable")
         continue
-    resolved, unbound, missing = {}, [], []
-    for role in ("Decision register", "Interface SSOT"):
+    resolved, unbound, broken = {}, [], []
+    for role in ("decision register", "interface ssot"):
         if role not in roles:
             unbound.append(f"{role} (no row)")
             continue
-        path = role_path(repo_root, roles[role])
-        if path is None:
+        outcome = role_path(repo_root, roles[role])
+        if outcome is None:
             unbound.append(role)
-        elif path is False:
-            missing.append(f"{role} -> {roles[role].strip()}")
+        elif outcome[1]:
+            broken.append(f"{role} -> {outcome[0]} ({outcome[1]})")
         else:
-            resolved[role] = path
-    for m in missing:
-        fail(f"{label}: bound path does not exist: {m}")
+            resolved[role] = outcome[0]
+    for b in broken:
+        fail(f"{label}: bound path unusable: {b}")
     if len(resolved) < 2:
-        if not missing:
+        if not broken:
             ok(f"{label}: register check skipped, unbound: {', '.join(unbound)}")
         continue
-    with io.open(resolved["Decision register"], encoding="utf-8") as fh:
-        entries = set(ENTRY_ROW.findall(fh.read()))
-    with io.open(resolved["Interface SSOT"], encoding="utf-8") as fh:
-        cited = set(ID_REF.findall(FENCE.sub("", fh.read())))
-    dangling = sorted(cited - entries)
-    uncited = sorted(entries - cited)
+    try:
+        entries = set(ENTRY_ROW.findall(read_text(resolved["decision register"])))
+        cited = set(ID_REF.findall(FENCE.sub("", read_text(resolved["interface ssot"]))))
+    except Exception as e:
+        fail(f"{label}: could not read a bound document ({e})")
+        continue
+    dangling = sorted(cited - entries, key=lambda s: int(s[1:]))
     if dangling:
         fail(f"{label}: SSOT cites {', '.join(dangling)} with no register entry")
-    if uncited:
-        fail(f"{label}: register entries never cited by the SSOT: {', '.join(uncited)}")
-    if not dangling and not uncited:
-        ok(f"{label}: {len(entries)} decision ids, register and SSOT agree")
+    else:
+        register_only = len(entries - cited)
+        note = f", {register_only} register-only" if register_only else ""
+        ok(f"{label}: {len(cited)} decision ids cited, all resolve{note}")
 
 print()
 if failures:

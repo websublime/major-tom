@@ -19,7 +19,7 @@ Paths only; the order between the roles is an invariant the skills hold. Unbound
 | Interface SSOT | unbound |
 | Component plans | unbound |
 
-Three of four are unbound and that is honest: this repo is docs and eval, it ships no application interfaces, and its decisions live in `docs/specs/` and `.knowledge/memory/` as prose rather than as a numbered register. The eval fixtures under `eval/` carry their own bindings and do bind these roles, which is what the register check in `.github/checks.py` currently guards.
+Three of four are unbound and that is honest: this repo is docs and eval, it ships no application interfaces, and its decisions live in `docs/specs/` and `.knowledge/memory/` as prose rather than as a numbered register. The eval fixtures carry their own bindings and do bind these roles, which is what the register check in `.github/checks.py` guards: `eval/scenarios/s11-wide-surface` plus the three archived ones under `eval/archive/scenarios/`.
 
 ## Working model
 
