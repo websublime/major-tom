@@ -6,4 +6,4 @@ The process binding (roles, tracker, conventions) loads every session:
 
 @docs/PROCESS.md
 
-Doc map: `docs/PRD.md` product truth (decisions in section 4) | `docs/design-spine.md` interface SSOT | `docs/plans/` component plans | `docs/STATUS.md` live task registry.
+Doc map: `docs/PRD.md` product truth | `docs/design-spine.md` interface SSOT | `docs/plans/` component plans | `docs/STATUS.md` live task registry.

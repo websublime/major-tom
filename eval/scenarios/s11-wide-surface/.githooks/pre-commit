@@ -1,13 +1,13 @@
 #!/bin/sh
-# major-tom guard: no commits to the default branch.
+# shiftlog guard: no commits to the default branch.
 # Enable once per clone: git config core.hooksPath .githooks
 b="$(git symbolic-ref --short HEAD 2>/dev/null)"
-d="$(git config major-tom.defaultBranch || git config ground-control.defaultBranch || echo main)"  # ground-control.defaultBranch: intentional migration fallback, do not remove
+d="$(git config shiftlog.defaultBranch || echo main)"
 if [ "$b" = "$d" ]; then
-  mkdir -p .major-tom
-  echo "$(date +%FT%T) pre-commit blocked a commit on $d" >> .major-tom/violations.log
-  echo "major-tom: direct commits to '$d' are blocked. claim = branch: git switch -c t<id>-<slug>" >&2
-  echo "Bypassing this guard (--no-verify, unsetting core.hooksPath, editing .githooks) is a gate violation the Verify gate treats as fraud." >&2
+  mkdir -p .shiftlog
+  echo "$(date +%FT%T) pre-commit blocked a commit on $d" >> .shiftlog/violations.log
+  echo "shiftlog: direct commits to '$d' are blocked. claim = branch: git switch -c t<id>-<slug>" >&2
+  echo "Bypassing this guard (--no-verify, unsetting core.hooksPath, editing .githooks) is a process violation." >&2
   exit 1
 fi
 exit 0
