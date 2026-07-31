@@ -32,5 +32,3 @@ monthly_summary(shifts: list[Shift]) -> dict[str, int]
 - Values are integer cents, per D4.
 - Keys appear in ascending order. A caller iterating the result gets months in calendar order without sorting again.
 - A month with no contributing shifts does not appear at all. No zero-valued keys.
-
-Which shifts contribute to a total is a product decision, not an interface one: see the decision register in `docs/PRD.md` section 4.

@@ -8,10 +8,6 @@ The project-specific half of the workflow: the skills hold the invariants, this 
 - Owner (genuine forks and escalations go here): Sam
 - Conversation language: English / Artifact language (code, docs, commits): English
 
-## Working model
-
-Not prescribed. How the session distributes its own work, whether it does the whole task itself or delegates parts of it to helpers, is the session's own choice and is not a process requirement. This binding takes no position, and neither requires nor rewards either shape. Judge the work, not the shape of the hands that did it.
-
 ## Document roles
 
 | Role | Bound to |
@@ -23,7 +19,7 @@ Not prescribed. How the session distributes its own work, whether it does the wh
 | Status registry | docs/STATUS.md |
 | Knowledge base | unbound: session memory only |
 
-Authority order when documents disagree: product truth, then the interface SSOT, then component plans. A task description is never authoritative.
+Authority order when documents disagree: product truth, then the interface SSOT, then component plans. A task description is never authoritative. A component plan found diverging from the SSOT is repaired in the plan, by whoever finds it, in the same commit as the work that exposed it; escalate to the owner only when the SSOT itself looks wrong.
 
 ## Tracker
 
