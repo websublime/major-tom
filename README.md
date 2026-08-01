@@ -17,7 +17,7 @@ What makes this repo different is not the method, it is the receipts: **it ships
 claude --plugin-dir path/to/major-tom
 ```
 
-Installing brings: the three skills (namespaced: `/major-tom:think`, `/major-tom:act`, `/major-tom:prove`), the `/major-tom:onboard` command, nine role agents the working model delegates to, and the discipline hooks. **Disclosure**: the hooks are self-gated; they act only inside git repos whose root carries a binding (`docs/PROCESS.md` starting with `# Process binding`) and stay inert everywhere else. The `guard-violations` monitor is an experimental Claude Code component (v2.1.105+). `jq` is optional: the branch guard falls back to a conservative parser and fails closed without it.
+Installing brings: the three skills (namespaced: `/major-tom:think`, `/major-tom:act`, `/major-tom:prove`), the `/major-tom:onboard` command, nine role agents the working model delegates to, and the discipline hooks. **Disclosure**: the hooks are self-gated; they act only inside git repos whose root carries a binding (`docs/PROCESS.md` starting with `# Process binding`) and stay inert everywhere else. The `guard-violations` monitor is an experimental Claude Code component (v2.1.105+). `jq` is optional: without it the branch guard still blocks on well-formed input, and allows the command on input it cannot parse at all (see the FAQ).
 
 ### Required first step: bind the repo
 
@@ -63,7 +63,7 @@ flowchart LR
 /major-tom:onboard
 ```
 
-onboard is a transformer: it detects stacks, docs, any tracker, and the harness delegation tools; asks the owner only what detection cannot settle, in one batch; fetches stack specialists from the agents directory with the owner's per-item approval; and writes a slim `docs/PROCESS.md` that CLAUDE.md imports. The binding records the working model (a team in isolated worktrees, or subagents on a single branch, with the coordinator orchestrating either way), which document carries which authority (a role with nothing to bind stays unbound, which degrades rather than blocks), the agent roster, and how the session reaches your issue tracker. It writes no product content and runs no lifecycle.
+onboard is a transformer: it detects stacks, docs, any tracker, and the harness delegation tools; asks the owner only what detection cannot settle, in one batch; fetches stack specialists from the agents directory with the owner's per-item approval; and writes a slim `docs/PROCESS.md` that CLAUDE.md imports. The binding records the working model (a team in isolated worktrees, or subagents on a single branch, with the coordinator orchestrating either way), which document carries which authority (a role with nothing to bind stays unbound, which degrades rather than blocks), the agent roster, how the session reaches your issue tracker, where design artifacts and recorded runs land, and how a spec declares its gate result: front matter at the top of the file carrying `verdict` (the prove verdict verbatim), `attacked_by`, and `author`. A fixed grammar rather than a phrase to recognize, so a document that quotes or illustrates a verdict is not mistaken for one. The check confirms the three fields are present and non-empty; it does not judge whether the attackers are real or independent. It writes no product content and runs no lifecycle.
 
 ```mermaid
 flowchart TD
@@ -124,10 +124,11 @@ Standing limitations, stated on purpose: small n throughout (1 to 4 runs per cel
 
 ## The guards
 
-Discipline that survives weak executors is mechanical, not prose. The plugin ships these layers, installed only with the owner's approval:
+Discipline that survives weak executors is mechanical, not prose. Two of these install only with the owner's approval; the harness hooks arrive with the plugin and are active in any repository carrying a binding, so they are listed with how to switch them off:
 
 - **Repo git hook** (`install-guards`, or copy [`pre-commit`](skills/onboard/references/guards/pre-commit) into `.githooks/`): blocks commits to the default branch for any actor, human or agent, any harness.
-- **Harness hook** ([`hooks/hooks.json`](hooks/hooks.json)): a PreToolUse branch guard that blocks the command before it runs. Root-anchored, self-gated.
+- **Harness hooks** ([`hooks/hooks.json`](hooks/hooks.json)): a PreToolUse branch guard that blocks a commit on the default branch before it runs, and the writing rule below. Root-anchored, self-gated.
+- **Writing rule** (`UserPromptSubmit`, [`scripts/userprompt-writing-rule.sh`](scripts/userprompt-writing-rule.sh)): re-states think Step 6 as context on every prompt, so reports stay in plain language with no coined shorthand. Step 6 says the same thing as prose, and prose is what auto-compaction drops first. The cost is deliberate: about 1,200 characters per message rather than per session, which is exactly why compaction cannot reach it. It arrives with the plugin rather than by approval. To switch it off, remove the `UserPromptSubmit` entry from the plugin's `hooks/hooks.json`, or do not bind the repository. If you also add this hook to a repo's own `.claude/settings.json` while the plugin is installed, it fires twice; keep one.
 - **Monitor** ([`monitors/monitors.json`](monitors/monitors.json)): surfaces guard violations live in the session (experimental, v2.1.105+).
 
 ## FAQ
@@ -138,9 +139,9 @@ Discipline that survives weak executors is mechanical, not prose. The plugin shi
 
 **Will the hooks interfere with my other repos?** No. Every hook exits immediately unless the current directory is inside a git repo whose root has `docs/PROCESS.md` starting with `# Process binding`. This was itself a gate finding (the first version was looser) and is covered by tests the Verify gate forced.
 
-**Do I need `jq`?** No. With `jq` the branch guard parses the tool input properly; without it, a conservative fallback still extracts the command and the guard fails closed, not open.
+**Do I need `jq`?** No, and here is the exact behaviour, because an earlier version of this answer overstated it. With `jq` the branch guard parses the tool input properly. Without `jq` a conservative fallback still extracts the command from well-formed input and still blocks (measured). On input it cannot parse at all, the guard allows the command rather than blocking every command, so it fails open in that one case. The repository `pre-commit` hook is the backstop that does not depend on parsing.
 
-**What is a "binding"?** A slim generated file (`docs/PROCESS.md`) that `onboard` writes and CLAUDE.md imports, recording the working model, which document carries which authority, the agent roster, and how the session reaches your issue tracker. It loads every session and carries no lifecycle. This repo eats its own food: see [`docs/PROCESS.md`](docs/PROCESS.md).
+**What is a "binding"?** A slim generated file (`docs/PROCESS.md`) that `onboard` writes and CLAUDE.md imports, recording the working model, which document carries which authority, the agent roster, how the session reaches your issue tracker, and where design artifacts and recorded runs land. It loads every session and carries no lifecycle. This repo eats its own food: see [`docs/PROCESS.md`](docs/PROCESS.md).
 
 **What is the INTENT line?** A forced artifact at the decision point: `INTENT: code does X; check expects Y; spec says Z` before behavior changes. It exists because the rule failed as prose and held as an artifact (rounds 2 to 3).
 

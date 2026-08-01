@@ -18,4 +18,4 @@ onboard binds the workflow to a repo. It is a transformer: repo state in, a slim
 
 ## What onboard does not do
 
-onboard binds the repo and records how the session should work; it does not develop product content, run a lifecycle, or make decisions. When a role has no docs to bind, bind it as unbound (degraded, declared). The binding is a slim set of slots: repo facts, the working model, which document carries which authority, the agent roster, and the tracker access. It carries no lifecycle.
+onboard binds the repo and records how the session should work; it does not develop product content, run a lifecycle, or make decisions. When a role has no docs to bind, bind it as unbound (degraded, declared). The binding is a slim set of slots: where design artifacts and recorded runs land, repo facts, the working model, which document carries which authority, the agent roster, and the tracker access. It carries no lifecycle.
