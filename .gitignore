@@ -2,3 +2,9 @@ temp
 .DS_Store
 __pycache__/
 .major-tom/
+
+# Run records live on the orphan branch `runs`, never on main. Adding this repository as a
+# plugin marketplace shallow-clones main and puts its whole tree on the user's disk, so a
+# recorded run on main would ship. Attach the branch here as a worktree to work on them:
+#   git worktree add docs/runs runs
+docs/runs/

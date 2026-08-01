@@ -65,15 +65,62 @@ for skill in ["think", "act", "prove", "onboard"]:
     except Exception as e:
         fail(f"skills/{skill}/SKILL.md: {e}")
 
-# 4. Domain adapters all carry a binding minimum evidence set and a fraud table
+# 4. Domain adapters all carry a binding minimum evidence set and a fraud table, AND are routed to.
+# The second half was missing: this check read every adapter's contents and never checked that
+# anything points at one. An adapter think's routing sentence does not name is never opened, so it
+# is dead weight that still passes. Slug separators are matched loosely because the sentence writes
+# them as prose ("business/ops" for business-ops, "design contracts" for design-contracts).
 domains_dir = os.path.join(ROOT, "skills", "think", "references", "domains")
-for name in sorted(os.listdir(domains_dir)):
-    with io.open(os.path.join(domains_dir, name), encoding="utf-8") as f:
-        body = f.read()
-    if "Minimum evidence set" not in body or "Fraud table" not in body:
-        fail(f"domains/{name}: missing minimum evidence set or fraud table")
-    else:
-        ok(f"domains/{name} complete")
+# Scope the search to the routing SENTENCE, not the whole file. The first version searched all of
+# think's SKILL.md and was already vacuous on landing day: removing `research/reporting` from the
+# routing sentence still passed, because "Research is never optional" sits in the same file. That is
+# the class this file removed from the register check in commit 2d1eedd, three commits before this
+# check landed, committed again here.
+with io.open(os.path.join(ROOT, "skills", "think", "SKILL.md"), encoding="utf-8") as f:
+    _think = f.read()
+# The CLAUSE, not the paragraph: scoping to the paragraph was still vacuous, because the same
+# paragraph carries "Research is never optional" and "education content uses research".
+_m = re.search(r"If the task is(.*?)read the matching file", _think, re.S)
+if not _m:
+    # One cause, one failure. Reporting the missing clause AND every adapter as unrouted produced
+    # nine failures for a single edit, which a gate flagged as noise that hides the real cause.
+    fail("skills/think/SKILL.md: no domain routing clause, so no adapter can be checked as routed")
+else:
+    # Whole ENTRIES, not substrings. The substring match let a future adapter named `ops.md` pass by
+    # matching "business/ops", measured by a gate. Entries are comma or "or" separated, a
+    # gloss is removed before splitting, and the slug must equal an entry or its first segment, so
+    # `research.md` still matches "research/reporting" while `ops.md` matches nothing. Residual,
+    # measured: a slug equal to an entry's FIRST segment still counts, so a hypothetical
+    # `design.md` would match "design/UX". That name is ambiguous next to the two design
+    # adapters that exist, so the residual is left rather than special-cased.
+    def _norm(entry):
+        return re.sub(r"[ /-]+", "-", entry.strip(" .*`\n").lower())
+
+    # Glosses are removed BEFORE splitting. Splitting first let a gloss containing commas leak its
+    # fragments in as entries: a gate measured `a`, `an` and `a-decision-record` all counting as
+    # routed names, so an adapter called `a.md` would have passed.
+    _clause = re.sub(r"\([^()]*\)", " ", _m.group(1), flags=re.S)
+    routed_names = set()
+    for _e in re.split(r",|\bor\b", _clause):
+        n = _norm(_e)
+        if n:
+            routed_names.add(n)
+            routed_names.add(n.split("-")[0])
+    for name in sorted(os.listdir(domains_dir)):
+        try:
+            with io.open(os.path.join(domains_dir, name), encoding="utf-8") as f:
+                body = f.read()
+        except Exception as e:
+            # Without this a single non-UTF-8 byte here raised, and checks 5 to 9 never ran.
+            fail(f"domains/{name}: unreadable as UTF-8 ({e})")
+            continue
+        slug = (name[:-3] if name.endswith(".md") else name).lower()
+        if "Minimum evidence set" not in body or "Fraud table" not in body:
+            fail(f"domains/{name}: missing minimum evidence set or fraud table")
+        elif slug not in routed_names:
+            fail(f"domains/{name}: not named in think's domain routing clause, so it is never read")
+        else:
+            ok(f"domains/{name} complete and routed")
 
 # 5. Evidence files parse as JSON
 results_dir = os.path.join(ROOT, "eval", "results")
@@ -101,7 +148,9 @@ for root, dirs, files in os.walk(ROOT):
                     fail(f"em/en dash in {os.path.relpath(p, ROOT)}")
                     count += 1
         except Exception:
-            pass
+            # A file this reader cannot decode is not exempt from the rule; say so rather than skip.
+            fail(f"unreadable as UTF-8, so the dash rule cannot be checked: {os.path.relpath(p, ROOT)}")
+            count += 1
 if count == 0:
     ok("no em/en dashes anywhere")
 
@@ -120,7 +169,13 @@ for name in sorted(os.listdir(scen_dir)):
 # silently passed: an unbound role degrades, it does not disappear.
 ROLE_ROW = re.compile(r"^\|\s*(decision register|interface ssot)\s*\|\s*([^|]*?)\s*\|", re.M | re.I)
 ENTRY_ROW = re.compile(r"^\|\s*(D\d+)\s*\|", re.M)
-FENCE = re.compile(r"```.*?```", re.S)
+FENCE = re.compile(r"```.*?```|~~~.*?~~~", re.S)
+# A lone opening fence with no closer hides everything after it, so strip to EOF too.
+OPEN_FENCE = re.compile(r"(?:^|\n)(?:```|~~~)[\s\S]*$")
+
+
+def strip_fences(text):
+    return OPEN_FENCE.sub("", FENCE.sub("", text))
 ID_REF = re.compile(r"\bD\d+\b")
 MD_LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 
@@ -166,7 +221,7 @@ for root, dirs, files in os.walk(ROOT):
             fail(f"{os.path.relpath(p, ROOT)}: unreadable ({e})")
             continue
         if text.lstrip("﻿ \t\r\n").startswith("# Process binding"):
-            bindings.append((os.path.dirname(root), p, FENCE.sub("", text)))
+            bindings.append((os.path.dirname(root), p, strip_fences(text)))
 
 for repo_root, binding_path, text in sorted(bindings):
     label = os.path.relpath(binding_path, ROOT)
@@ -193,8 +248,8 @@ for repo_root, binding_path, text in sorted(bindings):
             ok(f"{label}: register check skipped, unbound: {', '.join(unbound)}")
         continue
     try:
-        entries = set(ENTRY_ROW.findall(read_text(resolved["decision register"])))
-        cited = set(ID_REF.findall(FENCE.sub("", read_text(resolved["interface ssot"]))))
+        entries = set(ENTRY_ROW.findall(strip_fences(read_text(resolved["decision register"]))))
+        cited = set(ID_REF.findall(strip_fences(read_text(resolved["interface ssot"]))))
     except Exception as e:
         fail(f"{label}: could not read a bound document ({e})")
         continue
@@ -205,6 +260,99 @@ for repo_root, binding_path, text in sorted(bindings):
         register_only = len(entries - cited)
         note = f", {register_only} register-only" if register_only else ""
         ok(f"{label}: {len(cited)} decision ids cited, all resolve{note}")
+
+# 9. Gate verdicts carry their provenance, declared in one fixed grammar.
+#
+# WHY THIS IS A GRAMMAR AND NOT A MATCHER. Three Verify gates each found a regression in the previous
+# version, which tried to recognize a verdict written anywhere in free prose. Gate one found five
+# bypasses and a false-positive pair; gate two found three regressions plus eleven evasions; gate
+# three found three more regressions, including a heading arm that fired on ordinary section titles
+# and a character bound that silently dropped long headers. Every repair widened the surface the next
+# repair had to cover, because free text has no bounded set of shapes. The count of holes was not
+# going down, so the matcher was replaced rather than patched a fourth time.
+#
+# THE GRAMMAR. A document declares a gate verdict by carrying front matter at the very top: a line of
+# exactly three dashes, `key: value` lines, a closing line of exactly three dashes. Three keys are
+# required together: `verdict`, `attacked_by`, `author`. No front matter means no declaration, so
+# prose that quotes or discusses a verdict is not a verdict. That is what stops the false positives
+# the matcher produced on a command table in README.md, on agents/code-reviewer.md describing its own
+# output format, and on section titles beginning with a verdict word.
+#
+# WHAT IT CANNOT DO, stated rather than implied. It cannot make anyone use the grammar; a document
+# that states a verdict only in prose is simply not a verdict document by this convention, and
+# docs/PROCESS.md says so. It cannot judge independence, because all three values are author-written.
+# It enforces that a document claiming a verdict names who attacked it and who wrote it, in a form a
+# reader and a machine read the same way.
+FRONT_MATTER = re.compile(r"\A\ufeff?---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)", re.S)
+FM_KEY = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)[ \t]*:[ \t]*(.*?)[ \t]*$", re.M)
+VERDICT_WORDS = ("VERIFIED", "VERIFIED WITH CAVEATS", "REFUTED")
+# NO PLACEHOLDER SCREENING, and that is a decision rather than an omission.
+#
+# Four versions of this check tried to tell a real attribution from a fake one by matching the value
+# against a list of dead words. Four Verify gates each found holes in it, and the fourth version,
+# which removed a whole-value test to fix an order dependence, closed two cases and reopened ten,
+# including two that earlier gate reports had recorded as closed. The value of a free-text field
+# cannot be screened by pattern, because "who attacked this" has no bounded vocabulary.
+#
+# So the check now does exactly one thing and says so everywhere: a document that declares a verdict
+# must carry all three keys, and none of them may be empty. Whether the names are real people or
+# lenses, and whether they are independent of the author, is a human judgement this check does not
+# make and no longer implies it makes.
+
+
+def is_filled(value):
+    """True when the field carries any content at all. Deliberately not a judgement about content."""
+    # Whitespace is stripped again AFTER the quotes: a quoted-empty value `"   "` survived the
+    # first strip because the quotes were the outermost characters.
+    return bool(value.strip().strip("\"'").strip())
+
+
+guarded = 0
+for root, dirs, files in os.walk(ROOT):
+    dirs[:] = [d for d in dirs if d not in (".git", "node_modules", "temp", "__pycache__")]
+    # docs/runs is a worktree of the orphan branch `runs`, not part of what main ships. Scanning it
+    # made this check report six documents locally and two in continuous integration, where the
+    # worktree does not exist.
+    _rel_root = os.path.relpath(root, ROOT)
+    # Path comparison, not string comparison. `startswith` on the joined string also skipped
+    # `docs/runs-archive` and `docs/runsy`, which a gate measured.
+    if _rel_root == os.path.join("docs", "runs") or _rel_root.startswith(os.path.join("docs", "runs") + os.sep):
+        dirs[:] = []
+        continue
+    for f in sorted(files):
+        if not f.endswith(".md"):
+            continue
+        p = os.path.join(root, f)
+        rel = os.path.relpath(p, ROOT)
+        try:
+            head = FRONT_MATTER.match(read_text(p))
+        except Exception:
+            # A file this reader cannot decode cannot be checked. Say so rather than skip silently.
+            fail(f"{rel}: unreadable as UTF-8, so its front matter cannot be checked")
+            continue
+        if not head:
+            continue
+        fields = {k.lower(): v for k, v in FM_KEY.findall(head.group(1))}
+        if "verdict" not in fields:
+            continue
+        guarded += 1
+        verdict = fields["verdict"].strip().strip("\"'")
+        if verdict not in VERDICT_WORDS:
+            fail(f"{rel}: verdict is {verdict!r}, not one of {', '.join(VERDICT_WORDS)}")
+        elif "attacked_by" not in fields:
+            fail(f"{rel}: declares a verdict and carries no attacked_by")
+        elif not is_filled(fields["attacked_by"]):
+            fail(f"{rel}: attacked_by is empty")
+        elif "author" not in fields:
+            fail(f"{rel}: declares a verdict and carries no author")
+        elif not is_filled(fields["author"]):
+            fail(f"{rel}: author is empty")
+        else:
+            ok(f"{rel}: {verdict}, attackers and author stated")
+if guarded == 0:
+    fail("verdict provenance check guarded 0 files: it is vacuous, not passing")
+else:
+    ok(f"verdict provenance check guarded {guarded} file(s)")
 
 print()
 if failures:
