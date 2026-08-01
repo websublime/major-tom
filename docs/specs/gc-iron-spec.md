@@ -1,3 +1,10 @@
+---
+verdict: VERIFIED WITH CAVEATS
+attacked_by: architect and invariants lens, eval and compliance-budget lens, executor-realism lens (iteration 1); orchestrator re-verification (iteration 2)
+author: architect, Spec/Plan team
+gate_date: 2026-07-23
+---
+
 # gc-iron: making delegation checkable
 
 > Historical. Documents the gc-iron change to ground-control, a skill retired by the kill-ground-control change. Kept as an immutable design record; the ground-control references below are history.

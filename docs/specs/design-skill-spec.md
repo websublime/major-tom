@@ -1,3 +1,10 @@
+---
+verdict: REFUTED
+attacked_by: structural lens, value and build-order lens, buildability lens; none of them this spec's author
+author: the session that wrote this spec
+gate_date: 2026-07-31
+---
+
 # Spec: the `design` skill
 
 Status: REFUTED at the design review gate, 2026-07-31. The skill is not built and this spec does not license building it. The verdict and its findings are in section 11, written by attackers who did not author this file.
@@ -112,6 +119,7 @@ Neither can catch frauds 1 to 4. Those stay with the gate.
 **REFUTED** (design gate, 2026-07-31)
 
 ATTACKED BY: three lenses, none of them the author of this spec. Structural (is this the retired spec mode renamed), value and build order, and buildability. All three returned REFUTED independently. The author transcribed this block; the verdict and its findings are theirs.
+AUTHOR OF ARTIFACT: the session that wrote this spec, which is not among the attackers above. Field added editorially on 2026-07-31, when the provenance check began requiring it; the attackers' text is unchanged.
 
 Nothing in section 7 may be built. The findings that carry that verdict, each verified against the repo by a fourth pass:
 
