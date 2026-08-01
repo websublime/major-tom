@@ -67,6 +67,7 @@ Agents directory (where onboard fetches specialists): <default: https://github.c
 - Branch naming: <e.g. t<id>-<slug>, off the default branch>
 - Commits: <default: Conventional Commits, atomic>
 - PRs and merge sign-off: <who signs off / merges; local-only mode (no remote) names who signs off>
+- Design artifacts land in: <path, e.g. docs/specs/, or "unbound">; a recorded run in <path, e.g. docs/runs/<date>-<slug>/, or a non-default branch, or "unbound">, with the plan that fed the design as `01-plan.md` there. If this repository is itself distributed from its default branch (a plugin marketplace, a template repo), a run recorded on that branch reaches everyone who fetches it; put runs on a non-default branch instead. A spec declares its gate result in front matter at the very top: three dashes, then `verdict` (the prove verdict verbatim: VERIFIED, VERIFIED WITH CAVEATS, REFUTED), `attacked_by`, and `author`, then three dashes. No block before the gate. The author is never an attacker. A fixed grammar rather than a phrase to recognize, so a document that quotes or illustrates a verdict is not mistaken for one. A check on this can confirm the three fields are present and non-empty; whether the attackers are real and independent of the author is a human judgement.
 
 ## Hard-rule additions
 
