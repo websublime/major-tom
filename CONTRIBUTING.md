@@ -21,6 +21,6 @@ This repo eats its own food: contributions follow the workflow it ships. The sho
 ## Style rules (CI-enforced)
 
 - Artifacts in English.
-- **No em or en dashes anywhere** in repo files: `python3 .github/checks.py` locally must pass.
+- **No em or en dashes anywhere** in repo files: `python3 .github/checks.py` locally must pass. That script needs PyYAML (`pip install pyyaml`), because two of its checks parse frontmatter rather than pattern-matching it; without it the run fails and says so.
 - `claude plugin validate .` must pass before distribution-facing changes.
 - Skills state claims the eval backs; if you change a claim, point to the round that supports it or run one.
