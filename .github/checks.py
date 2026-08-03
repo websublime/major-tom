@@ -48,8 +48,19 @@ try:
 except Exception as e:
     fail(f"version check: {e}")
 
-# 3. All skills exist with frontmatter name + description
-for skill in ["think", "act", "prove", "onboard"]:
+# 3. All skills exist with frontmatter name + description.
+# The skill list is DISCOVERED, never hardcoded. The hardcoded version passed on the commit that
+# added a fifth skill: the new skill was simply not in the list, so nothing checked its frontmatter
+# and the check still printed four green lines. A check that reports success on a surface it does
+# not read is the exact class this repo hunts, so the surface defines the list.
+SKILLS = sorted(
+    d
+    for d in os.listdir(os.path.join(ROOT, "skills"))
+    if os.path.isdir(os.path.join(ROOT, "skills", d))
+)
+if not SKILLS:
+    fail("skills/: no skill directories found, so check 3 would have been vacuous")
+for skill in SKILLS:
     path = os.path.join(ROOT, "skills", skill, "SKILL.md")
     try:
         with io.open(path, encoding="utf-8") as f:
