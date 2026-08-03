@@ -12,7 +12,9 @@ The rules governing each individual step are `think`'s. This skill says which ph
 
 ## Entry: what this skill will not start without
 
-Three things from `intent`: the goal in one sentence, the classification, and where the work enters. **If they are absent, run `intent` first and do not proceed until it hands them over.** This is what stops the front door being bypassed by invoking this skill directly. An empty goal sentence is not a settled goal.
+Two things from `intent`: the goal in one sentence, and the classification with its domain adapter if one applies. **If they are absent, run `intent` first and do not proceed until it hands them over.** An empty goal sentence is not a settled goal, and neither is one you wrote yourself to get past this paragraph.
+
+Nothing enforces this. No hook and no check observes a skill being invoked, so a session that starts here and skips the front door is indistinguishable from one that did not. It is stated as a rule because a rule that is read is better than none, and disclosed as unenforced because this repo's own recorded finding is that prose does not hold on its own: see `.knowledge/memory/delegation-as-prose.md`.
 
 ## Phase 1 - DISTRIBUTE
 
@@ -74,12 +76,13 @@ Run `prove`. This is the second gate: adversarial, run by agents that did not do
 
 Two phases are gates: **Distribute** gates the design before the work starts, **Verify** gates the result after. Both are adversarial and both are run by agents that did not produce what is under review. **The author is never an attacker.**
 
-- **Size.** The binding's Lifecycle section names the minimum number of attacking agents plus the coordinator. Where it does not, the default is three plus the coordinator.
+- **Size.** The binding's Lifecycle section names how many agents attack, alongside the coordinator. Where it does not, the default is three attackers plus the coordinator. **The floor is one attacker who did not do the work**, whatever the binding says: a gate of zero is not a smaller gate, it is no gate, and a binding cannot turn one off that way.
+- **Distribute and Verify always run.** They are the two gates, and neither is a phase a project may drop.
 - **Proportionality.** That size is mandatory for substantive work: anything touching a public interface, a contract or a spec, or several files or components. A one-line mechanical edit does not get a four-agent gate.
 
 ## The repair loop
 
-A gate that does not pass **returns the work to the phase before it**: Verify returns to Work, the design gate returns to the start of Distribute. That is the loop, and it has a bound.
+A gate that does not pass **returns the work to the phase that produced what it judged**: Verify judges the work, so it returns to Work; the design gate judges the plan, so it returns to the start of Distribute. Capture is not a return point, because it is a running collection rather than a step that produces a thing to re-do; it simply gains an entry about what the gate found. That is the loop, and it has a bound.
 
 1. Fix what the gate named, then re-run **the same gate with the same lenses**. Count the round.
 2. At the bound the binding names (default: two rounds without a pass), **stop and escalate to the Owner.** Do not start a third round on your own authority. A loop that will not converge is information, and it belongs to the Owner.

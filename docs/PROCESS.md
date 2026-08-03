@@ -65,7 +65,7 @@ Phases that apply: all seven.
 | Verify, quality gate | `lifecycle`, running `prove` | code-reviewer, qa, architect |
 | Finalize | `lifecycle` | vcs-operator |
 
-- Gate size, attacking agents plus the coordinator: 3
+- Attacking agents per gate, alongside the coordinator, so four participants. The skills enforce a floor of 1 whatever is written here: 3
 - Repair rounds before escalation: 2
 - Escalation goes to: the Owner named under Project
 
@@ -83,7 +83,7 @@ none. Work intake is the conversation with Miguel; in-flight state lives in the 
 - Format: Open Knowledge Format v0.2 (https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md). The whole directory is one OKF bundle: every file that is not `index.md` or `log.md` carries YAML frontmatter with a non-empty `type`, those two filenames are reserved, and an `index.md` carries no frontmatter except `okf_version` at the bundle root. Check 10 in `.github/checks.py` reads the Path row above to find the tree, parses every concept's frontmatter with PyYAML, and enforces the non-empty `type`, the `index.md` frontmatter rule, and that the bundle-root index declares the version whose rules the check implements. It does not check an `index.md` body's structure and does not check `log.md` at all: that is two and a half of the spec's three conformance criteria, stated here rather than rounded up.
 - Concept types used here: `Fact`, `Session Audit`.
 - Layout: `memory/` holds one fact per file, `audits/` one record per working session, each subdirectory with its own `index.md`. CLAUDE.md imports `@.knowledge/memory/index.md` so the index loads every session.
-- The nine concepts that existed before the format was adopted carry no `generated` field: the record of which model produced their content was not available, and an invented actor is worse than an absent optional field. Concepts written from here on carry it.
+- The nine concepts that existed before the format was adopted carry no `generated` field: the record of which model produced their content was not available, and an invented actor is worse than an absent optional field. Every concept written since carries it, starting with `memory/okf-bundle.md`. Nothing checks this; check 10 reads only `type` and the index rules.
 
 ## Conventions
 

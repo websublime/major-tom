@@ -17,7 +17,7 @@ onboard needs the answers detection cannot settle. Fill each slot; check the box
    - [ ] subagents only: the coordinator delegates discrete tasks to subagents, one writer at a time, on a single branch
 
 4. Gates: the lifecycle stops at two adversarial gates, one on the design and one on the finished work. Set their size and how long a failing gate may be retried before it comes to you.
-   - Attacking agents per gate, plus the coordinator: <default: 3>
+   - Attacking agents per gate, alongside the coordinator (so 3 means four participants; the floor is 1): <default: 3>
    - Repair rounds before the work escalates to you: <default: 2>
    - Phases that apply (evaluate, classify, distribute, work, capture, verify, finalize): <default: all seven>
 
@@ -33,7 +33,6 @@ onboard needs the answers detection cannot settle. Fill each slot; check the box
    - Access: <MCP server name | CLI command | REST base URL + env var names (never values) | status file path>
 
 6. Docs layout
-   - Process artifacts: <default: docs/>
    - Design artifacts (where a spec or decision record lands): <default: docs/specs/, or "unbound">
    - Recorded runs (a pre-registered experiment and its evidence): <default: docs/runs/<date>-<slug>/, or a non-default branch if this repo is distributed from its default branch, or "unbound">
 

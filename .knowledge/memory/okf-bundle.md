@@ -4,6 +4,7 @@ title: The knowledge base is an OKF bundle
 description: the format this directory is written in, and the one field family that already matched the repo's gate grammar
 tags: [knowledge-base, okf, format, gate]
 status: stable
+generated: { by: claude/opus-5, at: 2026-08-03T07:24:46Z }
 ---
 
 # The knowledge base is an OKF bundle
