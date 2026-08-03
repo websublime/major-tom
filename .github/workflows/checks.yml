@@ -8,6 +8,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Checks 11 and 12 judge the change, not the tree, so they need the base branch
+          # to diff against. The default shallow clone has no base and both would skip.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

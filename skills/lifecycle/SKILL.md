@@ -79,6 +79,7 @@ Two phases are gates: **Distribute** gates the design before the work starts, **
 - **Size.** The binding's Lifecycle section names how many agents attack, alongside the coordinator. Where it does not, the default is three attackers plus the coordinator. **The floor is one attacker who did not do the work**, whatever the binding says: a gate of zero is not a smaller gate, it is no gate, and a binding cannot turn one off that way.
 - **Distribute and Verify always run.** They are the two gates, and neither is a phase a project may drop.
 - **Proportionality.** That size is mandatory for substantive work: anything touching a public interface, a contract or a spec, or several files or components. A one-line mechanical edit does not get a four-agent gate.
+- **Partly mechanical, for the design gate only.** Where the project's checks include one, a change that edits a durable contract fails unless the same change carries a spec declaring a verdict, its attackers and its author. In this plugin's own repository that is check 11 in `.github/checks.py`. It enforces that a gate happened and its result is written down; it does not judge which verdict, whether the spec is about that change, or whether the attackers were independent. **Everything else on this page is unenforced**, including the gate size, the floor, and that the author is never an attacker.
 
 ## The repair loop
 
