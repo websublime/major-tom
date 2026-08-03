@@ -82,7 +82,7 @@ Phases that apply: <default: all seven>. Drop one only with the reason recorded 
 ## Knowledge base
 
 - Path: <.knowledge/, or "none">
-- Format: <default: Open Knowledge Format v0.2 (https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)>. The whole path above is one OKF bundle: every file that is not `index.md` or `log.md` carries YAML frontmatter with a non-empty `type`, those two filenames are reserved, and an `index.md` carries no frontmatter except `okf_version` at the bundle root. The `sdlc` skills hold the rest of the rules.
+- Format: <default: Open Knowledge Format v0.2 (https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)>. The whole path above is one OKF bundle: every file that is not `index.md` or `log.md` carries YAML frontmatter with a non-empty `type`, those two filenames are reserved, and an `index.md` carries no frontmatter except `okf_version` at the bundle root. The `lifecycle` skill holds the rest of the rules, in its Capture phase.
 - Concept types used here: <default: Fact, Run Record, Topic, Domain>
 - Layout: <default: `memory/` holds one fact per file, `audits/` one record per session, each with its own `index.md`>
 - CLAUDE.md imports <default: `@.knowledge/memory/index.md`> so the index loads every session.

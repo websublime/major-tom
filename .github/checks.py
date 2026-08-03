@@ -366,68 +366,95 @@ else:
     ok(f"verdict provenance check guarded {guarded} file(s)")
 
 # 10. The knowledge base conforms to Open Knowledge Format v0.2.
-# Three criteria, from the spec's section 11:
-#   1. every non-reserved .md in the tree has a parseable YAML frontmatter block,
-#   2. every one of those blocks carries a non-empty `type`,
-#   3. the two reserved filenames follow their own structure, of which the only part
-#      expressible as a check is that an index.md carries no frontmatter, except a
-#      bundle-root index.md which may carry okf_version and nothing else.
-# Checked rather than asserted in prose because the binding says the tree IS a bundle,
-# and an unchecked format claim decays on the first file somebody adds by hand. The
-# file count is asserted non-zero for the same reason check 9 asserts its own: a
+#
+# WHAT THIS COVERS, of the spec's three conformance criteria (section 11). State it
+# exactly, because the first version of this check claimed all three and a gate proved
+# it enforced two and a half:
+#   1. parseable YAML frontmatter on every non-reserved .md: ENFORCED, by parsing it.
+#   2. a non-empty `type` in each: ENFORCED.
+#   3. the reserved filenames follow sections 8 and 9: PARTIAL. The index.md rule that
+#      it carries no frontmatter, except a bundle-root one which may carry okf_version
+#      and nothing else, is enforced. An index.md BODY structure is not checked, and
+#      log.md is not checked at all (its only MUST is ISO 8601 date headings).
+#
+# WHY THE YAML IS PARSED AND NOT PATTERN-MATCHED. The first version searched the block
+# for a line matching `^type:`. A gate fed it a concept whose frontmatter held
+# `tags: [broken, unclosed`, an unclosed flow sequence that PyYAML rejects outright:
+# the check counted the file as a valid concept and the run exited 0 while claiming to
+# have verified parseability. That is the same class the hardcoded skill list had, in
+# the check written to replace it. Anything that claims a document parses has to parse
+# it, so the parser is now a hard requirement and its absence fails loudly below rather
+# than silently reducing this to the pattern match it used to be.
+#
+# The concept count is asserted non-zero for the reason check 9 asserts its own: a
 # conformance check that reads no files reports success it did not earn.
+try:
+    import yaml as _yaml
+except ImportError:
+    _yaml = None
+
 OKF_BUNDLES = [".knowledge"]
 RESERVED = ("index.md", "log.md")
-for bundle in OKF_BUNDLES:
-    root = os.path.join(ROOT, bundle)
-    if not os.path.isdir(root):
-        fail(f"{bundle}: declared an OKF bundle but the directory does not exist")
-        continue
-    concepts = 0
-    for dirpath, _dirnames, filenames in os.walk(root):
-        for name in sorted(filenames):
-            if not name.endswith(".md"):
-                continue
-            path = os.path.join(dirpath, name)
-            rel = os.path.relpath(path, ROOT)
-            try:
-                text = io.open(path, encoding="utf-8").read()
-            except Exception as e:
-                fail(f"{rel}: unreadable, {e}")
-                continue
-            is_root_index = name == "index.md" and dirpath == root
-            if name in RESERVED:
-                if not text.startswith("---"):
+if _yaml is None:
+    fail("OKF check needs PyYAML to verify frontmatter parses; install it (pip install pyyaml)")
+else:
+    for bundle in OKF_BUNDLES:
+        root = os.path.join(ROOT, bundle)
+        if not os.path.isdir(root):
+            fail(f"{bundle}: declared an OKF bundle but the directory does not exist")
+            continue
+        concepts = 0
+        for dirpath, _dirnames, filenames in os.walk(root):
+            for name in sorted(filenames):
+                if not name.endswith(".md"):
                     continue
-                if not is_root_index:
-                    fail(f"{rel}: a reserved {name} carries frontmatter; only a bundle-root index.md may")
+                path = os.path.join(dirpath, name)
+                rel = os.path.relpath(path, ROOT)
+                try:
+                    text = io.open(path, encoding="utf-8").read()
+                except Exception as e:
+                    fail(f"{rel}: unreadable, {e}")
                     continue
-                block = text.split("---", 2)
-                keys = [
-                    ln.split(":", 1)[0].strip()
-                    for ln in block[1].splitlines()
-                    if ln.strip() and not ln.lstrip().startswith("#")
-                ]
-                if keys != ["okf_version"]:
-                    fail(f"{rel}: bundle-root index.md frontmatter is {keys}, only okf_version is permitted")
-                continue
-            concepts += 1
-            if not text.startswith("---\n"):
-                fail(f"{rel}: OKF concept with no frontmatter block")
-                continue
-            body = text.split("---\n", 2)
-            if len(body) < 3:
-                fail(f"{rel}: frontmatter block is not closed")
-                continue
-            m = re.search(r"^type:[ \t]*(\S.*)$", body[1], re.M)
-            if not m:
-                fail(f"{rel}: OKF concept with no non-empty type field")
-            elif not m.group(1).strip().strip("\"'"):
-                fail(f"{rel}: type field is empty")
-    if concepts == 0:
-        fail(f"{bundle}: OKF check found 0 concept files, so it is vacuous, not passing")
-    else:
-        ok(f"{bundle}: OKF v0.2 bundle, {concepts} concept(s), reserved filenames clean")
+                block = re.match(r"\A---\r?\n(.*?)^---\r?\n", text, re.S | re.M)
+                # log.md is reserved but section 9 places no frontmatter restriction on
+                # it; only section 8 restricts index.md. Rejecting a log.md that carries
+                # frontmatter made this check stricter than the format it enforces.
+                if name == "log.md":
+                    continue
+                if name == "index.md":
+                    if block is None:
+                        continue
+                    if dirpath != root:
+                        fail(f"{rel}: an index.md outside the bundle root carries frontmatter; section 8 permits none")
+                        continue
+                    try:
+                        data = _yaml.safe_load(block.group(1))
+                    except _yaml.YAMLError as e:
+                        fail(f"{rel}: bundle-root index.md frontmatter is not parseable YAML, {type(e).__name__}")
+                        continue
+                    keys = sorted(data) if isinstance(data, dict) else None
+                    if keys != ["okf_version"]:
+                        fail(f"{rel}: bundle-root index.md frontmatter is {keys}, only okf_version is permitted")
+                    continue
+                concepts += 1
+                if block is None:
+                    fail(f"{rel}: OKF concept with no closed frontmatter block")
+                    continue
+                try:
+                    data = _yaml.safe_load(block.group(1))
+                except _yaml.YAMLError as e:
+                    fail(f"{rel}: frontmatter is not parseable YAML, {type(e).__name__}")
+                    continue
+                if not isinstance(data, dict):
+                    fail(f"{rel}: frontmatter parses to {type(data).__name__}, not a mapping")
+                    continue
+                kind = data.get("type")
+                if not isinstance(kind, str) or not kind.strip():
+                    fail(f"{rel}: OKF concept with no non-empty type field")
+        if concepts == 0:
+            fail(f"{bundle}: OKF check found 0 concept files, so it is vacuous, not passing")
+        else:
+            ok(f"{bundle}: OKF v0.2 bundle, {concepts} concept(s), frontmatter parsed, index rules clean")
 
 print()
 if failures:
