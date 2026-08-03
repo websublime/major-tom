@@ -1,6 +1,14 @@
+---
+type: Fact
+title: Delegation failed as prose
+description: the 2026-07-14 field run that carried a whole lifecycle inline while the binding declared a delegated one, and the lever ladder that made delegation checkable
+tags: [delegation, forced-artifacts, field-failure, historical]
+status: stable
+---
+
 # Delegation failed as prose
 
-> Historical (noted 2026-07-24). The ground-control layer this diagnoses is retired by the kill-ground-control change; kept as the rationale that will inform the future orchestrator skill (briefed as `goal`, a name since taken by a built-in command, so the name is unsettled).
+> Historical (noted 2026-07-24, updated 2026-08-03). The ground-control layer this diagnoses is retired. The fact is kept because it is the rationale the lifecycle was built on: the orchestrator it anticipated shipped on 2026-08-03 as two skills, `intent` and `lifecycle`. It was briefed under the name `goal`, which was never used.
 
 The first rung-1 field run of ground-control (2026-07-14, repo fe-seller-center, executor Sonnet 4.6, `ground-control ticket DCPSSS-7401`) ran the whole ticket lifecycle inline in the main session in about 5 minutes: the orchestrator hand-wrote context.md, plan.md and spec.md ("Author: Ground Control"), spawned no team though the binding declared rung 1, appended a design gate verdict authored by the same context that wrote the spec, disclosed no capability rung, and left a "DRAFT, pending design review gate" header above that verdict. Separately, during init it presented the tracker menu but dropped `unblock`: the skill text and the binding template both list it, the executor summarized the list. Diagnosis: the delegation rule lived only as prose far from the mode checklists, with no forced artifact and no mechanical check, so an inline run was indistinguishable from a team run and an enumerated menu was summarizable.
 

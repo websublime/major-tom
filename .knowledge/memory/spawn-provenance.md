@@ -1,3 +1,11 @@
+---
+type: Fact
+title: Spawn provenance is measurable
+description: what the harness lets a judge observe about delegation, plus the subagent nesting depth limit, which moves between Claude Code versions
+tags: [delegation, subagents, harness, measured, version-dependent]
+status: stable
+---
+
 # Spawn provenance is measurable
 
 Measured 2026-07-27 on claude 2.1.220, in this repo.

@@ -1,3 +1,11 @@
+---
+type: Session Audit
+title: Session audit, 2026-07-10, ground-control integration
+description: integrating the process as an agnostic skill, building its eval, closing the branch-discipline gap, and adopting the process in this repo
+tags: [audit, ground-control, eval]
+status: stable
+---
+
 # Session audit - 2026-07-10 ground-control integration
 
 ## Mechanical

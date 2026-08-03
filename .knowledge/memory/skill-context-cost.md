@@ -1,3 +1,11 @@
+---
+type: Fact
+title: An invoked skill stays in context
+description: a skill body is a one time load with a permanent session cost, and compaction drops the earliest invoked skill first
+tags: [skills, context, compaction, measured, version-dependent]
+status: stable
+---
+
 # An invoked skill stays in context
 
 From the Claude Code skills documentation, read 2026-07-27: when a skill is invoked, the rendered `SKILL.md` content enters the conversation as a single message and stays there for the rest of the session. Claude Code does not re-read the file on later turns. A skill body is a one time load with a permanent cost, not a per turn cost.
