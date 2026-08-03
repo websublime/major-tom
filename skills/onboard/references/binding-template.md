@@ -55,7 +55,7 @@ Agents directory (where onboard fetches specialists): <default: https://github.c
 
 Which phases run here, and who runs each one. The phase order, the entry contract that `lifecycle` will not start without, the repair loop and what that loop forbids are invariants the `intent` and `lifecycle` skills hold; this file cannot remove them. Only the values below are the project's to set.
 
-Phases that apply: <default: all seven>. Drop one only with the reason recorded on the line.
+Phases that apply: <default: all seven>. Drop one only with the reason recorded on the line. **Distribute and Verify are not droppable**: they are the two gates, and the skills hold that as an invariant this file cannot remove.
 
 | Phase | Skill | Team (agents from the roster above) |
 |---|---|---|
@@ -68,7 +68,7 @@ Phases that apply: <default: all seven>. Drop one only with the reason recorded 
 | Verify, quality gate | `lifecycle`, running `prove` | <default: code-reviewer, qa, plus the stack specialist> |
 | Finalize | `lifecycle` | <default: vcs-operator> |
 
-- Gate size, attacking agents plus the coordinator: <default: 3>
+- Attacking agents per gate, alongside the coordinator (so a value of 3 means four participants). The skills enforce a floor of 1 whatever is written here: <default: 3>
 - Repair rounds before escalation: <default: 2>
 - Escalation goes to: the Owner named under Project
 

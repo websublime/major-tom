@@ -10,7 +10,7 @@ Every prompt enters here, whatever its shape: a ticket id, "the next ready task"
 
 Read the binding `docs/PROCESS.md` first: it names the tracker and its access, which document carries which authority, and who the Owner is. A slot left unbound degrades, and the session says which degraded mode it is in. It is never invented and it never blocks.
 
-The rules governing each step are `think`'s: read its SKILL.md (this plugin's `skills/think/` directory, or `~/.claude/skills/think/`). Intent runs think Steps 0 to 3 on the incoming prompt and stops there.
+The rules governing each step are `think`'s: read its SKILL.md (this plugin's `skills/think/` directory, or `~/.claude/skills/think/`). Intent runs think **Step 0** (classify the ask) and **Step 2** (gather evidence) and stops there. It does NOT define done and it does NOT commit to an approach: Steps 1 and 3 belong to the Distribute phase of `lifecycle`, which produces the plan and the acceptance criteria behind the design gate. Producing them here would put them in front of the gate that exists to attack them.
 
 ## Phase 1 - EVALUATE
 
@@ -29,19 +29,18 @@ Look at what actually arrived, before deciding what it is.
 
 ## What intent hands over
 
-Three things, written down. Everything downstream reads them, so an empty one is a defect, not a shortcut.
+Two things, written down. Everything downstream reads them, so an empty one is a defect, not a shortcut.
 
 1. The goal, in one sentence.
 2. The classification, plus the domain adapter if one applies.
-3. Where the work enters, from this table.
 
-| What intent settled | Where it goes |
+Then one routing decision, which is not a handover item because it has only two answers:
+
+| What intent settled | What happens |
 |---|---|
-| Trivial by think's triviality gate | Nowhere. Make the change, run the one obvious check, report in two sentences. |
-| A question or an assessment that changes no artifact | Nowhere. `think` answers it and intent is done. |
-| Work that is defined and needs carrying to done | `lifecycle`, entering at Distribute |
-| Work that is agreed but has no plan or acceptance criteria | `lifecycle`, entering at Distribute (its first act is to produce them) |
-| A body of work too large to carry as one piece | `lifecycle`, entering at Distribute, which decomposes it first |
+| Trivial by think's triviality gate | Stop. Make the change, run the one obvious check, report in two sentences. |
+| A question or an assessment that changes no artifact | Stop. `think` answers it and intent is done. |
+| Anything else: work to be carried to done, with or without a plan, of any size | Hand the two items to `lifecycle`. It always starts at Distribute, whose first act is the plan and the acceptance criteria, and which decomposes a body of work too large to carry as one piece. |
 
 ## Hard rules
 
