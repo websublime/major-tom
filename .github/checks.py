@@ -542,6 +542,152 @@ for label, repo_root, bundle in okf_bundles:
     else:
         ok(f"{label}: {bundle} is an OKF v{OKF_VERSION} bundle, {concepts} concept(s), frontmatter parsed, index rules clean")
 
+# ---------------------------------------------------------------------------
+# Checks 11 and 12 judge the CHANGE, not the tree. Both need the set of commits
+# this branch adds over the branch it will merge into, so they share one helper.
+# When that set cannot be worked out, they SKIP AND SAY WHY. They never pass
+# quietly on an empty set: a gate that reports success because it found nothing
+# to look at is the failure mode this file already carries three comments about.
+def git(*args):
+    import subprocess
+    try:
+        out = subprocess.run(
+            ["git", "-C", ROOT] + list(args),
+            capture_output=True, text=True, timeout=30,
+        )
+    except Exception as e:
+        return None, str(e)
+    if out.returncode != 0:
+        return None, (out.stderr or "").strip().splitlines()[-1:] or ["git failed"]
+    return out.stdout, None
+
+
+def change_base():
+    """The ref this change will merge into, or (None, reason)."""
+    base_ref = os.environ.get("GITHUB_BASE_REF") or ""
+    candidates = ([f"origin/{base_ref}"] if base_ref else []) + ["origin/main", "main"]
+    for ref in candidates:
+        out, err = git("rev-parse", "--verify", "--quiet", ref)
+        if out and out.strip():
+            merge_base, err = git("merge-base", ref, "HEAD")
+            if merge_base and merge_base.strip():
+                if merge_base.strip() == (git("rev-parse", "HEAD")[0] or "").strip():
+                    return None, f"HEAD is an ancestor of {ref}, so this adds no commits"
+                return merge_base.strip(), None
+    return None, "no base ref resolved (tried " + ", ".join(candidates) + "); a shallow clone needs fetch-depth: 0"
+
+
+CONTRACT_DIRS = ("skills/", "agents/")
+BASE, BASE_REASON = change_base()
+
+# 11. A durable contract does not ship without a design gate.
+#
+# THE FAILURE THIS EXISTS FOR, which happened in this repository. Two skill files were written and
+# pushed with no spec and no gate, and CI reported `validate pass` on the push. Nothing noticed. It
+# took the owner asking for a gate, and three agents running one, before anybody found out, and the
+# gate then returned REFUTED from all three. The rule "gate the design before the work" was already
+# written, in the body of one of the two skills being written, which is exactly why it did not fire.
+#
+# WHAT IT ENFORCES: if a change touches a durable contract (skills/ or agents/, the things that ship
+# to every installed repo), the same change must add or edit a file under docs/specs/ whose front
+# matter carries a non-empty verdict, attacked_by and author.
+#
+# WHAT IT DOES NOT: it does not care WHICH verdict. REFUTED satisfies it exactly as VERIFIED does,
+# because what it enforces is that a gate HAPPENED and its result is written down, not that the
+# result was good. Whether a REFUTED design may merge is a human decision, and the merge request
+# carries the verdict for that reason. It also cannot tell whether the spec is about this change,
+# and it cannot judge whether the attackers were real or independent of the author. Check 9 declares
+# the same two limits about the same three fields.
+if BASE is None:
+    ok(f"design gate check skipped: {BASE_REASON}")
+else:
+    changed, err = git("diff", "--name-only", BASE, "HEAD")
+    if changed is None:
+        fail(f"design gate check could not read the change: {err}")
+    else:
+        paths = [p for p in changed.splitlines() if p.strip()]
+        contracts = sorted(p for p in paths if p.startswith(CONTRACT_DIRS))
+        specs = [p for p in paths if p.startswith("docs/specs/") and p.endswith(".md")]
+        if not contracts:
+            ok(f"design gate check: no durable contract touched in {len(paths)} changed file(s)")
+        else:
+            gated = []
+            for rel in specs:
+                path = os.path.join(ROOT, rel)
+                if not os.path.isfile(path):
+                    continue
+                found, data, err2 = parse_frontmatter(io.open(path, encoding="utf-8").read())
+                if not found or err2 or not isinstance(data, dict):
+                    continue
+                if all(
+                    isinstance(data.get(k), str) and data[k].strip()
+                    for k in ("verdict", "attacked_by", "author")
+                ):
+                    gated.append(rel)
+            if gated:
+                ok(f"design gate check: {len(contracts)} contract file(s) changed, gated by {', '.join(gated)}")
+            else:
+                fail(
+                    "design gate: this change edits durable contracts ("
+                    + ", ".join(contracts)
+                    + ") and adds no spec under docs/specs/ carrying verdict, attacked_by and author"
+                )
+
+# 12. A change to a contract or a spec records what it was for, and what it did not settle.
+#
+# THE FAILURE THIS EXISTS FOR, also from this repository. A decision the owner had been asked about
+# and had not answered was written into four files anyway, and the only place that was visible was a
+# paragraph of conversation. Same session: a skill name was chosen alone, and a phase placement was
+# assumed and then argued for rather than tested. In each case a later reader had nowhere to look to
+# see what had actually been agreed and what was still open.
+#
+# WHY A LINE IN A COMMIT MESSAGE. This is the lever this repo has measured twice: an INTENT line
+# forced at the decision point moved a weak executor from 1 of 4 to 4 of 4 (rounds 2 and 3), and a
+# TRACK line did the same for landing discipline (rounds 12 and 13). Prose describing the same duty
+# did not, both times.
+#
+# WHAT IT CANNOT DO: it cannot tell whether the sentence is true. Round 13 measured exactly that: the
+# line was written truthfully while the behavior underneath it was still wrong, and the value was
+# that the wrong behavior became visible. A goal line is a place to look, not a guarantee.
+#
+# THE TRANSITION IS SELF-DESCRIBING. A commit is required to carry the lines only if its own tree
+# already contains this check, so the commit that introduces the check is the first one bound by it
+# and every commit before it is exempt without a hardcoded date or revision.
+GOAL_MARKER = "check 12: GOAL and UNSETTLED"  # check 12: GOAL and UNSETTLED
+GOAL_PATHS = ("skills/", "agents/", "docs/specs/")
+if BASE is None:
+    ok(f"goal line check skipped: {BASE_REASON}")
+else:
+    revs, err = git("rev-list", "--reverse", f"{BASE}..HEAD")
+    if revs is None:
+        fail(f"goal line check could not list the commits: {err}")
+    else:
+        shas = [s for s in revs.split() if s]
+        bound, missing = 0, []
+        for sha in shas:
+            touched, _ = git("diff-tree", "--no-commit-id", "--name-only", "-r", sha)
+            if not touched or not any(p.startswith(GOAL_PATHS) for p in touched.splitlines()):
+                continue
+            self_text, _ = git("show", f"{sha}:.github/checks.py")
+            if not self_text or GOAL_MARKER not in self_text:
+                continue  # predates this check; exempt by its own tree, not by a date
+            bound += 1
+            message, _ = git("log", "-1", "--format=%B", sha)
+            message = message or ""
+            if not re.search(r"^GOAL:", message, re.M) or not re.search(r"^UNSETTLED:", message, re.M):
+                missing.append(sha[:8])
+        if missing:
+            fail(
+                "goal line: commit(s) "
+                + ", ".join(missing)
+                + " touch a contract or a spec and carry no GOAL: and UNSETTLED: line "
+                "(write UNSETTLED: none when nothing is open)"
+            )
+        elif bound:
+            ok(f"goal line check: {bound} of {len(shas)} commit(s) bound, all carry GOAL and UNSETTLED")
+        else:
+            ok(f"goal line check: none of {len(shas)} commit(s) in this change are bound by it yet")
+
 print()
 if failures:
     print(f"{len(failures)} check(s) failed")

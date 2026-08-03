@@ -75,9 +75,16 @@ The binding `docs/PROCESS.md` holds the project's values; the skills hold the in
 - that Capture accumulates as the work runs rather than being written at the end;
 - that a concept written by Capture carries its `generated` actor.
 
-What IS mechanical, and what it covers: check 10 in `.github/checks.py` parses every knowledge-base concept's frontmatter and enforces a non-empty `type`, the `index.md` frontmatter rule, and the declared format version. Check 3 compares each skill's frontmatter name against its directory. Check 9 enforces the gate-verdict grammar on any document that declares one. That is the whole of it.
+**Two of those six were mechanized on 2026-08-03**, after the gate in section 11 and the decision rule in section 12 both said a mechanical check is the right home for them. Neither is a skill body, which is what the rule predicted:
 
-`.knowledge/memory/delegation-as-prose.md` records the field failure that says prose alone does not hold. This section exists because that finding applies to this work and cannot be answered by more prose.
+- **Check 11** fails a change that edits `skills/` or `agents/` unless the same change carries a file under `docs/specs/` declaring a verdict, its attackers and its author. It reproduces today's failure exactly: an edit to a skill with no gated spec now exits 1 where it exited 0. It enforces that a gate happened and its result is written; it does not judge which verdict, whether the spec is about that change, or whether the attackers were independent.
+- **Check 12** fails a commit touching a contract or a spec whose message carries no `GOAL:` and `UNSETTLED:` line. It is the lever this repo measured twice, as the `INTENT:` line in eval rounds 2 and 3 and the `TRACK:` line in rounds 12 and 13. It cannot tell whether the sentence is true; round 13 measured that limit directly, and the value there was that a truthful line made wrong behaviour visible.
+
+**The other four remain unenforced**: that `intent` runs before `lifecycle`, the gate size and its floor, that the author is not among the attackers, the three prohibitions inside the repair loop, Capture's timing, and the `generated` actor on a captured concept.
+
+The complete list of what is mechanical after those two: checks 3, 9, 10, 11 and 12 in `.github/checks.py`, plus check 4 which enforces that every domain adapter carries a minimum evidence set and a fraud table and is routed to, checks 6 and 8 which enforce binding rules, and two guards outside that file, `.githooks/pre-commit` and `scripts/pretool-branch-guard.sh`, which block a commit to the default branch. The gate in section 11 corrected an earlier version of this paragraph that claimed a shorter list was the whole of it.
+
+`.knowledge/memory/delegation-as-prose.md` records the field failure that says prose alone does not hold. This section exists because that finding applies to this work, and two of its six items stopped being prose on 2026-08-03.
 
 ## 6. Acceptance criteria
 
