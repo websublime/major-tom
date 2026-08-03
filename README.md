@@ -2,7 +2,7 @@
 
 # major-tom
 
-A working method for Claude Code: **think**, **act**, **prove**, plus the **onboard** command. A per-task problem-solving loop, its orchestration, an adversarial work-verifier, and a command that binds the workflow to a repo.
+A development lifecycle for Claude Code, installable in any repo: **intent**, **lifecycle**, **think**, **act**, **prove**, plus the **onboard** command. A front door that settles what you are trying to reach, the five phases that carry it to merged, a per-task problem-solving loop, its orchestration, an adversarial work-verifier, and a command that installs the workflow into a repo.
 
 What makes this repo different is not the method, it is the receipts: **it ships its own eval, failures included**. Sixteen rounds, published nulls, and a Verify gate that refuted its own author's work (12 reproduced findings) before that work was allowed to merge. Every rule in these skills traces to a round that made it necessary.
 
@@ -17,7 +17,7 @@ What makes this repo different is not the method, it is the receipts: **it ships
 claude --plugin-dir path/to/major-tom
 ```
 
-Installing brings: the three skills (namespaced: `/major-tom:think`, `/major-tom:act`, `/major-tom:prove`), the `/major-tom:onboard` command, nine role agents the working model delegates to, and the discipline hooks. **Disclosure**: the hooks are self-gated; they act only inside git repos whose root carries a binding (`docs/PROCESS.md` starting with `# Process binding`) and stay inert everywhere else. The `guard-violations` monitor is an experimental Claude Code component (v2.1.105+). `jq` is optional: without it the branch guard still blocks on well-formed input, and allows the command on input it cannot parse at all (see the FAQ).
+Installing brings: the five skills (namespaced: `/major-tom:intent`, `/major-tom:lifecycle`, `/major-tom:think`, `/major-tom:act`, `/major-tom:prove`), the `/major-tom:onboard` command, nine role agents the working model delegates to, and the discipline hooks. **Disclosure**: the hooks are self-gated; they act only inside git repos whose root carries a binding (`docs/PROCESS.md` starting with `# Process binding`) and stay inert everywhere else. The `guard-violations` monitor is an experimental Claude Code component (v2.1.105+). `jq` is optional: without it the branch guard still blocks on well-formed input, and allows the command on input it cannot parse at all (see the FAQ).
 
 ### Required first step: bind the repo
 
@@ -31,12 +31,14 @@ Run this once per repo, before anything else. The harness branch guard and the v
 
 | Command | What it is | Modes |
 |---|---|---|
+| `/major-tom:intent` | The front door. Works out what you are actually trying to reach before anything acts: resolves a pointer (a ticket id, a queue, "the next ready task") into the work itself, gathers the context that work needs, classifies the ask, states the goal in one sentence, and asks rather than guessing when it cannot. Hands over three things: the goal, the classification, and where the work enters. | two phases: evaluate, classify |
+| `/major-tom:lifecycle` | The five phases that carry settled work to merged: distribute it across the roster behind a gated design, do the work, capture what was learned into the knowledge base, verify adversarially, finalize with tests, commits and a merge request carrying the verdicts. Two gates, and a repair loop that escalates to you instead of running forever. | five phases, two gates |
 | `/major-tom:think` | The per-task loop: classify the ask, define done, gather evidence, decide, act surgically, verify by observation, report outcome-first. Domain adapters for marketing, research, data, business, finance, legal, design. | `plan` (stop after the plan), `audit` (grade finished work against the loop), `report` (rewrite an answer outcome-first) |
 | `/major-tom:act` | The orchestrated version of think for non-trivial tasks: parallel evidence subagents, one committed plan, execution with an intent gate, adversarial verification agents. | one loop, four stages |
 | `/major-tom:prove` | The judge. Treats any "done" as a set of claims: re-runs the claimed verifications, diffs what actually changed, hunts the fraud tables, returns VERIFIED / VERIFIED WITH CAVEATS / REFUTED. | `suite <target>` (run the trap suite against a skill or model) |
-| `/major-tom:onboard` | Binds the workflow to a repo: detects the stack, asks the owner only what detection cannot settle, fetches stack specialists with approval, and writes a slim `docs/PROCESS.md` that CLAUDE.md imports so every session loads it. Records the working model (a team in worktrees, or subagents on one branch), which document carries which authority, and the issue-tracker access; offers the branch guards. | one transformer flow |
+| `/major-tom:onboard` | Installs the workflow into a repo: detects the stack, asks the owner only what detection cannot settle, fetches stack specialists with approval, and writes a slim `docs/PROCESS.md` that CLAUDE.md imports so every session loads it. Records the working model (a team in worktrees, or subagents on one branch), which document carries which authority, which agent runs each lifecycle phase, the gate size and the repair bound, and the issue-tracker access with the operations that tracker supports; offers the branch guards. | one transformer flow |
 
-think governs a rule, act governs a task. Inside act's delegation, each implementer still follows think.
+think governs a rule, act governs a task, intent settles what the task is, lifecycle carries it to merged. Inside lifecycle, Work runs act and Verify runs prove; inside act's delegation, each implementer still follows think. lifecycle will not start without intent's three outputs, which is what stops the front door being bypassed.
 
 ## Flows
 
@@ -141,7 +143,7 @@ Discipline that survives weak executors is mechanical, not prose. Two of these i
 
 **Do I need `jq`?** No, and here is the exact behaviour, because an earlier version of this answer overstated it. With `jq` the branch guard parses the tool input properly. Without `jq` a conservative fallback still extracts the command from well-formed input and still blocks (measured). On input it cannot parse at all, the guard allows the command rather than blocking every command, so it fails open in that one case. The repository `pre-commit` hook is the backstop that does not depend on parsing.
 
-**What is a "binding"?** A slim generated file (`docs/PROCESS.md`) that `onboard` writes and CLAUDE.md imports, recording the working model, which document carries which authority, the agent roster, how the session reaches your issue tracker, and where design artifacts and recorded runs land. It loads every session and carries no lifecycle. This repo eats its own food: see [`docs/PROCESS.md`](docs/PROCESS.md).
+**What is a "binding"?** A slim generated file (`docs/PROCESS.md`) that `onboard` writes and CLAUDE.md imports, recording the working model, which document carries which authority, the agent roster, which agent runs each lifecycle phase, how large a gate is and how many repair rounds precede escalation, how the session reaches your issue tracker and which operations that tracker supports, and where design artifacts and recorded runs land. It loads every session. It records the lifecycle's project values and never holds the lifecycle itself: the phase order, the entry contract `lifecycle` will not start without, and the repair loop are invariants the `intent` and `lifecycle` skills hold, so editing a binding cannot silently remove them. This repo eats its own food: see [`docs/PROCESS.md`](docs/PROCESS.md).
 
 **What is the INTENT line?** A forced artifact at the decision point: `INTENT: code does X; check expects Y; spec says Z` before behavior changes. It exists because the rule failed as prose and held as an artifact (rounds 2 to 3).
 

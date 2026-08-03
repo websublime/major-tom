@@ -1,6 +1,6 @@
 {
   "name": "major-tom",
-  "description": "A working method as three skills (think / act / prove) plus the onboard command, with the eval that keeps them honest.",
+  "description": "An installable development lifecycle as five skills (intent / lifecycle / think / act / prove) plus the onboard command, with the eval that keeps them honest.",
   "owner": {
     "name": "miguelramos",
     "url": "https://github.com/websublime"
@@ -9,8 +9,8 @@
     {
       "name": "major-tom",
       "source": "./",
-      "description": "major-tom: think, act, prove, plus the onboard command. A problem-solving loop, its orchestration, an adversarial work-verifier, and a command that binds the workflow to a repo, with the eval that keeps them honest.",
-      "version": "0.7.0",
+      "description": "major-tom: intent, lifecycle, think, act, prove, plus the onboard command. A development lifecycle that carries any prompt to merged work, a problem-solving loop, its orchestration, an adversarial work-verifier, and a command that installs the workflow into a repo, with the eval that keeps them honest.",
+      "version": "0.8.0",
       "author": {
         "name": "Miguel Ramos"
       }
