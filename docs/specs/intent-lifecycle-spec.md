@@ -9,6 +9,8 @@ gate_date: 2026-08-03
 
 Status: **REFUTED at the design gate, 2026-08-03, unanimously.** All three attackers returned REFUTED independently. The verdict and its findings are in section 11, written by attackers who did not author this file. **Read sections 1 to 10 against that verdict, not as a description of something agreed.** Section 2 in particular contains a false statement that section 11 finding 1 names, and it is left standing rather than quietly corrected, because the attackers' finding cites it.
 
+**Section 12 then runs the pre-registered decision rule that finding 1 says this document ignored. Zero candidates clear it: by that rule, neither skill is necessary.** Read section 12 before reading the design it judges.
+
 **This spec was written after the code.** The two skills it describes were built, gated three times on the implementation, repaired, and pushed before any design artifact existed. The `lifecycle` skill this branch adds makes a gated design mandatory before work starts. The branch that adds it did not do that.
 
 ## 1. What was built, and why
@@ -173,3 +175,40 @@ Nothing here licenses shipping the design as written. Four findings were reprodu
 **Question 2, should any section 5 rule be mechanized, and which first?** The premise that no precedent exists is wrong: this plugin already ships a PreToolUse hook that mechanically enforces a Finalize rule. That is the shape for the first mechanization, and the candidate the record points at is the one `design-skill-spec.md` finding 1 named as needing to be structural, that the author is never an attacker.
 
 **Question 3, is a post-hoc spec worth anything?** The format is. This document is predominantly laundering. What only a post-hoc spec can do is test the shipped thing against the repo's own pre-registered rule for licensing a skill, and that rule exists, four-claused, in the attached worktree. The document ran it against nothing and asserted the run did not happen. **Keep the document. Do not sign it.**
+
+## 12. The decision rule, run
+
+Finding 1 of the verdict above says this document asserted that no real task had been run through the convention, and that the assertion was false. The run exists at `docs/runs/2026-07-31-design-path/` on the `runs` branch, and it fixed a decision rule before producing any result, so the rule cannot be softened after seeing one. It is run here, late, at the owner's instruction on 2026-08-03.
+
+**The rule, quoted from `00-preregistration.md`.** A named failure licenses writing a skill only if ALL FOUR hold: it is **observable** (quotable from artifacts or transcript, not from reasoning about what could happen); it is **structural** (caused by the shape of the path, so a second operator would meet it too); it is **not fixable at a lower rung** (the ladder is mechanical check, then placement in a binding or an agent file, then prose, and if any of those would prevent it the answer is that rung and NOT a skill); and it is **named with its rung**. "If zero failures clear all four, the recorded outcome is that the `design` skill is not necessary, and that is published as the result."
+
+**Two limits on this application, stated before the result.** The rule was pre-registered for one run about a different skill, so applying it to `intent` and `lifecycle` extends it; the extension is defensible because the ladder it encodes is the repo's general method, but it was not authorised in advance. And it is run by the author of the skills under test, which is the same independence failure the gate above already named. Both mean the result below should be checked by someone else.
+
+### The candidates, each against clause 3
+
+| # | The need the skill was to meet | Observable | Lower rung that already carries it | Clears? |
+|---|---|---|---|---|
+| 1 | Resolve a ticket id or "the next ready task" into work before acting | yes, the owner's opening request | `skills/act/SKILL.md` Stage 1 already resolves a pointer through the binding's Tracker slot | no |
+| 2 | Interrogate an ambiguous prompt instead of guessing | yes, this branch wrote a decision into four files while the fork was open | `skills/think/SKILL.md` Step 0 already says ask one pointed question and wait; the gap is a forced artifact recording the settled goal, which is rung 2 | no |
+| 3 | Decide whether the machinery should run at all | yes | think's triviality gate | no |
+| 4 | A design gate before work starts | **yes, and it is this branch's own strongest evidence**: two durable contracts shipped ungated, and the gate, once run, returned REFUTED from three lenses | a check that fails a change touching `skills/` with no gated spec is rung 1 and is implementable | no |
+| 5 | A repair loop bounded, with escalation | not observed failing here | a binding row states the bound | no |
+| 6 | Accumulate learning into the knowledge base | no failure observed; the knowledge base was maintained without it | a binding row plus check 10 | no |
+| 7 | Tests, atomic commits, a merge request carrying verdicts | no failure observed | `agents/vcs-operator.md`, plus `.githooks/pre-commit` and the branch guard, which are rung 1 and already installed | no |
+| 8 | A named team per phase | no failure observed | a binding row, which exists | no |
+| 9 | A user-invocable front door, so something routes before `think` is loaded | reasoning about triggering, not an observed failure, so it fails clause 1 before clause 3 | a description on an existing skill is prose, rung 3 | no |
+
+### Result
+
+**Zero candidates clear all four clauses.** By the rule's own terms, the recorded outcome is that **neither `intent` nor `lifecycle` is necessary as a skill**, and that is published here as the result.
+
+What the run's ladder says to do instead, for the two candidates that named a real gap:
+
+- Candidate 2, the settled goal, is a **forced artifact**: the goal sentence recorded where a later reader can check it, which is the rung that worked for the `INTENT:` line in eval rounds 2 and 3 and the `TRACK:` line in rounds 12 and 13.
+- Candidate 4, the ungated design, is a **mechanical check**: a change touching a durable contract fails without a spec carrying a gate verdict. Rung 1, and this branch is the case that motivates it.
+
+Neither is a skill body. That is finding 7 of `docs/specs/design-skill-spec.md` arriving a third time: the delta over what exists is a convention.
+
+### What this does not settle
+
+The rule answers whether a failure licenses a skill. It does not answer what to do with two skills that already exist, are already pushed, and are already in an open merge request. That is the owner's decision, and the options are: delete both and move the two named rungs into the places above; keep them as unmeasured prose with this section attached so the next reader inherits the result; or run the second design task the original run asked for, which is the only thing that could still license them.
