@@ -48,9 +48,34 @@ The roster the coordinator delegates to; the plugin ships the nine below. No sta
 
 Agents directory (where onboard fetches specialists): https://github.com/ayush-that/sub-agents.directory
 
+## Lifecycle
+
+Which phases run here, and who runs each one. The phase order, the entry contract that `lifecycle` will not start without, the repair loop and the three things that loop forbids are invariants the `intent` and `lifecycle` skills hold; only the values below belong to this project.
+
+Phases that apply: all seven.
+
+| Phase | Skill | Team |
+|---|---|---|
+| Evaluate | `intent` | researcher, for the parallel gathering |
+| Classify | `intent` | run in the main thread, not delegated |
+| Distribute | `lifecycle` | architect, project-manager |
+| Distribute, design gate | `lifecycle` | architect, researcher, product-validator |
+| Work | `lifecycle`, running `act` | coordinator's pick from the roster; no stack specialists are fetched here |
+| Capture | `lifecycle` | the agent that did the work |
+| Verify, quality gate | `lifecycle`, running `prove` | code-reviewer, qa, architect |
+| Finalize | `lifecycle` | vcs-operator |
+
+- Gate size, attacking agents plus the coordinator: 3
+- Repair rounds before escalation: 2
+- Escalation goes to: the Owner named under Project
+
+The Work row names no stack specialist because none is fetched for this repo, which is docs and eval rather than an application stack. That is the declared degraded mode, not an omission.
+
 ## Tracker
 
 none. Work intake is the conversation with Miguel; in-flight state lives in the session task lists and `.knowledge/audits/`.
+
+- Which of the lifecycle's four operations it supports: none of the four. There is no queue to take the next ready work from, no claim, no place to record a phase outcome except the audit files, and nothing to close. Every session that reaches for one of them says so and asks Miguel instead. With no tracker there is no state between sessions, so this repo has no loop over a queue.
 
 ## Knowledge base
 

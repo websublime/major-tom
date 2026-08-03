@@ -51,11 +51,33 @@ The roster the coordinator delegates to. The plugin ships the nine below; onboar
 
 Agents directory (where onboard fetches specialists): <default: https://github.com/ayush-that/sub-agents.directory>
 
+## Lifecycle
+
+Which phases run here, and who runs each one. The phase order, the entry contract that `lifecycle` will not start without, the repair loop and what that loop forbids are invariants the `intent` and `lifecycle` skills hold; this file cannot remove them. Only the values below are the project's to set.
+
+Phases that apply: <default: all seven>. Drop one only with the reason recorded on the line.
+
+| Phase | Skill | Team (agents from the roster above) |
+|---|---|---|
+| Evaluate | `intent` | <default: researcher, for the parallel gathering> |
+| Classify | `intent` | <default: run in the main thread, not delegated> |
+| Distribute | `lifecycle` | <default: architect, project-manager> |
+| Distribute, design gate | `lifecycle` | <default: architect, researcher, product-validator> |
+| Work | `lifecycle`, running `act` | <default: the stack specialist for the area, else coordinator's pick> |
+| Capture | `lifecycle` | <default: the agent that did the work> |
+| Verify, quality gate | `lifecycle`, running `prove` | <default: code-reviewer, qa, plus the stack specialist> |
+| Finalize | `lifecycle` | <default: vcs-operator> |
+
+- Gate size, attacking agents plus the coordinator: <default: 3>
+- Repair rounds before escalation: <default: 2>
+- Escalation goes to: the Owner named under Project
+
 ## Tracker
 
 <jira | linear | github | beads | unblock | status-file | none>
 
 - Access: <MCP server name; or REST base URL + credential env var NAMES (e.g. JIRA_BASE_URL, JIRA_API_TOKEN), names only, never values; or CLI command; or the status file path>
+- Which of the lifecycle's four operations it supports: <next ready work | claim | record an outcome | close>. Whatever is missing degrades and is declared where it is needed; it never blocks. With no tracker there is no state between sessions, so there is no queue to loop over.
 
 ## Knowledge base
 
