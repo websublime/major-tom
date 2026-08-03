@@ -4,7 +4,9 @@
 
 A development lifecycle for Claude Code, installable in any repo: **intent**, **lifecycle**, **think**, **act**, **prove**, plus the **onboard** command. A front door that settles what you are trying to reach, the five phases that carry it to merged, a per-task problem-solving loop, its orchestration, an adversarial work-verifier, and a command that installs the workflow into a repo.
 
-What makes this repo different is not the method, it is the receipts: **it ships its own eval, failures included**. Sixteen rounds, published nulls, and a Verify gate that refuted its own author's work (12 reproduced findings) before that work was allowed to merge. Every rule in these skills traces to a round that made it necessary.
+What makes this repo different is not the method, it is the receipts: **it ships its own eval, failures included**. Sixteen rounds, published nulls, and a Verify gate that refuted its own author's work (12 reproduced findings) before that work was allowed to merge. Every rule in `think`, `act` and `prove` traces to a round that made it necessary.
+
+**`intent` and `lifecycle` are not yet measured, and this says so rather than letting the sentence above cover them.** No eval round has run against either. Their rules come from three places: the rules `think`, `act` and `prove` already carry (those are measured), a seven-phase process that has been running in another repository of ours and whose recorded runs show its design gate catching defects, and design choices made in the session that wrote them. Until a round runs, treat the second and third as reasoning, not evidence.
 
 ## Install
 
