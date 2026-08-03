@@ -18,6 +18,55 @@ def ok(msg):
     print(f"ok    {msg}")
 
 
+# ONE frontmatter grammar and ONE parser for the whole file.
+#
+# Checks 3, 9 and 10 each grew their own way of reading a frontmatter block, and an independent
+# gate broke the weakest of the three. Check 10's ad-hoc regex required a bare `---` and a closing
+# `---` followed by a newline, so a byte-order mark or a single trailing space on the opening fence
+# made the block invisible: an index.md could then carry arbitrary smuggled keys while the run
+# printed "index rules clean" about a file it never opened, and a concept ending at its closing
+# fence with no trailing newline was rejected although the OKF spec calls it conformant. The
+# tolerances below are the union of what the three checks need: an optional BOM, trailing spaces on
+# either fence, CRLF, and end-of-file at the closing fence.
+#
+# Parsing, not pattern matching. Anything that claims a document parses has to parse it: a regex
+# looking for a `type:` or `name:` line accepts frontmatter that no YAML reader would. PyYAML is a
+# hard requirement for that reason and its absence fails loudly here rather than quietly returning
+# these checks to the pattern matching they replaced. Check 9 deliberately keeps its own key reader:
+# its comment records three gates that found regressions in earlier versions of that grammar, so it
+# is out of scope for this consolidation.
+FRONT_MATTER = re.compile(r"\A\ufeff?---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)", re.S)
+
+try:
+    import yaml as _yaml
+except ImportError:
+    _yaml = None
+
+if _yaml is None:
+    fail("PyYAML is required: checks 3 and 10 parse frontmatter instead of pattern-matching it (pip install pyyaml)")
+
+
+def parse_frontmatter(text):
+    """Read a leading frontmatter block. Returns (found, mapping, error).
+
+    found is False when there is no closed block at all. When found, error is None and mapping
+    holds the parsed keys, or error explains why the block could not become a mapping."""
+    m = FRONT_MATTER.match(text)
+    if m is None:
+        return False, None, None
+    if _yaml is None:
+        return True, None, "was not parsed because PyYAML is missing"
+    try:
+        data = _yaml.safe_load(m.group(1))
+    except _yaml.YAMLError as e:
+        return True, None, f"is not parseable YAML, {type(e).__name__}"
+    if data is None:
+        data = {}
+    if not isinstance(data, dict):
+        return True, None, f"parses to {type(data).__name__}, not a mapping"
+    return True, data, None
+
+
 # 1. Plugin and marketplace manifests parse and carry required fields
 for rel, required in [
     (".claude-plugin/plugin.json", ["name", "description", "version"]),
@@ -60,21 +109,33 @@ SKILLS = sorted(
 )
 if not SKILLS:
     fail("skills/: no skill directories found, so check 3 would have been vacuous")
+# The name is compared EXACTLY against the directory, and the block is parsed. The previous version
+# asked whether the literal text "name: <dir>" appeared anywhere in the first 2000 characters, which
+# a gate broke twice: `name: intent-typo` passed green, and so did a wrong name whose correct form
+# appeared in the body prose. The harness resolves a skill by its frontmatter name, so a mismatch
+# means the skill silently does not exist under the name everything else calls it. Parsing also
+# subsumes the old hand-rolled test for an unquoted colon in the description: such a block now fails
+# as unparseable YAML, with the parser's own reason.
 for skill in SKILLS:
+    rel = f"skills/{skill}/SKILL.md"
     path = os.path.join(ROOT, "skills", skill, "SKILL.md")
     try:
-        with io.open(path, encoding="utf-8") as f:
-            head = f.read(2000)
-        if not head.startswith("---") or f"name: {skill}" not in head or "description:" not in head:
-            fail(f"skills/{skill}/SKILL.md: frontmatter missing name/description")
-        else:
-            m = re.search(r"^description: (.+)$", head, re.M)
-            if m and not m.group(1).startswith(('"', "'")) and ": " in m.group(1):
-                fail(f"skills/{skill}/SKILL.md: unquoted colon inside description breaks YAML")
-            else:
-                ok(f"skills/{skill}/SKILL.md frontmatter valid")
+        text = io.open(path, encoding="utf-8").read()
     except Exception as e:
-        fail(f"skills/{skill}/SKILL.md: {e}")
+        fail(f"{rel}: {e}")
+        continue
+    found, data, err = parse_frontmatter(text)
+    desc = data.get("description") if data else None
+    if not found:
+        fail(f"{rel}: no closed frontmatter block")
+    elif err:
+        fail(f"{rel}: frontmatter {err}")
+    elif data.get("name") != skill:
+        fail(f"{rel}: frontmatter name is {data.get('name')!r} but the directory is {skill!r}; the harness resolves a skill by its frontmatter name, so they must match exactly")
+    elif not isinstance(desc, str) or not desc.strip():
+        fail(f"{rel}: frontmatter carries no non-empty description")
+    else:
+        ok(f"{rel} frontmatter valid")
 
 # 4. Domain adapters all carry a binding minimum evidence set and a fraud table, AND are routed to.
 # The second half was missing: this check read every adapter's contents and never checked that
@@ -294,7 +355,6 @@ for repo_root, binding_path, text in sorted(bindings):
 # docs/PROCESS.md says so. It cannot judge independence, because all three values are author-written.
 # It enforces that a document claiming a verdict names who attacked it and who wrote it, in a form a
 # reader and a machine read the same way.
-FRONT_MATTER = re.compile(r"\A\ufeff?---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)", re.S)
 FM_KEY = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)[ \t]*:[ \t]*(.*?)[ \t]*$", re.M)
 VERDICT_WORDS = ("VERIFIED", "VERIFIED WITH CAVEATS", "REFUTED")
 # NO PLACEHOLDER SCREENING, and that is a decision rather than an omission.
@@ -388,73 +448,99 @@ else:
 #
 # The concept count is asserted non-zero for the reason check 9 asserts its own: a
 # conformance check that reads no files reports success it did not earn.
-try:
-    import yaml as _yaml
-except ImportError:
-    _yaml = None
+OKF_VERSION = "0.2"
+KB_SECTION = re.compile(r"^##[ \t]+Knowledge base[ \t]*$(.*?)(?=^##[ \t]|\Z)", re.M | re.S)
+KB_PATH_ROW = re.compile(r"^-[ \t]*Path:[ \t]*(.+?)[ \t]*$", re.M)
 
-OKF_BUNDLES = [".knowledge"]
-RESERVED = ("index.md", "log.md")
-if _yaml is None:
-    fail("OKF check needs PyYAML to verify frontmatter parses; install it (pip install pyyaml)")
-else:
-    for bundle in OKF_BUNDLES:
-        root = os.path.join(ROOT, bundle)
-        if not os.path.isdir(root):
-            fail(f"{bundle}: declared an OKF bundle but the directory does not exist")
-            continue
-        concepts = 0
-        for dirpath, _dirnames, filenames in os.walk(root):
-            for name in sorted(filenames):
-                if not name.endswith(".md"):
+# WHICH TREES THIS READS is derived from the bindings, never from a list in this file. A hardcoded
+# list was removed from check 3 for reporting green on a surface it did not read, and a gate found
+# the same shape here two commits later: a second bundle simply was not in the list, so a tree full
+# of non-conformant files passed silently. The bindings already enumerated above are the authority
+# on what this repo and its fixtures claim, and a bundle no binding declares is not part of any
+# contract, so it is correctly out of scope rather than silently missed.
+okf_bundles = []
+for repo_root, binding_path, text in sorted(bindings):
+    label = os.path.relpath(binding_path, ROOT)
+    section = KB_SECTION.search(text)
+    row = KB_PATH_ROW.search(section.group(1)) if section else None
+    if row is None:
+        ok(f"{label}: no Knowledge base path, OKF check not applicable")
+        continue
+    value = row.group(1).strip().strip("`\"'").rstrip("/")
+    if not value or value.startswith("<") or value.lower() in ("none", "unbound"):
+        ok(f"{label}: knowledge base is {row.group(1).strip()}, OKF check not applicable")
+        continue
+    okf_bundles.append((label, repo_root, value))
+
+for label, repo_root, bundle in okf_bundles:
+    root = os.path.join(repo_root, bundle)
+    if not os.path.isdir(root):
+        fail(f"{label}: declares knowledge base {bundle} but that directory does not exist")
+        continue
+    concepts, declared_version, unreadable = 0, None, False
+    for dirpath, dirnames, filenames in os.walk(root):
+        # os.walk does not descend into symlinked directories, so a claim to have read the whole
+        # tree is false whenever one exists. Say so rather than skipping it in silence.
+        linked = [d for d in dirnames if os.path.islink(os.path.join(dirpath, d))]
+        for d in linked:
+            fail(f"{os.path.relpath(os.path.join(dirpath, d), ROOT)}: symlinked directory inside an OKF bundle, which this check does not walk")
+            unreadable = True
+        dirnames[:] = [d for d in dirnames if d not in linked]
+        for name in sorted(filenames):
+            # Case-insensitive on the EXTENSION, so a file named `.MD` cannot smuggle itself past a
+            # check that claims to read every markdown file. Case-sensitive on the RESERVED NAMES,
+            # because the spec reserves the exact strings `index.md` and `log.md`: anything else is
+            # a concept and answers to the concept rules.
+            if not name.lower().endswith(".md"):
+                continue
+            path = os.path.join(dirpath, name)
+            rel = os.path.relpath(path, ROOT)
+            try:
+                text = io.open(path, encoding="utf-8").read()
+            except Exception as e:
+                fail(f"{rel}: unreadable, {e}")
+                unreadable = True
+                continue
+            # Section 9 places no frontmatter restriction on a log file; only section 8 restricts
+            # index files. Checking one here made this stricter than the format it enforces.
+            if name == "log.md":
+                continue
+            found, data, err = parse_frontmatter(text)
+            if name == "index.md":
+                if not found:
                     continue
-                path = os.path.join(dirpath, name)
-                rel = os.path.relpath(path, ROOT)
-                try:
-                    text = io.open(path, encoding="utf-8").read()
-                except Exception as e:
-                    fail(f"{rel}: unreadable, {e}")
+                if err:
+                    fail(f"{rel}: index frontmatter {err}")
                     continue
-                block = re.match(r"\A---\r?\n(.*?)^---\r?\n", text, re.S | re.M)
-                # log.md is reserved but section 9 places no frontmatter restriction on
-                # it; only section 8 restricts index.md. Rejecting a log.md that carries
-                # frontmatter made this check stricter than the format it enforces.
-                if name == "log.md":
+                if dirpath != root:
+                    fail(f"{rel}: an index.md outside the bundle root carries frontmatter; section 8 permits none")
                     continue
-                if name == "index.md":
-                    if block is None:
-                        continue
-                    if dirpath != root:
-                        fail(f"{rel}: an index.md outside the bundle root carries frontmatter; section 8 permits none")
-                        continue
-                    try:
-                        data = _yaml.safe_load(block.group(1))
-                    except _yaml.YAMLError as e:
-                        fail(f"{rel}: bundle-root index.md frontmatter is not parseable YAML, {type(e).__name__}")
-                        continue
-                    keys = sorted(data) if isinstance(data, dict) else None
-                    if keys != ["okf_version"]:
-                        fail(f"{rel}: bundle-root index.md frontmatter is {keys}, only okf_version is permitted")
+                keys = sorted(data)
+                if keys != ["okf_version"]:
+                    fail(f"{rel}: bundle-root index.md frontmatter is {keys}, only okf_version is permitted")
                     continue
-                concepts += 1
-                if block is None:
-                    fail(f"{rel}: OKF concept with no closed frontmatter block")
-                    continue
-                try:
-                    data = _yaml.safe_load(block.group(1))
-                except _yaml.YAMLError as e:
-                    fail(f"{rel}: frontmatter is not parseable YAML, {type(e).__name__}")
-                    continue
-                if not isinstance(data, dict):
-                    fail(f"{rel}: frontmatter parses to {type(data).__name__}, not a mapping")
-                    continue
-                kind = data.get("type")
-                if not isinstance(kind, str) or not kind.strip():
-                    fail(f"{rel}: OKF concept with no non-empty type field")
-        if concepts == 0:
-            fail(f"{bundle}: OKF check found 0 concept files, so it is vacuous, not passing")
-        else:
-            ok(f"{bundle}: OKF v0.2 bundle, {concepts} concept(s), frontmatter parsed, index rules clean")
+                declared_version = str(data["okf_version"])
+                continue
+            concepts += 1
+            if not found:
+                fail(f"{rel}: OKF concept with no closed frontmatter block")
+            elif err:
+                fail(f"{rel}: frontmatter {err}")
+            elif not isinstance(data.get("type"), str) or not data["type"].strip():
+                fail(f"{rel}: OKF concept with no non-empty type field")
+    # The version is READ, not assumed. The success line used to name v0.2 while nothing had ever
+    # opened the one field that declares it, so a bundle marked 99.0, or marked nothing at all,
+    # was reported as v0.2 conformant.
+    if concepts == 0:
+        fail(f"{label}: OKF check found 0 concept files in {bundle}, so it is vacuous, not passing")
+    elif declared_version is None:
+        fail(f"{label}: {bundle} declares no okf_version in its bundle-root index.md, so no version's rules can be claimed verified")
+    elif declared_version != OKF_VERSION:
+        fail(f"{label}: {bundle} declares okf_version {declared_version!r}; this check implements the v{OKF_VERSION} rules only")
+    elif unreadable:
+        fail(f"{label}: {bundle} has parts this check could not read, so conformance is not established")
+    else:
+        ok(f"{label}: {bundle} is an OKF v{OKF_VERSION} bundle, {concepts} concept(s), frontmatter parsed, index rules clean")
 
 print()
 if failures:
