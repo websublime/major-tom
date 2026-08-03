@@ -47,6 +47,17 @@ Filing, in Finalize, sends each entry to a destination with the category it belo
 - **An entry that fits no destination is dropped out loud,** named in the report, never forced into the nearest file to look thorough.
 - **Lands with the work,** in the same commit Finalize makes, not in a later cleanup that never comes.
 
+### The file format
+
+The knowledge base is one **Open Knowledge Format** bundle (OKF v0.2, https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md), unless the binding's Knowledge base slot names another format. A bundle is a directory tree of markdown files; each file is one concept, YAML frontmatter then a body; concepts link with ordinary markdown links.
+
+- **`type` is the only required key** and it must be non-empty. Values are not registered anywhere: pick one that describes the concept, and reuse the ones the binding already lists so a reader can filter.
+- **Recommended on every concept:** `title`, `description` (one sentence, because the index reuses it), and `tags`. `resource` only when the concept describes a thing that has a URI.
+- **`index.md` and `log.md` are reserved** and may never be a concept's filename. An `index.md` carries **no frontmatter at all**, except the bundle-root one which may carry `okf_version` and nothing else. Its body groups entries under headings, each entry a link plus the linked concept's own description.
+- **Record who produced it and who confirmed it,** because the lifecycle already knows both: `generated: {by, at}` is the agent that wrote the concept, and `verified` is a list of `{by, at}`, one entry per gate attacker. These are kept apart on purpose, since the writer is never the confirmer. Actors are written `<producer>/<version>` for an agent or tool, `human:<id>` for a person, `process:<id>` for an automated process; consumers read trust off the `human:` prefix, so use it for anything a person wrote or signed off.
+- **If you do not know an actor, omit the field.** It is optional, and an invented actor is worse than an absent one.
+- **`status`** is `draft`, `stable` (the default when absent) or `deprecated`. Set **`stale_after`** to an absolute `YYYY-MM-DD` date only when the concept genuinely expires, for instance a measurement pinned to a tool version. Do not invent a date to fill the field.
+
 ## Phase 4 - VERIFY
 
 Run `prove`. This is the second gate: adversarial, run by agents that did not do the work, at the size the binding names. The verdict is `prove`'s three words and nothing else: **VERIFIED**, **VERIFIED WITH CAVEATS**, **REFUTED**. Where the binding records a front-matter grammar for declaring a gate result, the verdict is written there verbatim with the attackers and the author named.

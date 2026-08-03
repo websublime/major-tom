@@ -43,9 +43,11 @@ onboard needs the answers detection cannot settle. Fill each slot; check the box
    - Interface SSOT (the contracts between components): <path, or "unbound">
    - Component plans (how each piece gets built): <pattern, e.g. docs/plans/<component>.md, or "unbound">
 
-8. Knowledge base: keep one?
+8. Knowledge base: keep one? It is written in Open Knowledge Format v0.2, a directory of markdown files each carrying YAML frontmatter with a `type`, so any tool that reads OKF can read it.
    - [ ] yes: <default path: .knowledge/>
    - [ ] no
+   If yes and the repo already has knowledge files in another shape, say so and they are left alone rather than converted:
+   - Existing knowledge to leave as it is: <path, or "none">
 
 9. Branch and naming conventions: <default: t<id>-<slug> off the default branch>
 
