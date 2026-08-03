@@ -80,7 +80,10 @@ none. Work intake is the conversation with Miguel; in-flight state lives in the 
 ## Knowledge base
 
 - Path: `.knowledge/`
-- Layout: `memory/` holds one fact per file plus an `INDEX.md`; CLAUDE.md imports the index (`@.knowledge/memory/INDEX.md`) so it loads every session. `audits/` holds one session audit per file.
+- Format: Open Knowledge Format v0.2 (https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md). The whole directory is one OKF bundle: every file that is not `index.md` or `log.md` carries YAML frontmatter with a non-empty `type`, those two filenames are reserved, and an `index.md` carries no frontmatter except `okf_version` at the bundle root. Check 10 in `.github/checks.py` enforces all three, so the format is a fact about the tree and not a claim in this file.
+- Concept types used here: `Fact`, `Session Audit`.
+- Layout: `memory/` holds one fact per file, `audits/` one record per working session, each subdirectory with its own `index.md`. CLAUDE.md imports `@.knowledge/memory/index.md` so the index loads every session.
+- The nine concepts that existed before the format was adopted carry no `generated` field: the record of which model produced their content was not available, and an invented actor is worse than an absent optional field. Concepts written from here on carry it.
 
 ## Conventions
 

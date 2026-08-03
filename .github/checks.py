@@ -365,6 +365,70 @@ if guarded == 0:
 else:
     ok(f"verdict provenance check guarded {guarded} file(s)")
 
+# 10. The knowledge base conforms to Open Knowledge Format v0.2.
+# Three criteria, from the spec's section 11:
+#   1. every non-reserved .md in the tree has a parseable YAML frontmatter block,
+#   2. every one of those blocks carries a non-empty `type`,
+#   3. the two reserved filenames follow their own structure, of which the only part
+#      expressible as a check is that an index.md carries no frontmatter, except a
+#      bundle-root index.md which may carry okf_version and nothing else.
+# Checked rather than asserted in prose because the binding says the tree IS a bundle,
+# and an unchecked format claim decays on the first file somebody adds by hand. The
+# file count is asserted non-zero for the same reason check 9 asserts its own: a
+# conformance check that reads no files reports success it did not earn.
+OKF_BUNDLES = [".knowledge"]
+RESERVED = ("index.md", "log.md")
+for bundle in OKF_BUNDLES:
+    root = os.path.join(ROOT, bundle)
+    if not os.path.isdir(root):
+        fail(f"{bundle}: declared an OKF bundle but the directory does not exist")
+        continue
+    concepts = 0
+    for dirpath, _dirnames, filenames in os.walk(root):
+        for name in sorted(filenames):
+            if not name.endswith(".md"):
+                continue
+            path = os.path.join(dirpath, name)
+            rel = os.path.relpath(path, ROOT)
+            try:
+                text = io.open(path, encoding="utf-8").read()
+            except Exception as e:
+                fail(f"{rel}: unreadable, {e}")
+                continue
+            is_root_index = name == "index.md" and dirpath == root
+            if name in RESERVED:
+                if not text.startswith("---"):
+                    continue
+                if not is_root_index:
+                    fail(f"{rel}: a reserved {name} carries frontmatter; only a bundle-root index.md may")
+                    continue
+                block = text.split("---", 2)
+                keys = [
+                    ln.split(":", 1)[0].strip()
+                    for ln in block[1].splitlines()
+                    if ln.strip() and not ln.lstrip().startswith("#")
+                ]
+                if keys != ["okf_version"]:
+                    fail(f"{rel}: bundle-root index.md frontmatter is {keys}, only okf_version is permitted")
+                continue
+            concepts += 1
+            if not text.startswith("---\n"):
+                fail(f"{rel}: OKF concept with no frontmatter block")
+                continue
+            body = text.split("---\n", 2)
+            if len(body) < 3:
+                fail(f"{rel}: frontmatter block is not closed")
+                continue
+            m = re.search(r"^type:[ \t]*(\S.*)$", body[1], re.M)
+            if not m:
+                fail(f"{rel}: OKF concept with no non-empty type field")
+            elif not m.group(1).strip().strip("\"'"):
+                fail(f"{rel}: type field is empty")
+    if concepts == 0:
+        fail(f"{bundle}: OKF check found 0 concept files, so it is vacuous, not passing")
+    else:
+        ok(f"{bundle}: OKF v0.2 bundle, {concepts} concept(s), reserved filenames clean")
+
 print()
 if failures:
     print(f"{len(failures)} check(s) failed")
