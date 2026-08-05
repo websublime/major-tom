@@ -1,0 +1,27 @@
+{
+  "name": "major-tom",
+  "owner": {
+    "name": "Miguel Ramos",
+    "email": "miguel.marques.ramos@gmail.com"
+  },
+  "metadata": {
+    "description": "Major Tom harness marketplace: AI-agentic SDLC harness for any project, dual-published for Claude Code and GitHub Copilot CLI (Copilot reads this same file).",
+    "version": "0.9.0"
+  },
+  "plugins": [
+    {
+      "name": "major-tom",
+      "source": "./plugins/major-tom",
+      "description": "Claude Code plugin: two-stage onboard workflow (repo scan, interview in the session, execute), strict config schema for .claude/major-tom.json, specialist agent roster, .knowledge/ persistence. Install this one in Claude Code.",
+      "category": "workflow",
+      "keywords": ["sdlc", "agents", "harness", "onboard", "workflow"]
+    },
+    {
+      "name": "major-tom-copilot",
+      "source": "./plugins/major-tom-copilot",
+      "description": "GitHub Copilot CLI variant, derived from the same template source as the Claude Code plugin, never authored apart. Currently ships the agent roster; further surfaces land as they are derived. Install this one with `copilot plugin install`.",
+      "category": "workflow",
+      "keywords": ["sdlc", "agents", "harness", "copilot"]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "major-tom",
+  "displayName": "Major Tom Harness",
+  "version": "0.9.0",
+  "description": "AI-agentic SDLC harness: two-stage onboard workflow (repo scan, interview in the session, execute), strict config schema for .claude/major-tom.json, specialist agent roster, .knowledge/ persistence.",
+  "author": {
+    "name": "Miguel Ramos",
+    "email": "miguel.marques.ramos@gmail.com"
+  },
+  "repository": "https://github.com/websublime/major-tom",
+  "license": "MIT",
+  "keywords": ["sdlc", "agents", "harness", "onboard", "workflow", "multi-repo"]
+}
