@@ -1,0 +1,429 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/websublime/major-tom/main/plugins/major-tom/config.schema.json",
+  "title": "Major Tom onboard configuration",
+  "description": "Schema for .claude/major-tom.json in the target repo (PRD section 10, decisions D1..D6). The file is the single source of truth for every onboard decision (P1). Validation is strict (P3): unknown keys and invalid values are errors, never warnings. Written by the onboard workflow; every plugin surface reads it. Schema version 1. Validator note: use ajv strict mode with strictRequired disabled; the schema uses the canonical not/required idiom to forbid conditional properties (workspace on single topology, team in subagents mode).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "onboard",
+    "project",
+    "execution",
+    "persistence",
+    "stack",
+    "devops",
+    "org",
+    "sources",
+    "mcp",
+    "specialists"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "description": "Version of this schema the file conforms to. Migration anchor (P2): schema changes ship with explicit migrations. This schema validates version 1 only.",
+      "const": 1
+    },
+    "onboard": {
+      "description": "Provenance of the onboard run that wrote this file. Filled automatically, never by the user.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["completedAt", "pluginVersion"],
+      "properties": {
+        "completedAt": {
+          "description": "When the onboard workflow completed, ISO 8601 date-time.",
+          "type": "string",
+          "format": "date-time"
+        },
+        "pluginVersion": {
+          "description": "Version of the major-tom plugin that ran the onboard, semver.",
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$"
+        }
+      }
+    },
+    "project": {
+      "description": "Identity and shape of the target project. From the onboard interview plus scan.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description", "type", "topology"],
+      "properties": {
+        "name": {
+          "description": "Project name.",
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "description": "One-paragraph description of what the project is. May be empty on a fresh project.",
+          "type": "string"
+        },
+        "type": {
+          "description": "How onboard treats the repo. new = bootstrap a project from scratch; existing = adopt a codebase that already exists.",
+          "enum": ["new", "existing"]
+        },
+        "topology": {
+          "description": "Repository topology. single = one repo, one unit (workspace block forbidden); mono-repo = one repo holding several units (workspace block required, units use path); multi-repo = several repos forming one workspace (workspace block required, units use repo). Decision D6.",
+          "enum": ["single", "mono-repo", "multi-repo"]
+        }
+      }
+    },
+    "execution": {
+      "description": "Working model of the execution layer (PRD 9.2). INV-1 holds in both modes: the main session only orchestrates.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workingModel"],
+      "properties": {
+        "workingModel": {
+          "description": "team = the main session hands work to a coordinator leading a team of at least 3 agents (default); subagents = the main session delegates directly to individual subagents, no coordinator (only on explicit user choice at onboard).",
+          "enum": ["team", "subagents"]
+        },
+        "team": {
+          "description": "Team composition. Present exactly when workingModel is team.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["coordinator", "members"],
+          "properties": {
+            "coordinator": {
+              "description": "The coordinator agent. Fixed: always the plugin's coordinator.",
+              "const": "coordinator"
+            },
+            "members": {
+              "description": "Team member agent names. Minimum 3; the coordinator does not count toward the 3 and may not be listed here.",
+              "type": "array",
+              "minItems": 3,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "not": { "const": "coordinator" }
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": { "workingModel": { "const": "team" } },
+            "required": ["workingModel"]
+          },
+          "then": { "required": ["team"] },
+          "else": { "not": { "required": ["team"] } }
+        }
+      ]
+    },
+    "persistence": {
+      "description": "Where generated knowledge lives in the target repo (PRD section 11).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root"],
+      "properties": {
+        "root": {
+          "description": "Root directory of every generated artifact (memories, docs, runs, monitors, logs). Fixed by decision D2.",
+          "const": ".knowledge"
+        }
+      }
+    },
+    "stack": {
+      "description": "Detected technology stack of the target. Filled by scan, confirmed at the onboard interview. Drives specialist agent selection (OQ-2).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["languages", "frameworks", "databases", "messaging"],
+      "properties": {
+        "languages": {
+          "description": "Programming languages, e.g. typescript, java.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "frameworks": {
+          "description": "Frameworks, e.g. react, spring-boot.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "databases": {
+          "description": "Databases, e.g. postgres, redis.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "messaging": {
+          "description": "Messaging systems, e.g. kafka.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "devops": {
+      "description": "Delivery context of the target project.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ci", "containers", "cloud"],
+      "properties": {
+        "ci": {
+          "description": "CI system, e.g. github-actions. Empty when none.",
+          "type": "string"
+        },
+        "containers": {
+          "description": "Local container setup, e.g. docker-compose. Empty when none.",
+          "type": "string"
+        },
+        "cloud": {
+          "description": "Deployment target; context for the publish phase (lifecycle phase 9). Empty when none or undecided.",
+          "enum": ["", "aws", "azure", "gcp", "vercel"]
+        }
+      }
+    },
+    "org": {
+      "description": "Organization context: tenant identity and library policy agents must respect.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "internalLibraries", "preferredLibraries"],
+      "properties": {
+        "namespace": {
+          "description": "The organization's namespace/tenant in @scope form, e.g. @websublime. Identifies the org across surfaces; internal libraries typically publish under this scope. Always required (D7).",
+          "type": "string",
+          "pattern": "^@[a-z0-9][a-z0-9._-]*$"
+        },
+        "internalLibraries": {
+          "description": "In-house libraries agents must know and prefer (compose-first).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "purpose"],
+            "properties": {
+              "name": {
+                "description": "Package name, e.g. @acme/ui.",
+                "type": "string",
+                "minLength": 1
+              },
+              "registry": {
+                "description": "Where it is published, e.g. npm:@acme.",
+                "type": "string"
+              },
+              "purpose": {
+                "description": "What the library is for, so agents know when to reach for it.",
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "preferredLibraries": {
+          "description": "Library policy entries. The rationale is data, not a comment (P4): reason is required.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["use", "reason"],
+            "properties": {
+              "use": {
+                "description": "Library to use, e.g. dayjs.",
+                "type": "string",
+                "minLength": 1
+              },
+              "never": {
+                "description": "Library this choice forbids, e.g. moment. Optional: a preference does not have to ban an alternative.",
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "description": "Why this policy exists, e.g. org standard.",
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "sources": {
+      "description": "Pointers to enterprise knowledge sources for the memory, roadmap, and docs tools (OQ-5, OQ-6). Pointers only: no ingestion capability is claimed by this file.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issueTracker", "sites"],
+      "properties": {
+        "issueTracker": {
+          "description": "Where the project's issues live. A pointer only. Empty provider means no tracker (D9).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["provider", "project"],
+          "properties": {
+            "provider": {
+              "description": "Issue tracker product. Closed enum (P3): new providers enter by schema change. Empty when the project has none.",
+              "enum": ["", "jira", "github", "gitlab", "linear", "unblock", "trello"]
+            },
+            "project": {
+              "description": "Provider-specific project reference: Jira project key (ACME), GitHub owner/repo, GitLab project path, Linear team key, Trello board. Empty exactly when provider is empty.",
+              "type": "string"
+            },
+            "url": {
+              "description": "Base URL for self-hosted instances (GitLab on-prem, unblock). Omit for the provider's cloud default. Forbidden when provider is empty.",
+              "type": "string",
+              "pattern": "^https?://",
+              "format": "uri"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "type": "object",
+                "properties": { "provider": { "const": "" } },
+                "required": ["provider"]
+              },
+              "then": {
+                "type": "object",
+                "properties": { "project": { "const": "" } },
+                "not": { "required": ["url"] }
+              },
+              "else": {
+                "type": "object",
+                "properties": { "project": { "type": "string", "minLength": 1 } }
+              }
+            }
+          ]
+        },
+        "sites": {
+          "description": "Knowledge sites for the memory, roadmap, and docs tools (OQ-5, OQ-6). Pointers only (D10).",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["provider", "reference"],
+            "properties": {
+              "provider": {
+                "description": "Site product. Closed enum (P3): new providers enter by schema change.",
+                "enum": ["confluence", "sharepoint", "notion", "wiki"]
+              },
+              "reference": {
+                "description": "Provider-native reference: Confluence space key, SharePoint site name, Notion workspace or page, wiki name.",
+                "type": "string",
+                "minLength": 1
+              },
+              "url": {
+                "description": "Base URL for self-hosted instances or when the reference alone is not resolvable.",
+                "type": "string",
+                "pattern": "^https?://",
+                "format": "uri"
+              }
+            }
+          }
+        }
+      }
+    },
+    "mcp": {
+      "description": "MCP servers the project must have configured. Baseline (D11, amended by D13): codebase-memory is always present; additional servers may be listed, e.g. jira, github, atlassian. Canonical logical names; mapping to the concrete server keys of the environment is the onboard workflow's job.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 },
+      "contains": { "const": "codebase-memory" }
+    },
+    "specialists": {
+      "description": "Stack specialist agents installed by onboard (D17, D22, D24, D25). Candidates are proposed by the Prepare scan from the authorized source, confirmed by the user in the interview, installed in Execute, and this list is written by Finalize with the actual install outcome. The interview-assembled config carries the confirmed candidates; Finalize overwrites with what really got installed. Empty array when none.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "source"],
+        "properties": {
+          "name": {
+            "description": "Installed agent name, e.g. typescript-pro.",
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "description": "Origin of the agent definition. The authorized source is sub-agents.directory (D24).",
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "workspace": {
+      "description": "Workspace definition. Required when project.topology is mono-repo or multi-repo, forbidden when single (D6).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "layout", "units"],
+      "properties": {
+        "name": {
+          "description": "Workspace name.",
+          "type": "string",
+          "minLength": 1
+        },
+        "layout": {
+          "description": "Structural convention the units follow. layered = technical layers (api, domain, infra); domain = business domains own their full stack.",
+          "enum": ["layered", "domain"]
+        },
+        "units": {
+          "description": "The units forming the workspace, and with them its dependency picture (D14): a unit located by path is an internal dependency (a directory inside the workspace), a unit located by repo is an external dependency (its own repository). Exactly one of the two per unit.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "name": {
+                "description": "Unit name, e.g. example-service.",
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "description": "Relative directory inside the workspace: the unit is an internal dependency, e.g. services/example.",
+                "type": "string",
+                "minLength": 1
+              },
+              "repo": {
+                "description": "Git URL of the unit's own repository: the unit is an external dependency, e.g. git@github.com:acme/example-service.git.",
+                "type": "string",
+                "minLength": 1
+              },
+              "dependsOn": {
+                "description": "Names of other units this unit depends on (D15). Together with the unit list this yields the workspace dependency graph. Name existence, no self-reference, and acyclicity are semantic checks beyond JSON Schema; they belong to the plugin's read-time validation.",
+                "type": "array",
+                "uniqueItems": true,
+                "items": { "type": "string", "minLength": 1 }
+              }
+            },
+            "oneOf": [
+              { "required": ["path"], "not": { "required": ["repo"] } },
+              { "required": ["repo"], "not": { "required": ["path"] } }
+            ]
+          }
+        },
+        "run": {
+          "description": "Workspace-level local run definition, used by the verify phase (lifecycle phase 7).",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "compose": {
+              "description": "Path to the workspace-level compose file. Empty when none.",
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": { "topology": { "const": "single" } },
+            "required": ["topology"]
+          }
+        },
+        "required": ["project"]
+      },
+      "then": { "not": { "required": ["workspace"] } },
+      "else": { "required": ["workspace"] }
+    }
+  ]
+}
