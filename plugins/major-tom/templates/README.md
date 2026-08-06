@@ -68,14 +68,51 @@ its data through `render.js inject`, which replaces only the content of the
 `<script type="application/json" id="major-tom-data">` island (escaping `</script` inside
 the JSON).
 
-Snapshot schema v2 (D33). Required: `generatedAt` (ISO), `config` (the validated config),
-`git` (`[{hash, date, author, subject, kind, add, del}]`, 50-commit window), `knowledge`
+Snapshot schema v2 (D33, extended by D41 and D42). Required: `generatedAt` (ISO), `config`
+(the validated config), `git` (`[{hash, date, author, subject, kind, add, del}]`, same
+window as the timeline: commits of the last 30 days, with a floor of the 50 most recent
+commits when the horizon holds fewer and a ceiling of 500 when it holds more, newest
+first), `knowledge`
 (`{files: [{path, type, size, updated, frontmatter, body?, truncated?}]}`, body embedded
-up to 32 KB per file and 1 MB total in index order, truncated flagged), `decisions`
-(derived from OKF concepts with `type: decision`). Optional, no producer yet, the
-dashboard shows empty states when absent: `lastRun` (`{id, workflow, mode, duration,
-phases: [{name, artifact, status, elapsed}]}`) and `roadmap` (`{milestones: [{title,
-version, status, pct, tasks: [{ref, title, status, owner}]}]}`).
+up to 32 KB per file and 1 MB total in index order, truncated flagged; OKF concepts only,
+meaning non-reserved `.md` files carrying frontmatter, so `runs/intents.log` and the
+generated `dashboard.html` are not listed), `decisions`
+(derived from OKF concepts with `type: decision`), `timeline` (below). Optional, no
+producer yet, the dashboard shows empty states when absent: `lastRun` (`{id, workflow,
+mode, duration, phases: [{name, artifact, status, elapsed}]}`) and `roadmap`
+(`{milestones: [{title, version, status, pct, tasks: [{ref, title, status, owner}]}]}`).
+
+`timeline` (D41) is `{events, window, omitted}`, the event index the `#timeline` view and
+the overview strip render. Sources, all under the persistence root and nowhere else:
+`runs/intents.log` (trivial and task intents), the substantive intent concepts, and the run
+records. `.claude/session/` is never read: it is gitignored mechanism state, keyed by
+`prompt_id` and mutated in place, so a committed snapshot built on it would be empty for
+anyone else.
+
+| Field | Meaning |
+|---|---|
+| `events[]` | Newest first. One object per intent or run. |
+| `events[].at` | ISO timestamp of the event |
+| `events[].kind` | `"intent"` or `"run"` |
+| `events[].tier` | `trivial`, `task` or `substantive` for intents; `null` for runs |
+| `events[].type` | The intent's request type (free-form, D39); `null` for runs |
+| `events[].promptId`, `events[].sessionId` | Correlation ids as persisted at the source; the view groups by an 8-character `sessionId` prefix |
+| `events[].summary` | At most 200 characters; the full text stays in the concept or the log line |
+| `events[].summaryTruncated` | `true` exactly when the summary was cut |
+| `events[].path` | Path of the backing file relative to the persistence root, or `null` when the event has no own file |
+| `window` | The limits the builder applied: `{days: 30, floorEvents: 50, ceilingEvents: 500, byteBudget: 262144}` |
+| `omitted` | `{count, oldestKept, reason}`, the stated-omission record |
+
+Selection algorithm, in order: take the events of the last `days`; when that yields fewer
+than `floorEvents`, take the `floorEvents` most recent instead; when it yields more than
+`ceilingEvents`, keep the `ceilingEvents` most recent; then drop from the oldest end until
+the serialized key fits `byteBudget`, cutting at an event boundary and never mid-event.
+`omitted.count` is how many events the limits removed, `omitted.oldestKept` the `at` of the
+oldest event that survived, and `omitted.reason` is `"days"`, `"ceiling"`, `"bytes"` or
+`null` when nothing was omitted. Nothing is ever pruned at the source: the runs area stays
+the source of truth (D18) and older events are reached by opening the files, never by
+paginating this page. Commits are not copied into `events`: they stay in `git` and the view
+merges the two client-side, which is why both windows carry the same three limits (D42).
 
 Whitespace semantics, exactly as `render.js` implements them: a line holding only a block
 tag is consumed with its line break; a skipped block leaves nothing behind; runs of blank
@@ -92,7 +129,7 @@ that ends it; close the inline block before the line break.
 | `claude.md.tpl` | `CLAUDE.md` in the target repo root, importing `@AGENTS.md` | done |
 | `render.js` | not a template: the canonical renderer both templates go through, plus the dashboard `inject` mode | done, fixture-verified (three topologies, apply idempotence, outside-marker preservation, island injection) |
 | `dashboard/` | authoring split for the dashboard (D34): `index.html` + `dashboard.css` + ES modules; built by `scripts/build-dashboard.js`; excluded from the plugin sync | authoring source |
-| `dashboard.html` | GENERATED from `dashboard/` (never edit directly). Injected into `<persistence.root>/dashboard.html` via `render.js inject` (never the mustache grammar): single-file vanilla port of the owner's Claude Design reference (D33): collapsible rail, five hash-routed views (overview grid/console, roadmap, git with search and kind filters, knowledge tree + viewer, config table/raw), persisted theme toggle, system fonts, honest empty states for lastRun/roadmap | v2 (D33, D34); runs window/retention and design iteration under OQ-13 |
+| `dashboard.html` | GENERATED from `dashboard/` (never edit directly). Injected into `<persistence.root>/dashboard.html` via `render.js inject` (never the mustache grammar): single-file vanilla port of the owner's Claude Design reference (D33): collapsible rail, six hash-routed views (overview grid/console with the last-five-events strip, timeline merging `timeline` events with `git` commits, roadmap, git with search and kind filters, knowledge tree + viewer, config table/raw), persisted theme toggle, system fonts, honest empty states for lastRun/roadmap | v2 (D33, D34, D41); window and retention settled and built, design iteration and the lastRun/roadmap producers under OQ-13 |
 | `dashboard-server.js` | not a template: localhost static server. Onboard copies it to `.claude/server/` in the target repo (D32); `/major-tom:dashboard` and Desktop's launch.json both run that copy. Honors the `PORT` env var (autoPort). | done, smoke-tested |
 | `launch-merge.js` | not a template: merges the managed `major-tom-dashboard` entry into the target's `.claude/launch.json` (Claude Desktop preview surface), preserving every other entry and field; refuses an unparseable file | done, scenario-tested |
 | `settings-merge.js` | not a template: merges the three session defaults (`env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` `"1"`, `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` `"1"`, `alwaysThinkingEnabled` `true`, D37) into the target's Claude Code settings: `.claude/settings.local.json` when it exists, else `.claude/settings.json` when it exists, else a fresh `.claude/settings.json`; every other key and every other `env` entry preserved; fails closed, writing nothing, when the existing file does not parse, is not a JSON object, or has a non-object `env` | done, scenario-tested |
@@ -100,4 +137,4 @@ that ends it; close the inline block before the line break.
 
 Planned, not yet written: one doc template per lifecycle artifact (intent record, research
 notes, decision record, spec/plan, review verdict, implementation log, verification report,
-roadmap update, release record) and the `.knowledge/dashboard.html` template.
+roadmap update, release record).
