@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Draft, under iteration |
-| **Version** | 0.13.14 |
+| **Version** | 0.13.15 |
 | **Date** | 2026-08-06 |
 | **Owner** | Miguel Ramos |
 | **Scope** | The Major Tom plugin (Claude Code + GitHub Copilot CLI) |
@@ -333,7 +333,7 @@ the harness. Four phases:
 |---|---|
 | **Check** | Preconditions: target is a git repo; existing `.claude/major-tom.json` means re-onboard (diff mode, OQ-10); the `codebase-memory` MCP is available (D11/D13); when it is missing, the blocked report tells the user to install it from https://deusdata.github.io/codebase-memory-mcp/ before relaunching; the plugin's own runtime assets (`config.schema.json`, `templates/context.md.tpl`) exist under the plugin root (D23); detect `project.type`. |
 | **Prepare** | Scan (stack, devops, topology, unit discovery, dependency graph) plus specialist candidates from the authorized source, inexact matches flagged (D24); ends stage 1 by returning the detected facts plus self-describing instructions to the main session (D21). |
-| **Execute** | Stage 2, relaunched by the session with the interviewed config in `args`. Validate against `config.schema.json` (fail closed: an invalid config is never written), write the config, bootstrap `.knowledge/` (D2), render templates, install exactly the interview-confirmed specialist list via `agent-installer` (D22, D24), generate the dashboard. |
+| **Execute** | Stage 2, relaunched by the session with the interviewed config in `args`. Validate against `config.schema.json` (fail closed: an invalid config is never written), write the config, bootstrap `.knowledge/` (D2), render templates, install exactly the interview-confirmed specialist list via `agent-installer` (D22, D24), generate the dashboard, merge the project session defaults into the target's settings file (D37). |
 | **Finalize** | Re-read and re-validate everything written, record the onboard itself as the first run in the runs area, report to the user. |
 
 **The interview is the schema**: every interview question is derived from a config key and its
@@ -413,6 +413,20 @@ the session passed in `args`.
 Still open in OQ-12: the merge policy for an existing `CLAUDE.md` (managed blocks proposed
 in `templates/README.md`).
 
+### 12.4 Project session defaults
+
+The Execute phase also writes the target project's Claude Code session defaults (D37):
+`env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"` (sandboxing hardening forced on by default),
+`env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: "1"` (the flag behind the team delegation mode
+of 9.2), and `alwaysThinkingEnabled: true` (extended thinking on, matching the north star).
+The write is done by `templates/settings-merge.js`, the same discipline as the D32 launch
+merge: the script owns the file choice (`.claude/settings.local.json` when the project
+already has one, else `.claude/settings.json`, else a fresh `.claude/settings.json`), only
+the three managed keys are written, every other key and every other `env` entry is
+preserved, and an existing file that does not parse, that is not a JSON object, or whose
+`env` is not an object is a hard failure that writes nothing. Finalize re-reads the file the
+merge targeted and verifies the three values landed.
+
 ## 13. Packaging and distribution
 
 - One marketplace (`.claude-plugin/marketplace.json`), two plugins:
@@ -467,9 +481,13 @@ in `templates/README.md`).
   for it was found, so a workflow launched without a prior mutating tool call is not
   gated; flagged, not yet resolved.
 - `templates/` at the repository root (D16, D19), the authoring source shared by both
-  plugins: `README.md` (rendering contract, placeholder grammar) and `context.md.tpl`
-  (first draft of the CLAUDE.md/AGENTS.md source). Synced verbatim into
-  `plugins/*/templates/` by `scripts/sync-templates.js` (D23).
+  plugins: `README.md` (rendering contract, placeholder grammar, inventory),
+  `context.md.tpl` and `claude.md.tpl` (the AGENTS.md source and its CLAUDE.md wrapper,
+  D26), `render.js` (canonical renderer plus `inject`, D29), `dashboard/` and the generated
+  `dashboard.html` (D34, D33), `dashboard-server.js` (D32), `launch-merge.js` (D32) and
+  `settings-merge.js` (D37: the session-defaults merge, scenario-tested). Synced verbatim
+  into `plugins/*/templates/` by `scripts/sync-templates.js` (D23), the `dashboard/`
+  authoring split excluded.
 - `plugins/major-tom-copilot`: 9 agents (`.agent.md`), synced `templates/`, no manifest yet.
 - `.claude-plugin/marketplace.json` v0.14.0 (D30), dual-plugin.
 - One skill, `think` (D36, see above). No other skills, no tools, no persistence layer
@@ -594,3 +612,4 @@ reversed by a new decision entry, never by silent edit.
 | 0.13.12 | 2026-08-06 | D39 amends D36: `think` gains a type axis (which lifecycle phases a turn touches, first draft: question, learning, research, brainstorm, request), ticket-grounding recognition, and replaces the single confirmation question with reformulate-and-offer-paths for ambiguous requests, user decides. `record-intent.js` to gain `--type`, logged as `type` in `intents.log` and `request_type` in OKF frontmatter (not `type`, reserved by D28). Decision recorded, not yet implemented. |
 | 0.13.13 | 2026-08-06 | D39 implemented and verified. `SKILL.md` rewritten to the 8-step flow (lane, ticket grounding, two-form vagueness with reformulate-and-offer-paths, type, tier, summary, recorder call, proceed). `record-intent.js` gains `--type` (required, free-form, not a closed enum, unlike `--tier`), threaded into `.knowledge/runs/intents.log` as a new column and into the substantive concept's frontmatter as `request_type`, confirmed distinct from the untouched `type: intent` OKF field, and into the `.claude/session/<session_id>.json` marker. Verified: trivial and substantive cases both persist correctly with `type` present, `request_type` and `type: intent` coexist as separate keys in the same frontmatter block, an empty `--type` fails closed, `hooks.json` and the hook scripts untouched, `claude plugin validate` passes, no em/en dashes, no stray test artifacts left in the repo. |
 | 0.13.14 | 2026-08-06 | Owner-caught defect: D39's first-draft type values were left in Portuguese (`duvida`, `aprendizagem`, `pedido`) inside `docs/PRD.md` and `SKILL.md`, artifacts that must be in English per this repo's convention. Renamed to `question`, `learning`, `request` everywhere they appeared (`research` and `brainstorm` were already English, untouched); `record-intent.js` needed no change, `--type` was already a free-form argument with no hardcoded word list. Re-verified: no occurrences of the three Portuguese words remain in any changed file, no em/en dashes, `claude plugin validate` still passes. |
+| 0.13.15 | 2026-08-06 | D37 implemented and verified. New `templates/settings-merge.js` (Node, zero dependencies, same discipline as the D32 launch merge): merges the three session defaults into `.claude/settings.local.json` when the project has one, else `.claude/settings.json`, else a fresh `.claude/settings.json`; only the managed keys are written, every other key and every other `env` entry preserved; hard failure writing nothing when the existing file does not parse, is not a JSON object, or has a non-object `env`. Wired into `onboard.js`: writer step 6 runs the script, Finalize verifies the targeted file carries the three values. `onboard-check.md` and the blocked-assets report now enumerate the new asset (eight required, so a stale install blocks at Check instead of failing at write time). Verified by scenario suite (fresh create, merge preserving other keys and env entries, local-over-shared precedence with both files present, unparseable/array/non-object-env refusals leaving the file byte-identical, idempotence) plus a manual run of the synced plugin copy on three fixture projects. Section 12 gains 12.4; section 15 template inventory refreshed. |
