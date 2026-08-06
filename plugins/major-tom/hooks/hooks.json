@@ -1,6 +1,17 @@
 {
-  "description": "Injects the operator writing rule and session context before every reply; gates mutating tools on a recorded intent for the current prompt.",
+  "description": "Injects the operator writing rule and session context before every reply; gates mutating tools on a recorded intent for the current prompt; on a fresh session start, reports when the installed plugin or this project's onboarded artifacts are out of date.",
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/hooks/version-check.js"
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [
