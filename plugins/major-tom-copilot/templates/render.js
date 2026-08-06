@@ -6,10 +6,16 @@
 // Usage:
 //   node render.js render <template> <config.json>           rendered text to stdout
 //   node render.js apply <template> <config.json> <target>   render, then managed-block write
+//   node render.js inject <html> <data.json> <target>        replace the JSON data island
 //
 // apply semantics: the rendered output must carry the managed markers. If the target file
 // has markers, only the block between them is replaced; without markers the block is
 // appended; a missing target is created. Content outside the markers is never touched.
+//
+// inject semantics (the dashboard path, D31): the source html must contain the data island
+// <script type="application/json" id="major-tom-data">...</script>. Its content is replaced
+// with the JSON from data.json (validated to parse); everything else is copied verbatim to
+// the target. The dashboard is never rendered through the mustache grammar.
 
 'use strict'
 
@@ -126,9 +132,30 @@ function applyManaged(target, rendered) {
 }
 
 const [, , cmd, tplPath, cfgPath, targetPath] = process.argv
-if (cmd !== 'render' && cmd !== 'apply') fail('usage: render.js render|apply <template> <config.json> [target]')
+if (cmd !== 'render' && cmd !== 'apply' && cmd !== 'inject')
+  fail('usage: render.js render|apply|inject <template|html> <config.json|data.json> [target]')
 if (!tplPath || !cfgPath) fail('template and config paths are required')
-if (cmd === 'apply' && !targetPath) fail('apply requires a target path')
+if ((cmd === 'apply' || cmd === 'inject') && !targetPath) fail(`${cmd} requires a target path`)
+
+if (cmd === 'inject') {
+  let dataRaw
+  try {
+    dataRaw = fs.readFileSync(cfgPath, 'utf8')
+    JSON.parse(dataRaw)
+  } catch (e) {
+    fail(`data ${cfgPath}: ${e.message}`)
+  }
+  // A "</script" inside a JSON string would terminate the island in the browser; the
+  // \/ escape is legal JSON and neutralizes it without changing the parsed value.
+  const safe = dataRaw.trim().replace(/<\/script/gi, '<\\/script')
+  const html = fs.readFileSync(tplPath, 'utf8')
+  const island = /(<script[^>]*id="major-tom-data"[^>]*>)[\s\S]*?(<\/script>)/
+  if (!island.test(html)) fail(`no data island (script id="major-tom-data") in ${tplPath}`)
+  const next = html.replace(island, (_, openTag, closeTag) => `${openTag}\n${safe}\n${closeTag}`)
+  fs.writeFileSync(targetPath, next)
+  console.log(`injected ${targetPath}`)
+  process.exit(0)
+}
 
 let config
 try {
