@@ -5,6 +5,20 @@ lives at the repository root (D19) because it is shared by both plugins: the sin
 source for both distribution variants (PRD packaging rule): the Copilot CLI output is derived
 from the same source as the Claude Code output, never authored apart.
 
+## Dashboard authoring split (D34)
+
+The dashboard is authored in `templates/dashboard/` (`index.html` skeleton,
+`dashboard.css`, and real ES modules under `src/`: data, state, ui, one module per view,
+main) and built into the single-file artifact `templates/dashboard.html` by
+`node scripts/build-dashboard.js`. The artifact is GENERATED: never edit it directly, and
+`--check` fails when it is stale. The bundler enforces a declared subset and fails closed
+outside it: static named relative `.mjs` imports only, no cycles, no dynamic import,
+unique top-level declarations across modules (they share one scope after bundling).
+Dev loop without a build: serve the authoring directory
+(`node templates/dashboard-server.js templates/dashboard <port>`) and the browser loads
+the modules natively; edit and refresh. The authoring directory is excluded from the
+plugin sync: only the built artifact ships.
+
 ## Authoring vs runtime (D23)
 
 Author here, and only here. Installed plugins cannot reference files outside their own
@@ -49,6 +63,20 @@ A minimal mustache-compatible subset, no engine dependency:
 Anything beyond this subset is a design change: extend this table first, then `render.js`,
 then the templates.
 
+The dashboard is the exception to the grammar: `dashboard.html` is fully static and gets
+its data through `render.js inject`, which replaces only the content of the
+`<script type="application/json" id="major-tom-data">` island (escaping `</script` inside
+the JSON).
+
+Snapshot schema v2 (D33). Required: `generatedAt` (ISO), `config` (the validated config),
+`git` (`[{hash, date, author, subject, kind, add, del}]`, 50-commit window), `knowledge`
+(`{files: [{path, type, size, updated, frontmatter, body?, truncated?}]}`, body embedded
+up to 32 KB per file and 1 MB total in index order, truncated flagged), `decisions`
+(derived from OKF concepts with `type: decision`). Optional, no producer yet, the
+dashboard shows empty states when absent: `lastRun` (`{id, workflow, mode, duration,
+phases: [{name, artifact, status, elapsed}]}`) and `roadmap` (`{milestones: [{title,
+version, status, pct, tasks: [{ref, title, status, owner}]}]}`).
+
 Whitespace semantics, exactly as `render.js` implements them: a line holding only a block
 tag is consumed with its line break; a skipped block leaves nothing behind; runs of blank
 lines collapse to one; trailing spaces are trimmed. A value that may be empty must be
@@ -62,7 +90,11 @@ that ends it; close the inline block before the line break.
 |---|---|---|
 | `context.md.tpl` | `AGENTS.md` in the target repo root | second draft, restructured after the owner's reference analysis (role header, north star, hard rules, document map) |
 | `claude.md.tpl` | `CLAUDE.md` in the target repo root, importing `@AGENTS.md` | done |
-| `render.js` | not a template: the canonical renderer both templates go through | done, fixture-verified (three topologies, apply idempotence, outside-marker preservation) |
+| `render.js` | not a template: the canonical renderer both templates go through, plus the dashboard `inject` mode | done, fixture-verified (three topologies, apply idempotence, outside-marker preservation, island injection) |
+| `dashboard/` | authoring split for the dashboard (D34): `index.html` + `dashboard.css` + ES modules; built by `scripts/build-dashboard.js`; excluded from the plugin sync | authoring source |
+| `dashboard.html` | GENERATED from `dashboard/` (never edit directly). Injected into `<persistence.root>/dashboard.html` via `render.js inject` (never the mustache grammar): single-file vanilla port of the owner's Claude Design reference (D33): collapsible rail, five hash-routed views (overview grid/console, roadmap, git with search and kind filters, knowledge tree + viewer, config table/raw), persisted theme toggle, system fonts, honest empty states for lastRun/roadmap | v2 (D33, D34); runs window/retention and design iteration under OQ-13 |
+| `dashboard-server.js` | not a template: localhost static server. Onboard copies it to `.claude/server/` in the target repo (D32); `/major-tom:dashboard` and Desktop's launch.json both run that copy. Honors the `PORT` env var (autoPort). | done, smoke-tested |
+| `launch-merge.js` | not a template: merges the managed `major-tom-dashboard` entry into the target's `.claude/launch.json` (Claude Desktop preview surface), preserving every other entry and field; refuses an unparseable file | done, scenario-tested |
 
 Planned, not yet written: one doc template per lifecycle artifact (intent record, research
 notes, decision record, spec/plan, review verdict, implementation log, verification report,
