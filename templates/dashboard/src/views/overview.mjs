@@ -4,6 +4,7 @@
 import { COMMITS, COUNTS, DECISIONS, LASTRUN, ROADMAP, ROOT } from '../data.mjs'
 import { S } from '../state.mjs'
 import { commitRow, decisionRow, esc, milestoneVm, phaseVms } from '../ui.mjs'
+import { timelineRow, timelineStream } from './timeline.mjs'
 
 function lifecycleGrid(phases) {
   return '<section class="panel"><div class="panel-head"><span class="eyebrow">lifecycle</span>'
@@ -81,6 +82,15 @@ export function vOverview() {
         + '<span style="color:var(--dim);font-size:11px">' + esc(c.label) + '</span></div>'
     }).join('') + '</div></section>'
 
+  const recent = timelineStream().slice(0, 5)
+  const activityStrip = '<section class="panel" style="grid-column:span 12">'
+    + '<div class="panel-head"><span class="eyebrow">activity</span>'
+    + '<span style="color:var(--dimmer);font-size:11px">last ' + recent.length + ' of the merged stream</span>'
+    + '<a href="#/timeline" style="margin-left:auto;font-size:11.5px">timeline &#8594;</a></div>'
+    + (recent.length ? '<div style="display:flex;flex-direction:column;gap:2px">' + recent.map(timelineRow).join('') + '</div>'
+      : '<div class="empty">No activity in the snapshot yet: no recorded events and no commits.</div>')
+    + '</section>'
+
   const gitPanel = '<section class="panel" style="grid-column:span 7">'
     + '<div class="panel-head"><span class="eyebrow">git history</span><a href="#/git" style="margin-left:auto;font-size:11.5px">full log &#8594;</a></div>'
     + (COMMITS.length ? '<div style="display:flex;flex-direction:column;gap:2px">' + COMMITS.slice(0, 7).map(commitRow).join('') + '</div>'
@@ -97,5 +107,5 @@ export function vOverview() {
     + '</section>'
 
   return bar + '<div style="display:flex;flex-direction:column;gap:14px">' + lifecycle
-    + '<div class="grid12">' + roadmapBrief + knowledgePanel + gitPanel + decisionsPanel + '</div></div>'
+    + '<div class="grid12">' + roadmapBrief + knowledgePanel + activityStrip + gitPanel + decisionsPanel + '</div></div>'
 }

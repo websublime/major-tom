@@ -1,12 +1,13 @@
 // Mutable UI state and the view registry metadata.
 
-import { CFG, COMMITS, ROOT } from './data.mjs'
+import { CFG, COMMITS, ROOT, TIMELINE } from './data.mjs'
 
-export const VIEWS = ['overview', 'roadmap', 'git', 'knowledge', 'config']
+export const VIEWS = ['overview', 'roadmap', 'timeline', 'git', 'knowledge', 'config']
 
 export const SUBTITLES = {
   overview: 'Lifecycle state, roadmap and knowledge at a glance',
   roadmap: 'Milestones, tasks and open questions',
+  timeline: TIMELINE.events.length + '-event window merged with the commit stream',
   git: COMMITS.length + '-commit window from the snapshot',
   knowledge: ROOT + ' as an OKF 0.2 bundle',
   config: 'Single source of truth for every plugin surface'
