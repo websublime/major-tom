@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --bg:#101214; --panel:#1a1d21; --panel2:#22262b; --raise:#2a2f35; --tile:#1f2328;
+  --line:#282c32; --line2:#3a4048; --text:#edeff1; --dim:#98a0a8; --dimmer:#69717a;
+  --accent:#ef8272; --accent-soft:#332624; --accent-line:#5b3a34;
+  --ok:#6fcf9d; --ok-soft:#1e2c26; --warn:#e6bd6c; --stop:#e0757f;
+  --shadow:0 1px 0 rgba(255,255,255,.03), 0 12px 28px -14px rgba(0,0,0,.7);
+}
+:root[data-theme="light"]{
+  --bg:#ececeb; --panel:#fbfbfa; --panel2:#f1f2f2; --raise:#e4e5e6; --tile:#f5f6f6;
+  --line:#e0e1e2; --line2:#c3c6c8; --text:#14171a; --dim:#5b6167; --dimmer:#8a9096;
+  --accent:#d9604c; --accent-soft:#fbeae6; --accent-line:#f0c4bb;
+  --ok:#2f8a62; --ok-soft:#e8f2ec; --warn:#8e6c22; --stop:#b04d58;
+  --shadow:0 1px 0 rgba(255,255,255,.6), 0 10px 24px -16px rgba(0,0,0,.28);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:"IBM Plex Mono",ui-monospace,monospace;-webkit-font-smoothing:antialiased;}
+a{color:var(--accent);text-decoration:none;}
+a:hover{color:var(--text);}
+input::placeholder{color:var(--dimmer);}
+::selection{background:var(--accent-soft);}
+::-webkit-scrollbar{width:10px;height:10px;}
+::-webkit-scrollbar-thumb{background:var(--raise);border-radius:10px;border:3px solid transparent;background-clip:content-box;}
+::-webkit-scrollbar-track{background:transparent;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+</style>
+</helmet>
+
+<div style="display:flex;gap:12px;height:100vh;width:100%;padding:12px;overflow:hidden;background:var(--bg);font-size:13px;line-height:1.45">
+
+  <nav style="flex:0 0 auto;display:flex;flex-direction:column;gap:6px;padding:14px 10px;border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);overflow:hidden;transition:width .18s ease;width:{{ railWidth }}">
+    <div style="display:flex;align-items:center;gap:11px;padding:2px 4px 16px 4px">
+      <div style="flex:0 0 auto;width:34px;height:34px;border-radius:12px;background:var(--accent-soft);border:1px solid var(--accent-line);display:grid;place-items:center;color:var(--accent);font-size:12px;font-weight:600">MT</div>
+      <div style="display:flex;flex-direction:column;white-space:nowrap;opacity:{{ labelOpacity }}">
+        <span style="font-family:'IBM Plex Sans',sans-serif;font-size:14px;font-weight:600;letter-spacing:-.01em">Major Tom</span>
+        <span style="font-size:10.5px;color:var(--dimmer)">v0.11.0</span>
+      </div>
+    </div>
+
+    <sc-for list="{{ navItems }}" as="item" hint-placeholder-count="5">
+      <button type="button" onClick="{{ item.go }}" title="{{ item.label }}" style="display:flex;align-items:center;gap:11px;width:100%;padding:8px;border:1px solid {{ item.border }};border-radius:14px;background:{{ item.bg }};color:{{ item.fg }};font-family:inherit;font-size:12.5px;cursor:pointer;text-align:left;white-space:nowrap;transition:background .12s ease" style-hover="background:var(--panel2);color:var(--text)">
+        <span style="flex:0 0 auto;width:22px;height:22px;border-radius:8px;display:grid;place-items:center;font-size:12.5px">{{ item.glyph }}</span>
+        <span style="opacity:{{ labelOpacity }}">{{ item.label }}</span>
+        <span style="margin-left:auto;padding:0 7px;border-radius:999px;background:var(--panel2);color:var(--dimmer);font-size:10.5px;opacity:{{ labelOpacity }}">{{ item.count }}</span>
+      </button>
+    </sc-for>
+
+    <div style="margin-top:auto;display:flex;flex-direction:column;gap:6px">
+      <button type="button" onClick="{{ toggleTheme }}" title="Theme" style="display:flex;align-items:center;gap:11px;padding:8px;border:1px solid transparent;border-radius:14px;background:transparent;color:var(--dim);font-family:inherit;font-size:12.5px;cursor:pointer;white-space:nowrap" style-hover="background:var(--panel2);color:var(--text)">
+        <span style="flex:0 0 auto;width:22px;text-align:center">{{ themeGlyph }}</span>
+        <span style="opacity:{{ labelOpacity }}">{{ themeLabel }}</span>
+      </button>
+      <button type="button" onClick="{{ toggleRail }}" title="Collapse" style="display:flex;align-items:center;gap:11px;padding:8px;border:1px solid transparent;border-radius:14px;background:transparent;color:var(--dim);font-family:inherit;font-size:12.5px;cursor:pointer;white-space:nowrap" style-hover="background:var(--panel2);color:var(--text)">
+        <span style="flex:0 0 auto;width:22px;text-align:center">{{ railGlyph }}</span>
+        <span style="opacity:{{ labelOpacity }}">collapse</span>
+      </button>
+    </div>
+  </nav>
+
+  <main style="flex:1 1 auto;display:flex;flex-direction:column;gap:14px;min-width:0;overflow:auto;padding-right:2px">
+
+    <header style="flex:0 0 auto;display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;padding:6px 4px 0 4px">
+      <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+        <h1 style="margin:0;font-family:'IBM Plex Sans',sans-serif;font-size:29px;font-weight:600;letter-spacing:-.02em;text-transform:capitalize">{{ viewTitle }}</h1>
+        <span style="color:var(--dim);font-size:12px">{{ viewSubtitle }}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap">
+        <span style="display:flex;align-items:center;gap:8px;padding:7px 13px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--dim);font-size:11.5px;white-space:nowrap;box-shadow:var(--shadow)"><span style="width:6px;height:6px;border-radius:50%;background:var(--ok);animation:pulse 2.6s infinite"></span>snapshot {{ generatedAt }}</span>
+        <span style="padding:7px 13px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--dim);font-size:11.5px;white-space:nowrap;box-shadow:var(--shadow)">unblock &#183; mono-repo</span>
+        <span style="padding:7px 13px;border:1px solid var(--accent-line);border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:11.5px;white-space:nowrap">team &#183; 3 + coordinator</span>
+      </div>
+    </header>
+
+    <!-- ============ OVERVIEW ============ -->
+    <sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column;gap:14px">
+
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:0 4px">
+          <div style="display:flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:999px;background:var(--panel)">
+            <button type="button" onClick="{{ setLayoutA }}" style="padding:6px 15px;border:0;border-radius:999px;background:{{ layoutABg }};color:{{ layoutAFg }};font-family:inherit;font-size:11.5px;cursor:pointer">grid</button>
+            <button type="button" onClick="{{ setLayoutB }}" style="padding:6px 15px;border:0;border-radius:999px;background:{{ layoutBBg }};color:{{ layoutBFg }};font-family:inherit;font-size:11.5px;cursor:pointer">console</button>
+          </div>
+          <span style="margin-left:auto;color:var(--dim);font-size:11.5px">last run <span style="color:var(--text)">{{ lastRun.id }}</span> &#183; {{ lastRun.duration }}</span>
+        </div>
+
+        <!-- ---- layout A ---- -->
+        <sc-if value="{{ isLayoutA }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;gap:14px">
+
+            <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px 16px 18px 16px">
+              <div style="display:flex;align-items:center;gap:12px;padding:0 2px 14px 2px;flex-wrap:wrap">
+                <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">lifecycle</span>
+                <span style="color:var(--dimmer);font-size:11.5px">{{ lastRun.id }}</span>
+                <span style="margin-left:auto;padding:4px 11px;border-radius:999px;background:var(--panel2);color:var(--text);font-size:11.5px">phase {{ lastRun.phaseIndex }}/9 &#183; {{ lastRun.phaseName }}</span>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:8px">
+                <sc-for list="{{ phases }}" as="p" hint-placeholder-count="9">
+                  <div style="padding:12px;border:1px solid {{ p.tileLine }};border-radius:14px;background:{{ p.tileBg }};display:flex;flex-direction:column;gap:8px;min-width:0">
+                    <div style="display:flex;align-items:center;gap:7px">
+                      <span style="width:7px;height:7px;border-radius:50%;background:{{ p.color }}"></span>
+                      <span style="color:var(--dimmer);font-size:10.5px">{{ p.num }}</span>
+                    </div>
+                    <div style="font-family:'IBM Plex Sans',sans-serif;color:{{ p.labelColor }};font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</div>
+                    <div style="height:3px;border-radius:999px;background:var(--raise)"><div style="height:3px;border-radius:999px;background:{{ p.color }};width:{{ p.pct }}%"></div></div>
+                    <div style="color:var(--dimmer);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.artifact }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
+
+            <div style="display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px;align-items:start">
+
+              <section style="grid-column:span 7;border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
+                <div style="display:flex;align-items:center;gap:12px;padding:0 2px 12px 2px">
+                  <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">roadmap</span>
+                  <a href="#roadmap" onClick="{{ goRoadmap }}" style="margin-left:auto;font-size:11.5px">open &#8594;</a>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <sc-for list="{{ milestonesBrief }}" as="m" hint-placeholder-count="5">
+                    <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:var(--tile)">
+                      <span style="width:7px;height:7px;flex:0 0 auto;border-radius:50%;background:{{ m.color }}"></span>
+                      <span style="flex:1 1 auto;min-width:0;font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.title }}</span>
+                      <span style="flex:0 0 auto;color:var(--dimmer);font-size:11px">{{ m.doneTasks }}/{{ m.totalTasks }}</span>
+                      <span style="flex:0 0 96px;height:4px;border-radius:999px;background:var(--raise)"><span style="display:block;height:4px;border-radius:999px;background:{{ m.color }};width:{{ m.pct }}%"></span></span>
+                      <span style="flex:0 0 36px;text-align:right;color:var(--text);font-size:11.5px">{{ m.pct }}%</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </section>
+
+              <section style="grid-column:span 5;border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
+                <div style="display:flex;align-items:center;gap:12px;padding:0 2px 12px 2px">
+                  <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">.knowledge</span>
+                  <span style="margin-left:auto;color:var(--dimmer);font-size:11px">okf 0.2 bundle</span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+                  <sc-for list="{{ counts }}" as="c" hint-placeholder-count="6">
+                    <div style="padding:12px;border-radius:14px;background:var(--tile);display:flex;flex-direction:column;gap:2px">
+                      <span style="font-family:'IBM Plex Sans',sans-serif;font-size:24px;font-weight:600;letter-spacing:-.02em;color:{{ c.color }}">{{ c.n }}</span>
+                      <span style="color:var(--dim);font-size:11px">{{ c.label }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </section>
+
+              <section style="grid-column:span 7;border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
+                <div style="display:flex;align-items:center;gap:12px;padding:0 2px 12px 2px">
+                  <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">git history</span>
+                  <a href="#git" onClick="{{ goGit }}" style="margin-left:auto;font-size:11.5px">full log &#8594;</a>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <sc-for list="{{ commitsBrief }}" as="c" hint-placeholder-count="7">
+                    <div style="display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:12px" style-hover="background:var(--panel2)">
+                      <span style="flex:0 0 auto;padding:1px 8px;border-radius:999px;background:var(--panel2);color:var(--accent);font-size:11px">{{ c.sha }}</span>
+                      <span style="flex:0 0 58px;color:{{ c.kindColor }};font-size:11px">{{ c.kind }}</span>
+                      <span style="flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.subject }}</span>
+                      <span style="flex:0 0 auto;color:var(--dimmer);font-size:11px">{{ c.when }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </section>
+
+              <section style="grid-column:span 5;border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
+                <div style="display:flex;align-items:center;gap:12px;padding:0 2px 12px 2px">
+                  <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">decisions</span>
+                  <span style="margin-left:auto;color:var(--dimmer);font-size:11px">32 closed &#183; 8 open</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <sc-for list="{{ decisions }}" as="d" hint-placeholder-count="7">
+                    <div style="display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:12px" style-hover="background:var(--panel2)">
+                      <span style="flex:0 0 auto;padding:1px 8px;border-radius:999px;background:{{ d.chipBg }};border:1px solid {{ d.chipLine }};color:{{ d.color }};font-size:10.5px">{{ d.id }}</span>
+                      <span style="flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ d.textColor }}">{{ d.text }}</span>
+                      <span style="flex:0 0 auto;color:var(--dimmer);font-size:11px">{{ d.date }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </section>
+
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ---- layout B ---- -->
+        <sc-if value="{{ isLayoutB }}" hint-placeholder-val="{{ true }}">
+          <div style="display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px;align-items:start">
+
+            <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+              <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
+                <div style="display:flex;align-items:center;gap:11px;padding:0 2px 14px 2px;flex-wrap:wrap">
+                  <span style="width:26px;height:26px;border-radius:10px;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent);display:grid;place-items:center;font-size:11px">&#9656;</span>
+                  <span style="font-family:'IBM Plex Sans',sans-serif;font-size:14px;font-weight:600">{{ lastRun.id }}</span>
+                  <span style="color:var(--dim);font-size:11.5px">{{ lastRun.workflow }}</span>
+                  <span style="margin-left:auto;padding:4px 11px;border-radius:999px;background:var(--panel2);color:var(--dim);font-size:11.5px">{{ lastRun.duration }} &#183; {{ lastRun.mode }}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:3px">
+                  <sc-for list="{{ phases }}" as="p" hint-placeholder-count="9">
+                    <div style="display:flex;align-items:center;gap:13px;padding:9px 12px;border-radius:13px;background:{{ p.rowBg }}">
+                      <span style="flex:0 0 16px;color:var(--dimmer);font-size:11px">{{ p.num }}</span>
+                      <span style="flex:0 0 7px;height:7px;border-radius:50%;background:{{ p.color }}"></span>
+                      <span style="flex:0 0 118px;font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;color:{{ p.labelColor }};font-weight:500">{{ p.name }}</span>
+                      <span style="flex:1 1 auto;min-width:0;color:var(--dim);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.artifact }}</span>
+                      <span style="flex:0 0 auto;padding:1px 9px;border-radius:999px;background:{{ p.chipBg }};color:{{ p.color }};font-size:10.5px;letter-spacing:.08em;text-transform:uppercase">{{ p.status }}</span>
+                      <span style="flex:0 0 50px;text-align:right;color:var(--dimmer);font-size:11px">{{ p.elapsed }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </section>
+
+              <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
+                <div style="display:flex;align-items:center;gap:12px;padding:0 2px 12px 2px">
+                  <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">git history</span>
+                  <a href="#git" onClick="{{ goGit }}" style="margin-left:auto;font-size:11.5px">full log &#8594;</a>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <sc-for list="{{ commitsBrief }}" as="c" hint-placeholder-count="7">
+                    <div style="display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:12px" style-hover="background:var(--panel2)">
+                      <span style="flex:0 0 auto;padding:1px 8px;border-radius:999px;background:var(--panel2);color:var(--accent);font-size:11px">{{ c.sha }}</span>
+                      <span style="flex:0 0 58px;color:{{ c.kindColor }};font-size:11px">{{ c.kind }}</span>
+                      <span style="flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.subject }}</span>
+                      <span style="flex:0 0 auto;color:var(--dimmer);font-size:11px">{{ c.when }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </section>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+              <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:14px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+                <sc-for list="{{ counts }}" as="c" hint-placeholder-count="6">
+                  <div style="padding:11px;border-radius:13px;background:var(--tile);display:flex;flex-direction:column;gap:1px">
+                    <span style="font-family:'IBM Plex Sans',sans-serif;font-size:20px;font-weight:600;color:{{ c.color }}">{{ c.n }}</span>
+                    <span style="color:var(--dim);font-size:10.5px">{{ c.label }}</span>
+                  </div>
+                </sc-for>
+              </section>
+
+              <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
+                <div style="display:flex;align-items:center;gap:12px;padding:0 2px 12px 2px">
+                  <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">roadmap</span>
+                  <a href="#roadmap" onClick="{{ goRoadmap }}" style="margin-left:auto;font-size:11.5px">open &#8594;</a>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <sc-for list="{{ milestonesBrief }}" as="m" hint-placeholder-count="5">
+                    <div style="padding:11px 12px;border-radius:13px;background:var(--tile);display:flex;flex-direction:column;gap:7px">
+                      <div style="display:flex;gap:10px;align-items:baseline">
+                        <span style="flex:1 1 auto;min-width:0;font-family:'IBM Plex Sans',sans-serif;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.title }}</span>
+                        <span style="color:var(--dim);font-size:11.5px">{{ m.pct }}%</span>
+                      </div>
+                      <div style="height:3px;border-radius:999px;background:var(--raise)"><div style="height:3px;border-radius:999px;background:{{ m.color }};width:{{ m.pct }}%"></div></div>
+                    </div>
+                  </sc-for>
+                </div>
+              </section>
+
+              <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
+                <div style="display:flex;align-items:center;padding:0 2px 12px 2px">
+                  <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">decisions</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <sc-for list="{{ decisions }}" as="d" hint-placeholder-count="7">
+                    <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:12px" style-hover="background:var(--panel2)">
+                      <span style="flex:0 0 auto;padding:1px 8px;border-radius:999px;background:{{ d.chipBg }};border:1px solid {{ d.chipLine }};color:{{ d.color }};font-size:10.5px">{{ d.id }}</span>
+                      <span style="flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ d.textColor }}">{{ d.text }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </section>
+            </div>
+          </div>
+        </sc-if>
+
+      </div>
+    </sc-if>
+
+    <!-- ============ ROADMAP ============ -->
+    <sc-if value="{{ isRoadmap }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <section style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:16px 18px;border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow)">
+          <div style="display:flex;flex-direction:column;gap:1px">
+            <span style="color:var(--dim);font-size:11px;letter-spacing:.14em;text-transform:uppercase">overall</span>
+            <span style="font-family:'IBM Plex Sans',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.02em">{{ roadmapPct }}%</span>
+          </div>
+          <div style="flex:1 1 240px;height:7px;border-radius:999px;background:var(--raise)"><div style="height:7px;border-radius:999px;background:var(--accent);width:{{ roadmapPct }}%"></div></div>
+          <div style="display:flex;gap:8px">
+            <span style="padding:5px 12px;border-radius:999px;background:var(--ok-soft);color:var(--ok);font-size:11.5px">{{ roadmapDone }} done</span>
+            <span style="padding:5px 12px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:11.5px">{{ roadmapActive }} active</span>
+            <span style="padding:5px 12px;border-radius:999px;background:var(--panel2);color:var(--dim);font-size:11.5px">{{ roadmapPlanned }} planned</span>
+          </div>
+        </section>
+
+        <sc-for list="{{ milestones }}" as="m" hint-placeholder-count="5">
+          <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:0 2px 12px 2px">
+              <span style="width:8px;height:8px;border-radius:50%;background:{{ m.color }}"></span>
+              <span style="font-family:'IBM Plex Sans',sans-serif;font-size:15px;font-weight:600">{{ m.title }}</span>
+              <span style="color:var(--dimmer);font-size:11.5px">{{ m.version }}</span>
+              <span style="padding:2px 10px;border-radius:999px;background:{{ m.chipBg }};color:{{ m.color }};font-size:10.5px;letter-spacing:.08em;text-transform:uppercase">{{ m.status }}</span>
+              <span style="margin-left:auto;display:flex;align-items:center;gap:12px;color:var(--dim);font-size:11.5px">
+                <span>{{ m.doneTasks }}/{{ m.totalTasks }} tasks</span>
+                <span style="width:120px;height:4px;border-radius:999px;background:var(--raise);display:inline-block"><span style="display:block;height:4px;border-radius:999px;background:{{ m.color }};width:{{ m.pct }}%"></span></span>
+                <span style="width:36px;text-align:right;color:var(--text)">{{ m.pct }}%</span>
+              </span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <sc-for list="{{ m.tasks }}" as="t" hint-placeholder-count="4">
+                <div style="display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:13px;background:var(--tile)">
+                  <span style="flex:0 0 14px;color:{{ t.color }};font-size:12px">{{ t.mark }}</span>
+                  <span style="flex:0 0 auto;padding:1px 8px;border-radius:999px;background:var(--panel2);color:var(--dim);font-size:10.5px">{{ t.ref }}</span>
+                  <span style="flex:1 1 auto;min-width:0;color:{{ t.textColor }};text-wrap:pretty">{{ t.title }}</span>
+                  <span style="flex:0 0 auto;color:var(--dimmer);font-size:11px">{{ t.owner }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <!-- ============ GIT ============ -->
+    <sc-if value="{{ isGit }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:0 4px">
+          <div style="display:flex;align-items:center;gap:9px;padding:8px 14px;border:1px solid var(--line);border-radius:999px;background:var(--panel);flex:0 0 300px;box-shadow:var(--shadow)">
+            <span style="color:var(--dimmer)">&#9906;</span>
+            <input type="text" placeholder="filter subject, sha, author" value="{{ query }}" onInput="{{ onQuery }}" style="flex:1 1 auto;min-width:0;border:0;outline:none;background:transparent;color:var(--text);font-family:inherit;font-size:12.5px" />
+          </div>
+          <div style="display:flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:999px;background:var(--panel)">
+            <sc-for list="{{ kindFilters }}" as="f" hint-placeholder-count="7">
+              <button type="button" onClick="{{ f.go }}" style="padding:6px 13px;border:0;border-radius:999px;background:{{ f.bg }};color:{{ f.fg }};font-family:inherit;font-size:11.5px;cursor:pointer">{{ f.label }}</button>
+            </sc-for>
+          </div>
+          <span style="margin-left:auto;color:var(--dim);font-size:11.5px">{{ visibleCount }} of 50 commits &#183; window from D31</span>
+        </div>
+
+        <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:14px 14px 8px 14px">
+          <div style="display:flex;gap:12px;padding:0 12px 10px 12px;color:var(--dim);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase">
+            <span style="flex:0 0 78px">sha</span>
+            <span style="flex:0 0 58px">kind</span>
+            <span style="flex:1 1 auto">subject</span>
+            <span style="flex:0 0 130px">author</span>
+            <span style="flex:0 0 84px">files</span>
+            <span style="flex:0 0 104px">when</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <sc-for list="{{ visibleCommits }}" as="c" hint-placeholder-count="14">
+              <div style="display:flex;gap:12px;padding:9px 12px;border-radius:13px;align-items:center" style-hover="background:var(--panel2)">
+                <span style="flex:0 0 78px"><span style="padding:1px 8px;border-radius:999px;background:var(--panel2);color:var(--accent);font-size:11px">{{ c.sha }}</span></span>
+                <span style="flex:0 0 58px;color:{{ c.kindColor }};font-size:11px">{{ c.kind }}</span>
+                <span style="flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.subject }}</span>
+                <span style="flex:0 0 130px;color:var(--dim);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.author }}</span>
+                <span style="flex:0 0 84px;font-size:11px"><span style="color:var(--ok)">+{{ c.add }}</span> <span style="color:var(--stop)">&#8722;{{ c.del }}</span></span>
+                <span style="flex:0 0 104px;color:var(--dimmer);font-size:11px">{{ c.when }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+      </div>
+    </sc-if>
+
+    <!-- ============ KNOWLEDGE ============ -->
+    <sc-if value="{{ isKnowledge }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;grid-template-columns:minmax(240px,300px) minmax(0,1fr);gap:14px;align-items:start">
+        <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:14px">
+          <div style="display:flex;align-items:center;gap:10px;padding:2px 8px 12px 8px">
+            <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">.knowledge</span>
+            <span style="margin-left:auto;padding:1px 8px;border-radius:999px;background:var(--panel2);color:var(--dimmer);font-size:10.5px">okf 0.2</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <sc-for list="{{ tree }}" as="n" hint-placeholder-count="12">
+              <button type="button" onClick="{{ n.go }}" style="display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px;padding-left:{{ n.indent }};border:0;border-radius:12px;background:{{ n.bg }};color:{{ n.fg }};font-family:inherit;font-size:12.5px;cursor:{{ n.cursor }};text-align:left" style-hover="background:var(--panel2)">
+                <span style="flex:0 0 auto;color:var(--dimmer)">{{ n.glyph }}</span>
+                <span style="flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ n.name }}</span>
+                <span style="flex:0 0 auto;color:var(--dimmer);font-size:10.5px">{{ n.meta }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </section>
+
+        <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px;min-width:0">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:0 2px 12px 2px">
+            <span style="font-family:'IBM Plex Sans',sans-serif;font-size:14.5px;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ activeFile.path }}</span>
+            <span style="flex:0 0 auto;padding:1px 9px;border-radius:999px;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent);font-size:10.5px">{{ activeFile.type }}</span>
+            <span style="margin-left:auto;color:var(--dimmer);font-size:11px;white-space:nowrap">{{ activeFile.size }} &#183; {{ activeFile.updated }}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px;padding-bottom:14px">
+            <sc-for list="{{ activeFile.frontmatter }}" as="f" hint-placeholder-count="4">
+              <div style="display:flex;gap:10px;padding:8px 12px;border-radius:12px;background:var(--tile)">
+                <span style="flex:0 0 auto;color:var(--dim);font-size:11.5px">{{ f.k }}</span>
+                <span style="flex:1 1 auto;min-width:0;color:var(--text);font-size:12px;word-break:break-word;text-align:right">{{ f.v }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <pre style="margin:0;padding:16px 18px;border-radius:16px;background:var(--tile);color:var(--text);font-family:inherit;font-size:12.5px;line-height:1.75;white-space:pre-wrap;word-break:break-word">{{ activeFile.body }}</pre>
+        </section>
+      </div>
+    </sc-if>
+
+    <!-- ============ CONFIG ============ -->
+    <sc-if value="{{ isConfig }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:0 4px">
+          <div style="display:flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:999px;background:var(--panel)">
+            <button type="button" onClick="{{ setTable }}" style="padding:6px 15px;border:0;border-radius:999px;background:{{ tableBg }};color:{{ tableFg }};font-family:inherit;font-size:11.5px;cursor:pointer">table</button>
+            <button type="button" onClick="{{ setRaw }}" style="padding:6px 15px;border:0;border-radius:999px;background:{{ rawBg }};color:{{ rawFg }};font-family:inherit;font-size:11.5px;cursor:pointer">raw json</button>
+          </div>
+          <span style="color:var(--dim);font-size:11.5px">.claude/major-tom.json &#183; schemaVersion 1</span>
+          <span style="margin-left:auto;display:flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;background:var(--ok-soft);color:var(--ok);font-size:11.5px"><span style="width:6px;height:6px;border-radius:50%;background:var(--ok)"></span>valid against config.schema.json</span>
+        </div>
+
+        <sc-if value="{{ isTable }}" hint-placeholder-val="{{ true }}">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px;align-items:start">
+            <sc-for list="{{ configSections }}" as="s" hint-placeholder-count="8">
+              <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
+                <div style="display:flex;align-items:center;gap:10px;padding:0 2px 12px 2px">
+                  <span style="font-family:'IBM Plex Sans',sans-serif;font-size:14px;font-weight:600;color:var(--text)">{{ s.key }}</span>
+                  <span style="margin-left:auto;color:var(--dimmer);font-size:10.5px">{{ s.note }}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:2px">
+                  <sc-for list="{{ s.rows }}" as="r" hint-placeholder-count="4">
+                    <div style="display:flex;gap:12px;padding:8px 12px;border-radius:12px;background:var(--tile)">
+                      <span style="flex:0 0 160px;color:var(--dim);font-size:11.5px;word-break:break-word">{{ r.k }}</span>
+                      <span style="flex:1 1 auto;min-width:0;color:{{ r.color }};word-break:break-word">{{ r.v }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </section>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isRaw }}" hint-placeholder-val="{{ false }}">
+          <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
+            <div style="padding:0 2px 12px 2px;color:var(--dim);font-size:11px;letter-spacing:.16em;text-transform:uppercase">raw</div>
+            <pre style="margin:0;padding:16px 18px;border-radius:16px;background:var(--tile);font-family:inherit;font-size:12.5px;line-height:1.7;color:var(--text);white-space:pre;overflow:auto">{{ configRaw }}</pre>
+          </section>
+        </sc-if>
+      </div>
+    </sc-if>
+
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;defaultTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark'|'light'&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;options&quot;:[&quot;#ef8272&quot;,&quot;#e0a05c&quot;,&quot;#6fcf9d&quot;,&quot;#9fd0e3&quot;],&quot;default&quot;:&quot;#ef8272&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const PHASES = [
+  ["think", "intent record", "done", "0.4s"],
+  ["understand", "scan + context notes", "done", "12.1s"],
+  ["decide", "decision record D32", "done", "1.8s"],
+  ["spec/plan", "launch.json merge plan", "done", "3.2s"],
+  ["review", "review verdict: pass", "done", "2.0s"],
+  ["implement", "launch-merge.js, server copy", "done", "41.6s"],
+  ["verify", "scenario suite 4/4", "done", "9.4s"],
+  ["track", "roadmap + dashboard refresh", "active", "2.7s"],
+  ["publish", "release record", "pending", "-"]
+];
+
+const MILESTONES = [
+  {
+    title: "Onboard workflow", version: "0.5.0 - 0.9.1", status: "done", pct: 100,
+    tasks: [
+      ["D20", "Native workflow entry point /major-tom:onboard", "done", "architect"],
+      ["D21", "Two-stage protocol, session runs the interview", "done", "architect"],
+      ["D23", "Path resolution via onboard-check agent", "done", "architect"],
+      ["D29", "Canonical templates/render.js, no improvised renderer", "done", "technical"]
+    ]
+  },
+  {
+    title: "Configuration file", version: "0.2.0 - 0.7.0", status: "done", pct: 100,
+    tasks: [
+      ["D1", "Config at .claude/major-tom.json", "done", "owner"],
+      ["D3", "config.schema.json at plugin root, strict validation", "done", "architect"],
+      ["D25", "specialists key, Finalize records real outcome", "done", "project-manager"],
+      ["45", "Fixture suite, 45 cases passing", "done", "qa"]
+    ]
+  },
+  {
+    title: "Dashboard", version: "0.10.0 - 0.11.0", status: "active", pct: 62,
+    tasks: [
+      ["D31", "Static dashboard.html over the data island", "done", "designer"],
+      ["D32", "Desktop launch.json managed entry, vanilla permanent", "done", "owner"],
+      ["OQ-13", "Snapshot window and retention numbers", "active", "project-manager"],
+      ["OQ-13", "Live-data endpoint as the server evolution", "todo", "architect"],
+      ["OQ-13", "Design iteration inside the single file", "active", "designer"]
+    ]
+  },
+  {
+    title: "Skills and gates", version: "unversioned", status: "planned", pct: 8,
+    tasks: [
+      ["OQ-3", "Skill catalog decomposition, one per phase or other", "active", "project-manager"],
+      ["OQ-4", "Phase ownership and human-in-the-loop gates", "todo", "project-manager"],
+      ["OQ-11", "INV-1 guard mechanics and consent scope", "todo", "architect"],
+      ["OQ-1", "Designer agent scope and iteration loop", "todo", "owner"]
+    ]
+  },
+  {
+    title: "Distribution", version: "0.9.0+", status: "planned", pct: 25,
+    tasks: [
+      ["D30", "Version lineage continues, manifests at 0.9.0", "done", "owner"],
+      ["OQ-8", "Copilot CLI parity matrix and degradation story", "todo", "architect"],
+      ["FR-7", "Dual publish from one marketplace", "todo", "vcs-operator"],
+      ["OQ-7", "gitignore split for runs and logs", "active", "architect"]
+    ]
+  }
+];
+
+const COMMITS = [
+  ["a71c4e9", "feat", "launch-merge writes the managed major-tom-dashboard entry", "Miguel Ramos", 214, 6, "12 min ago"],
+  ["3f08b1d", "feat", "onboard writer copies dashboard-server into .claude/server", "Miguel Ramos", 96, 12, "38 min ago"],
+  ["c9d2a44", "fix", "server honors PORT for Desktop autoPort", "Miguel Ramos", 18, 4, "1 h ago"],
+  ["7be6103", "test", "launch.json scenarios: create, preserve, idempotent, refuse", "qa-agent", 402, 0, "1 h ago"],
+  ["1d4f8c2", "docs", "PRD 0.11.0, D32 recorded, framework option dropped", "Miguel Ramos", 88, 31, "2 h ago"],
+  ["b52e097", "feat", "render.js inject mode replaces the major-tom-data island", "Miguel Ramos", 176, 9, "5 h ago"],
+  ["e08a3f6", "feat", "dashboard.html v1, hash-routed views, light and dark", "Miguel Ramos", 640, 0, "6 h ago"],
+  ["44c17ab", "feat", "commands/dashboard.md on-demand localhost server", "Miguel Ramos", 74, 2, "6 h ago"],
+  ["9a3b6de", "chore", "bump plugin and marketplace manifests to 0.9.0", "vcs-operator", 6, 6, "9 h ago"],
+  ["2cf90b7", "feat", "canonical templates/render.js, render and apply modes", "Miguel Ramos", 388, 122, "11 h ago"],
+  ["58d0e41", "fix", "unit without dependsOn no longer glues the end marker", "Miguel Ramos", 9, 7, "11 h ago"],
+  ["f7104c8", "feat", "bootstrap .knowledge as an OKF 0.2 bundle with index.md", "Miguel Ramos", 231, 14, "14 h ago"],
+  ["6ba8f52", "refactor", "context.md.tpl renders to AGENTS.md only", "refactor-specialist", 143, 168, "16 h ago"],
+  ["0e93a1c", "feat", "specialists key, hash-verified installs", "Miguel Ramos", 297, 22, "18 h ago"],
+  ["ad5c760", "test", "schema fixtures raised to 45 cases", "qa-agent", 512, 3, "19 h ago"],
+  ["81f2b93", "fix", "args arriving as JSON string downgraded stage 2", "Miguel Ramos", 34, 8, "21 h ago"]
+];
+
+const FILES = [
+  { path: ".knowledge/index.md", name: "index.md", type: "index", size: "3.1 kB", updated: "12 min ago",
+    frontmatter: [["okf_version", "0.2"], ["type", "index"], ["generated.by", "major-tom-track"], ["generated.at", "2026-08-05T18:42:11Z"]],
+    body: "# Knowledge index\n\nOne line per knowledge file, grouped by area. Whoever writes a knowledge\nfile appends its index line in the same change.\n\n## memories\n- conventions-unblock.md  org conventions inferred from the target repo\n- stack-facts.md          detected stack, confirmed at interview\n\n## docs\n- prd-major-tom.md        product requirements, v0.11.0\n- adr-0032-desktop.md     Desktop launch.json integration (D32)\n- domain-lifecycle.md     the nine phases as ubiquitous language\n\n## runs\n- run-2026-08-05-onboard.md   second full onboard, clean\n- run-2026-08-05-track.md     dashboard snapshot refresh\n\n## monitors\n- drift-templates.md      sync --check gate before publish\n\n## logs\n- 2026-08-05.log          execution trail" },
+  { path: ".knowledge/docs/adr-0032-desktop.md", name: "adr-0032-desktop.md", type: "decision", size: "5.4 kB", updated: "2 h ago",
+    frontmatter: [["type", "decision"], ["id", "D32"], ["status", "accepted"], ["supersedes", "D31 server clause"]],
+    body: "# D32 - Claude Desktop integration\n\n## Context\n\nThe Desktop Browser pane reads .claude/launch.json. It is per-project,\nplugins cannot contribute entries, and no plugin-path substitution exists\nthere. D31 said the server never enters the target repo.\n\n## Decision\n\n1. Onboard writes a generated copy of the server to .claude/server/,\n   refreshed on every onboard. Mechanism lives in Claude's config space,\n   never inside .knowledge/.\n2. .claude/launch.json gets a managed, namespaced entry,\n   major-tom-dashboard, merged by templates/launch-merge.js. Only that\n   entry is rewritten; user entries and unknown fields are preserved; an\n   unparseable file is refused, never overwritten.\n3. The dashboard UI is vanilla HTML/CSS/JS permanently. The framework\n   option is dropped; design iterates inside the single file.\n\n## Consequences\n\nThe CLI command prefers the repo copy for surface consistency and falls\nback to the plugin copy. Finalize verifies both artifacts." },
+  { path: ".knowledge/runs/run-2026-08-05-onboard.md", name: "run-2026-08-05-onboard.md", type: "run", size: "8.9 kB", updated: "4 h ago",
+    frontmatter: [["type", "run"], ["generated.by", "major-tom-onboard"], ["workflow", "onboard"], ["outcome", "completed"]],
+    body: "# Onboard run, 2026-08-05\n\nStage 1 check and prepare: git repo confirmed, codebase-memory MCP\navailable, plugin assets present, project.type existing.\n\nStage 2 execute: config validated against config.schema.json and written,\n.knowledge bootstrapped with its index, AGENTS.md and CLAUDE.md rendered\nbyte-idempotent, two specialists installed and hash-verified.\n\nFinalize: everything re-read and re-validated, completedAt stamped with\nthe actual completion time, this record written as the first concept." },
+  { path: ".knowledge/memories/stack-facts.md", name: "stack-facts.md", type: "memory", size: "2.2 kB", updated: "4 h ago",
+    frontmatter: [["type", "memory"], ["scope", "project"], ["confidence", "confirmed"]],
+    body: "# Stack facts\n\nLanguages: typescript, javascript\nFrameworks: node, express\nDatabases: postgres\nMessaging: none detected\n\nCI is github-actions, containers docker-compose, cloud vercel.\nNamespace @websublime. Internal libraries preferred over new dependencies." },
+  { path: ".knowledge/monitors/drift-templates.md", name: "drift-templates.md", type: "monitor", size: "1.1 kB", updated: "5 h ago",
+    frontmatter: [["type", "monitor"], ["signal", "template drift"], ["state", "green"], ["stale_after", "2026-09-01"]],
+    body: "# Template drift\n\nscripts/sync-templates.js --check must pass before publish. The synced\ncopies under plugins/*/templates/ are generated artifacts and are never\nedited directly.\n\nLast check: clean, 6 files mirrored verbatim." }
+];
+
+const CONFIG = {
+  schemaVersion: 1,
+  onboard: { completedAt: "2026-08-05T14:31:08Z", pluginVersion: "0.11.0" },
+  project: { name: "unblock", description: "Data-integrity tooling, from-scratch rewrite", type: "existing", topology: "mono-repo" },
+  execution: { workingModel: "team", team: { coordinator: "coordinator", members: ["architect", "code-reviewer", "qa"] } },
+  persistence: { root: ".knowledge" },
+  stack: { languages: ["typescript", "javascript"], frameworks: ["node", "express"], databases: ["postgres"], messaging: [] },
+  devops: { ci: "github-actions", containers: "docker-compose", cloud: "vercel" },
+  org: { namespace: "@websublime", internalLibraries: [{ name: "@websublime/core", registry: "npm", purpose: "shared primitives" }], preferredLibraries: [{ use: "vitest", never: "jest", reason: "esm first" }] },
+  sources: { issueTracker: { provider: "github", project: "websublime/unblock" }, sites: [{ provider: "notion", reference: "unblock-space" }] },
+  mcp: ["codebase-memory", "github"],
+  specialists: [{ name: "typescript-pro", source: "sub-agents.directory" }, { name: "node-specialist", source: "sub-agents.directory" }],
+  workspace: { name: "unblock", layout: "domain", units: [{ name: "api", path: "services/api", dependsOn: ["design-system"] }, { name: "design-system", repo: "git@github.com:websublime/design-system.git" }], run: { compose: "docker-compose.yml" } }
+};
+
+const DECISIONS = [
+  ["D32", "Desktop launch.json managed entry, vanilla permanent", "2026-08-05", "closed"],
+  ["D31", "Dashboard v1 over the data island, on-demand server", "2026-08-05", "closed"],
+  ["D29", "Canonical templates/render.js", "2026-08-05", "closed"],
+  ["OQ-13", "Snapshot window and retention numbers", "open", "open"],
+  ["OQ-3", "Skill catalog decomposition", "open", "open"],
+  ["OQ-4", "Phase ownership and gates", "open", "open"],
+  ["OQ-1", "Designer role scope", "open", "open"]
+];
+
+const KIND_COLOR = { feat: "var(--accent)", fix: "var(--stop)", docs: "var(--dim)", test: "var(--ok)", chore: "var(--dimmer)", refactor: "var(--warn)" };
+
+const SUBTITLES = {
+  overview: "Lifecycle state, roadmap and knowledge at a glance",
+  roadmap: "Milestones, tasks and open questions",
+  git: "50-commit window from the track phase",
+  knowledge: ".knowledge as an OKF 0.2 bundle",
+  config: "Single source of truth for every plugin surface"
+};
+
+class Component extends DCLogic {
+  state = { view: "overview", layout: "A", rail: true, theme: null, filter: "all", query: "", file: 0, configMode: "table" };
+
+  componentDidMount() {
+    const root = document.documentElement;
+    const t = this.props.defaultTheme || "dark";
+    root.dataset.theme = t;
+    if (this.props.accent) root.style.setProperty("--accent", this.props.accent);
+    this.setState({ theme: t });
+    const hash = (location.hash || "").replace("#", "");
+    if (["overview", "roadmap", "git", "knowledge", "config"].includes(hash)) this.setState({ view: hash });
+  }
+
+  go(view) {
+    return (e) => { if (e && e.preventDefault) e.preventDefault(); this.setState({ view }); history.replaceState(null, "", "#" + view); };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const activePhase = PHASES.findIndex(p => p[2] === "active");
+
+    const phases = PHASES.map((p, i) => {
+      const st = p[2];
+      const color = st === "done" ? "var(--ok)" : st === "active" ? "var(--accent)" : "var(--line2)";
+      return {
+        num: String(i + 1).padStart(2, "0"), name: p[0], artifact: p[1], status: st, elapsed: p[3], color,
+        pct: st === "done" ? 100 : st === "active" ? 55 : 0,
+        labelColor: st === "pending" ? "var(--dimmer)" : "var(--text)",
+        tileBg: st === "active" ? "var(--accent-soft)" : "var(--tile)",
+        tileLine: st === "active" ? "var(--accent-line)" : "transparent",
+        rowBg: st === "active" ? "var(--accent-soft)" : "var(--tile)",
+        chipBg: st === "done" ? "var(--ok-soft)" : st === "active" ? "var(--panel)" : "var(--panel2)"
+      };
+    });
+
+    const msColor = (st) => st === "done" ? "var(--ok)" : st === "active" ? "var(--accent)" : "var(--line2)";
+    const milestones = MILESTONES.map(m => ({
+      title: m.title, version: m.version, status: m.status, pct: m.pct, color: msColor(m.status),
+      chipBg: m.status === "done" ? "var(--ok-soft)" : m.status === "active" ? "var(--accent-soft)" : "var(--panel2)",
+      doneTasks: m.tasks.filter(t => t[2] === "done").length, totalTasks: m.tasks.length,
+      tasks: m.tasks.map(t => ({
+        ref: t[0], title: t[1], owner: t[3],
+        mark: t[2] === "done" ? "\u2713" : t[2] === "active" ? "\u25B8" : "\u00B7",
+        color: t[2] === "done" ? "var(--ok)" : t[2] === "active" ? "var(--accent)" : "var(--dimmer)",
+        textColor: t[2] === "todo" ? "var(--dim)" : "var(--text)"
+      }))
+    }));
+
+    const commits = COMMITS.map(c => ({
+      sha: c[0], kind: c[1], subject: c[2], author: c[3], add: c[4], del: c[5], when: c[6],
+      kindColor: KIND_COLOR[c[1]] || "var(--dim)"
+    }));
+    const q = s.query.trim().toLowerCase();
+    const visibleCommits = commits.filter(c =>
+      (s.filter === "all" || c.kind === s.filter) &&
+      (!q || (c.subject + " " + c.sha + " " + c.author).toLowerCase().includes(q))
+    );
+
+    const kindFilters = ["all", "feat", "fix", "docs", "test", "chore", "refactor"].map(k => ({
+      label: k, go: () => this.setState({ filter: k }),
+      bg: s.filter === k ? "var(--accent-soft)" : "transparent",
+      fg: s.filter === k ? "var(--accent)" : "var(--dim)"
+    }));
+
+    const navItems = [
+      ["overview", "\u25C8", "6"], ["roadmap", "\u2317", "5"], ["git", "\u2387", "50"],
+      ["knowledge", "\u25A4", "13"], ["config", "{ }", "12"]
+    ].map(([id, glyph, count]) => ({
+      label: id, glyph, count, go: this.go(id),
+      bg: s.view === id ? "var(--raise)" : "transparent",
+      border: s.view === id ? "var(--line2)" : "transparent",
+      fg: s.view === id ? "var(--text)" : "var(--dim)"
+    }));
+
+    const tree = [{
+      name: "index.md", glyph: "\u2261", meta: "index", indent: "10px", cursor: "pointer",
+      go: () => this.setState({ file: 0 }),
+      bg: s.file === 0 ? "var(--accent-soft)" : "var(--tile)", fg: s.file === 0 ? "var(--accent)" : "var(--text)"
+    }];
+    [["memories", 2], ["docs", 3], ["runs", 2], ["monitors", 1], ["logs", 1]].forEach(([dir, count]) => {
+      tree.push({ name: dir + "/", glyph: "\u25B8", meta: String(count), indent: "10px", cursor: "default", go: () => {}, bg: "transparent", fg: "var(--dim)" });
+      FILES.forEach((f, i) => {
+        if (i === 0 || f.path.split("/")[1] !== dir) return;
+        tree.push({
+          name: f.name, glyph: "\u00B7", meta: f.type, indent: "28px", cursor: "pointer",
+          go: () => this.setState({ file: i }),
+          bg: s.file === i ? "var(--accent-soft)" : "transparent",
+          fg: s.file === i ? "var(--accent)" : "var(--dim)"
+        });
+      });
+    });
+
+    const af = FILES[s.file] || FILES[0];
+    const activeFile = {
+      path: af.path, type: af.type, size: af.size, updated: af.updated, body: af.body,
+      frontmatter: af.frontmatter.map(([k, v]) => ({ k, v }))
+    };
+
+    const fmt = (v) => Array.isArray(v)
+      ? (v.length === 0 ? "[ ]" : v.map(x => typeof x === "object" ? Object.values(x).join(" / ") : x).join(", "))
+      : (typeof v === "object" && v !== null ? Object.entries(v).map(([k, x]) => k + ": " + fmt(x)).join(" \u00B7 ") : (v === "" ? "\u2014" : String(v)));
+
+    const configSections = Object.entries(CONFIG).filter(([, v]) => typeof v === "object" && !Array.isArray(v)).map(([key, obj]) => ({
+      key,
+      note: key === "persistence" ? "D2" : key === "workspace" ? "D6" : key === "execution" ? "9.2" : "",
+      rows: Object.entries(obj).map(([k, v]) => ({ k, v: fmt(v), color: v === "" || (Array.isArray(v) && !v.length) ? "var(--dimmer)" : "var(--text)" }))
+    })).concat([
+      { key: "mcp", note: "D13", rows: CONFIG.mcp.map((m, i) => ({ k: "[" + i + "]", v: m, color: "var(--text)" })) },
+      { key: "specialists", note: "D25", rows: CONFIG.specialists.map(m => ({ k: m.name, v: m.source, color: "var(--text)" })) },
+      { key: "schemaVersion", note: "P2", rows: [{ k: "schemaVersion", v: "1", color: "var(--text)" }] }
+    ]);
+
+    const done = MILESTONES.filter(m => m.status === "done").length;
+    const active = MILESTONES.filter(m => m.status === "active").length;
+
+    return {
+      navItems,
+      railWidth: s.rail ? "206px" : "62px",
+      labelOpacity: s.rail ? 1 : 0,
+      railGlyph: s.rail ? "\u00AB" : "\u00BB",
+      toggleRail: () => this.setState({ rail: !s.rail }),
+      themeGlyph: s.theme === "light" ? "\u25D1" : "\u25D0",
+      themeLabel: s.theme === "light" ? "light" : "dark",
+      toggleTheme: () => {
+        const next = s.theme === "light" ? "dark" : "light";
+        document.documentElement.dataset.theme = next;
+        this.setState({ theme: next });
+      },
+
+      viewTitle: s.view,
+      viewSubtitle: SUBTITLES[s.view],
+      isOverview: s.view === "overview", isRoadmap: s.view === "roadmap", isGit: s.view === "git",
+      isKnowledge: s.view === "knowledge", isConfig: s.view === "config",
+      goGit: this.go("git"), goRoadmap: this.go("roadmap"),
+      generatedAt: "18:42:11",
+
+      isLayoutA: s.layout === "A", isLayoutB: s.layout === "B",
+      setLayoutA: () => this.setState({ layout: "A" }), setLayoutB: () => this.setState({ layout: "B" }),
+      layoutABg: s.layout === "A" ? "var(--accent-soft)" : "transparent", layoutAFg: s.layout === "A" ? "var(--accent)" : "var(--dim)",
+      layoutBBg: s.layout === "B" ? "var(--accent-soft)" : "transparent", layoutBFg: s.layout === "B" ? "var(--accent)" : "var(--dim)",
+
+      phases,
+      lastRun: {
+        id: "run-2026-08-05-track", workflow: "workflows/track", mode: "team",
+        duration: "1m 13s", phaseIndex: activePhase + 1, phaseName: PHASES[activePhase][0]
+      },
+
+      milestones, milestonesBrief: milestones,
+      roadmapDone: done, roadmapActive: active, roadmapPlanned: MILESTONES.length - done - active,
+      roadmapTotal: MILESTONES.length,
+      roadmapPct: Math.round(MILESTONES.reduce((a, m) => a + m.pct, 0) / MILESTONES.length),
+
+      counts: [
+        { label: "memories", n: 2, color: "var(--text)" }, { label: "docs", n: 3, color: "var(--text)" },
+        { label: "runs", n: 2, color: "var(--accent)" }, { label: "monitors", n: 1, color: "var(--ok)" },
+        { label: "logs", n: 1, color: "var(--dim)" }, { label: "concepts", n: 13, color: "var(--text)" }
+      ],
+
+      commitsBrief: commits.slice(0, 7),
+      visibleCommits, visibleCount: visibleCommits.length,
+      kindFilters, query: s.query, onQuery: (e) => this.setState({ query: e.target.value }),
+
+      tree, activeFile,
+
+      decisions: DECISIONS.map(d => ({
+        id: d[0], text: d[1], date: d[2] === "open" ? "open" : d[2],
+        color: d[3] === "open" ? "var(--warn)" : "var(--ok)",
+        chipBg: d[3] === "open" ? "var(--panel2)" : "var(--ok-soft)",
+        chipLine: d[3] === "open" ? "var(--line2)" : "transparent",
+        textColor: d[3] === "open" ? "var(--text)" : "var(--dim)"
+      })),
+
+      configSections,
+      configRaw: JSON.stringify(CONFIG, null, 2),
+      isTable: s.configMode === "table", isRaw: s.configMode === "raw",
+      setTable: () => this.setState({ configMode: "table" }), setRaw: () => this.setState({ configMode: "raw" }),
+      tableBg: s.configMode === "table" ? "var(--accent-soft)" : "transparent", tableFg: s.configMode === "table" ? "var(--accent)" : "var(--dim)",
+      rawBg: s.configMode === "raw" ? "var(--accent-soft)" : "transparent", rawFg: s.configMode === "raw" ? "var(--accent)" : "var(--dim)"
+    };
+  }
+}
+</script>
+</body>
+</html>
