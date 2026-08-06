@@ -2,8 +2,8 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "major-tom",
   "displayName": "Major Tom Harness",
-  "version": "0.13.1",
-  "description": "AI-agentic SDLC harness: two-stage onboard workflow (repo scan, interview in the session, execute), strict config schema for .claude/major-tom.json, specialist agent roster, .knowledge/ persistence.",
+  "version": "0.14.0",
+  "description": "AI-agentic SDLC harness: two-stage onboard workflow (repo scan, interview in the session, execute), strict config schema for .claude/major-tom.json, specialist agent roster, .knowledge/ persistence, an operator writing-rule hook, and a think skill with a mechanical intent gate.",
   "author": {
     "name": "Miguel Ramos",
     "email": "miguel.marques.ramos@gmail.com"
