@@ -27,8 +27,9 @@ else; this path is authoritative (the host substitutes it at load time).
 3. `codebaseMemoryMcpAvailable`: is a codebase-memory MCP server configured and reachable
    in this environment? Check the configured MCP servers; do not guess.
 4. `pluginAssetsPresent`: do `config.schema.json`, `templates/context.md.tpl`,
-   `templates/claude.md.tpl`, and `templates/render.js` all exist under the plugin root
-   reported above? All four must exist for true.
+   `templates/claude.md.tpl`, `templates/render.js`, `templates/dashboard.html`,
+   `templates/dashboard-server.js`, and `templates/launch-merge.js` all exist under the
+   plugin root reported above? All seven must exist for true.
 5. `projectTypeGuess`: `new` for an empty or scaffold-only repo, `existing` for an
    established codebase.
 
