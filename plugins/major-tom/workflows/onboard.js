@@ -48,7 +48,7 @@ function blockedOnAssets(pre) {
     at: 'check',
     reason: 'plugin assets missing (config.schema.json, templates, or templates/render.js not under the plugin root)',
     preconditions: pre,
-    instructions: `Tell the user the installed major-tom plugin at ${pre.pluginRoot} is incomplete: config.schema.json plus the templates dir (context.md.tpl, claude.md.tpl, render.js, dashboard.html, dashboard-server.js) must exist there. Reinstall or update the plugin (for a dev checkout, run node scripts/sync-templates.js in the plugin repo), then relaunch /major-tom:onboard.`,
+    instructions: `Tell the user the installed major-tom plugin at ${pre.pluginRoot} is incomplete: config.schema.json plus the templates dir (context.md.tpl, claude.md.tpl, render.js, dashboard.html, dashboard-server.js, launch-merge.js, settings-merge.js) must exist there. Reinstall or update the plugin (for a dev checkout, run node scripts/sync-templates.js in the plugin repo), then relaunch /major-tom:onboard.`,
   }
 }
 
@@ -290,6 +290,9 @@ const write = await agent(
     `4. Copy ${pre2.pluginRoot}/templates/dashboard-server.js byte for byte to .claude/server/dashboard-server.js, creating .claude/server/ (D32: launch.json cannot reference the plugin path, so the repo carries a generated copy, refreshed on every onboard).`,
     `5. Run: node ${pre2.pluginRoot}/templates/launch-merge.js .claude/launch.json ${cfg.persistence.root}/dashboard.html`,
     'It merges the managed major-tom-dashboard entry into .claude/launch.json, preserving every other configuration and field. If it exits non-zero (an existing file that does not parse), report that as a failure; never hand-edit the file around it.',
+    `6. Run: node ${pre2.pluginRoot}/templates/settings-merge.js .claude`,
+    'It merges the project session defaults into the Claude Code settings file (D37): env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB "1", env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS "1", alwaysThinkingEnabled true.',
+    'The script owns the file choice (.claude/settings.local.json when it exists, else .claude/settings.json, else a fresh .claude/settings.json) and the merge policy (every other key and every other env entry preserved). If it exits non-zero (an existing file that does not parse, is not a JSON object, or carries a non-object env), report that as a failure; never hand-edit the settings file around it.',
     'Report every path written and every failure. Change nothing else.',
   ].join('\n'),
   { label: 'write config + knowledge root', schema: WRITE_REPORT }
@@ -352,7 +355,7 @@ const finalize = await agent(
         ].join('\n')
       : 'The installer agent did not complete, so its outcome is unknown. Reconcile from disk: for each entry in the specialists list already in .claude/major-tom.json, check whether .claude/agents/<name>.md exists; keep the entries that do, drop the ones that do not, and record the reconciliation in problems.',
     `2. Re-read .claude/major-tom.json and re-validate it against the schema at ${schemaPath} (same ajv setup as validation: draft-07, strict, strictRequired disabled, temporary install, nothing added to the target repo).`,
-    `3. Verify ${cfg.persistence.root}/ exists with memories, docs, runs, monitors, logs, the bundle index.md at its root, and dashboard.html with a non-empty data island; that CLAUDE.md and AGENTS.md exist at the repo root with major-tom managed block markers; that .claude/server/dashboard-server.js exists; and that .claude/launch.json parses and contains the major-tom-dashboard configuration (D32).`,
+    `3. Verify ${cfg.persistence.root}/ exists with memories, docs, runs, monitors, logs, the bundle index.md at its root, and dashboard.html with a non-empty data island; that CLAUDE.md and AGENTS.md exist at the repo root with major-tom managed block markers; that .claude/server/dashboard-server.js exists; that .claude/launch.json parses and contains the major-tom-dashboard configuration (D32); and that the session defaults landed (D37): the settings file the merge targeted, .claude/settings.local.json when that file exists, else .claude/settings.json, exists, parses, and carries env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB "1", env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS "1", and alwaysThinkingEnabled true.`,
     `4. Write the run record: a markdown file in ${cfg.persistence.root}/runs/ named onboard-<UTC timestamp>.md summarizing this onboard (config keys written, files rendered, specialists installed, problems). Use the current UTC time. The record is an OKF v0.2 concept (D28): YAML frontmatter with type: run, a title, and generated: {by: major-tom-onboard, at: <the same UTC time>}.`,
     `5. Append the run record's one-line entry under the runs area in ${cfg.persistence.root}/index.md (the bundle index maintenance rule).`,
     'Report revalidated, the run record path, and every problem found.',
