@@ -28,9 +28,9 @@ else; this path is authoritative (the host substitutes it at load time).
    in this environment? Check the configured MCP servers; do not guess.
 4. `pluginAssetsPresent`: do `config.schema.json`, `templates/context.md.tpl`,
    `templates/claude.md.tpl`, `templates/render.js`, `templates/dashboard.html`,
-   `templates/dashboard-server.js`, `templates/launch-merge.js`, and
-   `templates/settings-merge.js` all exist under the plugin root reported above? All eight
-   must exist for true.
+   `templates/dashboard-server.js`, `templates/launch-merge.js`,
+   `templates/settings-merge.js`, and `templates/gitignore-merge.js` all exist under the
+   plugin root reported above? All nine must exist for true.
 5. `projectTypeGuess`: `new` for an empty or scaffold-only repo, `existing` for an
    established codebase.
 
