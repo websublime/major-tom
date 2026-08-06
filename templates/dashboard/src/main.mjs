@@ -5,16 +5,18 @@ import { S, SUBTITLES, VIEWS } from './state.mjs'
 import { esc } from './ui.mjs'
 import { vOverview } from './views/overview.mjs'
 import { vRoadmap } from './views/roadmap.mjs'
+import { vTimeline, timelineStream } from './views/timeline.mjs'
 import { vGit } from './views/git.mjs'
 import { vKnowledge } from './views/knowledge.mjs'
 import { vConfig } from './views/config.mjs'
 
-const VIEW_FN = { overview: vOverview, roadmap: vRoadmap, git: vGit, knowledge: vKnowledge, config: vConfig }
+const VIEW_FN = { overview: vOverview, roadmap: vRoadmap, timeline: vTimeline, git: vGit, knowledge: vKnowledge, config: vConfig }
 
 function renderRail() {
   const items = [
-    ['overview', '◈', ''], ['roadmap', '⌗', ROADMAP.length || ''], ['git', '⎇', COMMITS.length || ''],
-    ['knowledge', '▤', FILES.length || ''], ['config', '{ }', Object.keys(CFG).length || '']
+    ['overview', '◈', ''], ['roadmap', '⌗', ROADMAP.length || ''], ['timeline', '⧖', timelineStream().length || ''],
+    ['git', '⎇', COMMITS.length || ''], ['knowledge', '▤', FILES.length || ''],
+    ['config', '{ }', Object.keys(CFG).length || '']
   ]
   document.getElementById('rail').innerHTML =
     '<div class="brand"><div class="brand-badge">MT</div>'

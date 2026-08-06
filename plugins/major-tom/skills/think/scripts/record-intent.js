@@ -54,17 +54,20 @@ function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
 }
 
-// Column order: timestamp, tier, type, promptId, summary.
-function appendIntentLog(root, timestamp, tier, type, promptId, summary) {
+// Column order: timestamp, tier, type, promptId, sessionId, summary (D41).
+// The summary stays last because it is free text: a consumer splitting on tabs takes
+// everything after field five as the summary. Legacy five-field lines (pre-D41) stay
+// valid on disk and are never migrated; the field count is what tells them apart.
+function appendIntentLog(root, timestamp, tier, type, promptId, sessionId, summary) {
   const runsDir = path.join(root, '.knowledge', 'runs');
   ensureDir(runsDir);
   const logPath = path.join(runsDir, 'intents.log');
-  const line = [timestamp, tier, type, promptId, summary].join('\t') + '\n';
+  const line = [timestamp, tier, type, promptId, sessionId || '', summary].join('\t') + '\n';
   fs.appendFileSync(logPath, line, 'utf8');
   return logPath;
 }
 
-function writeIntentConcept(root, timestamp, tier, type, promptId, summary) {
+function writeIntentConcept(root, timestamp, tier, type, promptId, sessionId, summary) {
   const intentsDir = path.join(root, '.knowledge', 'runs', 'intents');
   ensureDir(intentsDir);
 
@@ -77,6 +80,9 @@ function writeIntentConcept(root, timestamp, tier, type, promptId, summary) {
   const frontmatterLines = ['---', 'type: intent'];
   if (promptId) {
     frontmatterLines.push('prompt_id: ' + promptId);
+  }
+  if (sessionId) {
+    frontmatterLines.push('session_id: ' + sessionId);
   }
   frontmatterLines.push('tier: ' + tier);
   frontmatterLines.push('request_type: ' + type);
@@ -171,9 +177,9 @@ function main() {
   const timestamp = new Date().toISOString();
 
   if (args.tier === 'trivial' || args.tier === 'task') {
-    appendIntentLog(root, timestamp, args.tier, args.type, args.prompt, args.summary);
+    appendIntentLog(root, timestamp, args.tier, args.type, args.prompt, args.session, args.summary);
   } else {
-    writeIntentConcept(root, timestamp, args.tier, args.type, args.prompt, args.summary);
+    writeIntentConcept(root, timestamp, args.tier, args.type, args.prompt, args.session, args.summary);
   }
 
   writeSessionRecord(root, args.session, args.prompt, args.tier, args.type, timestamp);
