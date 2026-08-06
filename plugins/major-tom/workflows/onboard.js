@@ -48,7 +48,7 @@ function blockedOnAssets(pre) {
     at: 'check',
     reason: 'plugin assets missing (config.schema.json, templates, or templates/render.js not under the plugin root)',
     preconditions: pre,
-    instructions: `Tell the user the installed major-tom plugin at ${pre.pluginRoot} is incomplete: config.schema.json, templates/context.md.tpl, templates/claude.md.tpl, and templates/render.js must exist there. Reinstall or update the plugin (for a dev checkout, run node scripts/sync-templates.js in the plugin repo), then relaunch /major-tom:onboard.`,
+    instructions: `Tell the user the installed major-tom plugin at ${pre.pluginRoot} is incomplete: config.schema.json plus the templates dir (context.md.tpl, claude.md.tpl, render.js, dashboard.html, dashboard-server.js) must exist there. Reinstall or update the plugin (for a dev checkout, run node scripts/sync-templates.js in the plugin repo), then relaunch /major-tom:onboard.`,
   }
 }
 
@@ -287,6 +287,9 @@ const write = await agent(
     cfgJson,
     `2. Create the knowledge root ${cfg.persistence.root}/ with subdirectories: memories, docs, runs, monitors, logs. Put a .gitkeep file in each empty directory.`,
     `3. Create ${cfg.persistence.root}/index.md, the OKF v0.2 bundle index (D28): YAML frontmatter with okf_version: 0.2, then a heading per area (memories, docs, runs, monitors, logs) each stating it is empty for now, plus one line explaining the maintenance rule: every knowledge file added to the bundle gets a one-line entry here in the same change.`,
+    `4. Copy ${pre2.pluginRoot}/templates/dashboard-server.js byte for byte to .claude/server/dashboard-server.js, creating .claude/server/ (D32: launch.json cannot reference the plugin path, so the repo carries a generated copy, refreshed on every onboard).`,
+    `5. Run: node ${pre2.pluginRoot}/templates/launch-merge.js .claude/launch.json ${cfg.persistence.root}/dashboard.html`,
+    'It merges the managed major-tom-dashboard entry into .claude/launch.json, preserving every other configuration and field. If it exits non-zero (an existing file that does not parse), report that as a failure; never hand-edit the file around it.',
     'Report every path written and every failure. Change nothing else.',
   ].join('\n'),
   { label: 'write config + knowledge root', schema: WRITE_REPORT }
@@ -311,6 +314,16 @@ const [render, install] = await parallel([
         `node ${pre2.pluginRoot}/templates/render.js apply ${pre2.pluginRoot}/templates/claude.md.tpl .claude/major-tom.json CLAUDE.md`,
         'The renderer owns the managed-block semantics (replace between markers, append without markers, create when missing) and fails closed on unresolved template syntax. The content is authored once (D26): the context render goes to AGENTS.md; CLAUDE.md is the thin wrapper importing @AGENTS.md.',
         'After running, verify: both files exist with the major-tom markers, no {{ remains in either, and content outside the markers was not touched. If the renderer script is missing or exits non-zero, report it as a failure; do not improvise content.',
+        'Then generate the dashboard (D31, snapshot schema v2 per D33). Build a snapshot JSON file in a temporary directory outside the target repo with these keys:',
+        '- generatedAt: current UTC ISO 8601.',
+        '- config: the parsed content of .claude/major-tom.json.',
+        '- git: the 50 most recent commits as {hash, date (ISO), author, subject, kind, add, del}. kind is the conventional-commit prefix of the subject (feat, fix, docs, test, chore, refactor) or "other"; add/del come from git log --numstat totals per commit. Empty array if no commits.',
+        '- knowledge: {files: [{path, type, size, updated, frontmatter, body, truncated}]} for every file under the persistence root (.gitkeep excluded). path is relative to the persistence root; frontmatter is the parsed YAML frontmatter object when present; type comes from frontmatter.type; updated is the file mtime as ISO. Window caps (D33): body is included only up to 32 KB per file (set truncated: true and cut cleanly when over) and only while the running total of embedded bodies is under 1 MB, walking files in index.md order first, then the rest; beyond the caps omit body entirely.',
+        '- decisions: derived from knowledge files whose frontmatter.type is "decision": [{id, text, date, status}] with id from frontmatter.id (else the path), text from frontmatter.title (else the path), status "open" only when frontmatter.status says so. Empty array if none.',
+        '- Omit lastRun and roadmap entirely: no mechanism produces them yet; the dashboard shows honest empty states for both.',
+        'Then run:',
+        `node ${pre2.pluginRoot}/templates/render.js inject ${pre2.pluginRoot}/templates/dashboard.html <snapshot.json> ${cfg.persistence.root}/dashboard.html`,
+        'The dashboard is never rendered through the template grammar; inject replaces only the data island. If the island or the dashboard template is missing, report a failure.',
         'Report the files written, failures, and notes.',
       ].join('\n'),
       { label: 'render context templates', phase: 'Execute', schema: RENDER_REPORT }
@@ -339,7 +352,7 @@ const finalize = await agent(
         ].join('\n')
       : 'The installer agent did not complete, so its outcome is unknown. Reconcile from disk: for each entry in the specialists list already in .claude/major-tom.json, check whether .claude/agents/<name>.md exists; keep the entries that do, drop the ones that do not, and record the reconciliation in problems.',
     `2. Re-read .claude/major-tom.json and re-validate it against the schema at ${schemaPath} (same ajv setup as validation: draft-07, strict, strictRequired disabled, temporary install, nothing added to the target repo).`,
-    `3. Verify ${cfg.persistence.root}/ exists with memories, docs, runs, monitors, logs and the bundle index.md at its root, and that CLAUDE.md and AGENTS.md exist at the repo root with major-tom managed block markers.`,
+    `3. Verify ${cfg.persistence.root}/ exists with memories, docs, runs, monitors, logs, the bundle index.md at its root, and dashboard.html with a non-empty data island; that CLAUDE.md and AGENTS.md exist at the repo root with major-tom managed block markers; that .claude/server/dashboard-server.js exists; and that .claude/launch.json parses and contains the major-tom-dashboard configuration (D32).`,
     `4. Write the run record: a markdown file in ${cfg.persistence.root}/runs/ named onboard-<UTC timestamp>.md summarizing this onboard (config keys written, files rendered, specialists installed, problems). Use the current UTC time. The record is an OKF v0.2 concept (D28): YAML frontmatter with type: run, a title, and generated: {by: major-tom-onboard, at: <the same UTC time>}.`,
     `5. Append the run record's one-line entry under the runs area in ${cfg.persistence.root}/index.md (the bundle index maintenance rule).`,
     'Report revalidated, the run record path, and every problem found.',
@@ -354,5 +367,5 @@ return {
   render: render || { written: [], failures: ['render agent did not complete'], notes: '' },
   specialists: install || { installed: [], skipped: [], notes: 'installer agent did not complete' },
   finalize: finalize || { revalidated: false, runRecordPath: '', problems: ['finalize agent did not complete'] },
-  instructions: 'Report the outcome to the user: files written, templates rendered, specialists installed, run record path, and any problems. Mention that re-running /major-tom:onboard updates the configuration. The dashboard is not rendered yet (PRD OQ-13: template pending).',
+  instructions: 'Report the outcome to the user: files written, templates rendered, specialists installed, dashboard generated, run record path, and any problems. Mention that re-running /major-tom:onboard updates the configuration and refreshes the dashboard snapshot, and that /major-tom:dashboard serves it in the browser. Snapshot window and retention are still open (PRD OQ-13).',
 }
