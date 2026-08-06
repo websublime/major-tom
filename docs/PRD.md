@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Draft, under iteration |
-| **Version** | 0.9.1 |
+| **Version** | 0.13.2 |
 | **Date** | 2026-08-04 |
 | **Owner** | Miguel Ramos |
 | **Scope** | The Major Tom plugin (Claude Code + GitHub Copilot CLI) |
@@ -207,7 +207,7 @@ File: `.claude/major-tom.json` (D1).
   "schemaVersion": 1,
   "onboard": {
     "completedAt": "2026-08-04T10:00:00Z",
-    "pluginVersion": "0.9.0"
+    "pluginVersion": "0.13.1"
   },
   "project": {
     "name": "",
@@ -357,12 +357,28 @@ Planned template set: the context template (exists), one doc template per lifecy
 
 ### 12.2 Dashboard
 
-`dashboard.html` is a static, self-contained HTML file inside the persistence root: roadmap
-plus history, no server (non-goals). The **track** lifecycle phase always refreshes it (D18).
-Interactivity comes from inline JS over an embedded data snapshot; browsers block `fetch` on
-`file://`, so sidecar data files are not an option. Growth over time is a real risk: the
-dashboard must stay a **windowed view** over the run history, never the store itself; the
-runs area remains the source of truth. Window and retention strategy: OQ-13.
+`dashboard.html` is a static, self-contained HTML file inside the persistence root,
+implemented in v1 (D31): hash-routed views (overview, config, git history, knowledge) over
+a single embedded JSON data island; the template is authored once and never goes through
+the mustache grammar, `render.js inject` replaces only the island (snapshot keys:
+`generatedAt`, `config`, `git`, `knowledge`). The **track** lifecycle phase always
+refreshes it (D18); today the onboard renders it and a re-onboard refreshes it.
+Viewing has two surfaces (D31, amended by D32). CLI: `/major-tom:dashboard [start|stop]`
+(default start) starts the localhost server and opens the browser, or surgically stops it
+(the stop path verifies the listening PID is the dashboard server before killing, never a
+stranger on the port; start refuses to double-start). Claude Desktop: onboard merges a managed
+`major-tom-dashboard` entry into the target's `.claude/launch.json` (the Desktop Browser
+pane surface; per-project, no plugin-path substitution exists there), pointing at a
+generated copy of the server the onboard writes to `.claude/server/dashboard-server.js`,
+with `autoPort: true` (the server honors the `PORT` env var). The merge is done by
+`templates/launch-merge.js`: only the managed entry is rewritten, every other
+configuration and field is preserved, and an unparseable existing file is a hard failure,
+never overwritten. Monitors were rejected because they auto-start every session. The file
+also works over `file://` since the data is embedded. The dashboard UI is **vanilla
+HTML/CSS/JS permanently** (D32): no framework, no build pipeline; the single-file
+self-contained artifact is the invariant, and design iterates within it. Growth over time is a real risk: the dashboard must stay a **windowed view**
+over the run history, never the store itself; the runs area remains the source of truth.
+Window and retention strategy, plus design/tech iteration: OQ-13.
 
 ### 12.3 Invocation and runtime facts
 
@@ -427,17 +443,18 @@ in `templates/README.md`).
   precondition and plugin-path resolution, D23),
   `workflows/onboard.js` (full two-stage body per D21: Check/Prepare returning scan facts,
   Execute/Finalize writing config, knowledge root, templates, specialists, run record; the
-  dashboard render is pending OQ-13) plus `workflows/README.md` (the workflow script API
-  contract, D20),
-  `plugin.json` v0.9.0 (D30), `config.schema.json` at the plugin root (D3; JSON Schema
+  dashboard snapshot rendered per D31) plus `workflows/README.md` (the workflow script API
+  contract, D20), `commands/dashboard.md` (the `/major-tom:dashboard` on-demand server
+  command, D31),
+  `plugin.json` v0.13.1 (D30), `config.schema.json` at the plugin root (D3; JSON Schema
   draft-07 for the section 10 config, verified by a 45-case fixture suite).
 - `templates/` at the repository root (D16, D19), the authoring source shared by both
   plugins: `README.md` (rendering contract, placeholder grammar) and `context.md.tpl`
   (first draft of the CLAUDE.md/AGENTS.md source). Synced verbatim into
   `plugins/*/templates/` by `scripts/sync-templates.js` (D23).
 - `plugins/major-tom-copilot`: 9 agents (`.agent.md`), synced `templates/`, no manifest yet.
-- `.claude-plugin/marketplace.json` v0.9.0 (D30), dual-plugin.
-- No skills, no tools, no hooks, no persistence layer, no docs (this PRD is the first).
+- `.claude-plugin/marketplace.json` v0.13.1 (D30), dual-plugin.
+- No skills, no tools, no hooks, no persistence layer, no docs beyond this PRD.
 - `temp/`: reference archive from previous iterations; read-only, not part of the product.
 
 ## 16. Open questions (iteration backlog)
@@ -456,7 +473,7 @@ in `templates/README.md`).
 | OQ-10 | Config envelope (path closed by D1, schema reference closed by D3): re-onboard diff behavior and the manual-edit policy. |
 | OQ-11 | INV-1 mechanics: which main-session actions does the guard block exactly, how does user consent unblock (scope: per request? per task?), and is consent recorded anywhere? |
 | OQ-12 | Onboard mechanics (entry point closed by D20, runtime path resolution closed by D23): merge policy when the target already has a `CLAUDE.md` (managed blocks proposed and implemented in the renderer prompt, pending owner blessing). |
-| OQ-13 | Dashboard window and retention: how much history the embedded snapshot carries, and how older runs stay reachable without the file growing unbounded. Standing proposal (owner reviewing): the dashboard is NOT rendered through the mustache grammar; `dashboard.html` is a static template (HTML + inline JS authored once) with a single JSON data island (`<script type="application/json" id="major-tom-data">`), and refreshing it is a future `inject` mode of `render.js` that replaces only the island. Refreshes become idempotent and diffable, and the retention window applies to the JSON, not the document. |
+| OQ-13 | Narrowed by D31, D32, D33 (data island, inject mode, on-demand server, Desktop integration, vanilla-permanent, design ported, knowledge window 32 KB/file and 1 MB total). Remaining: runs windowing and retention (how older runs stay reachable), producers for the `lastRun` and `roadmap` snapshot keys (depend on OQ-3/OQ-4 and the track phase), further design iteration, and the live-data endpoint as the server's evolution. |
 | OQ-14 | Closed by D21: the main session interviews between the two workflow stages and relaunches stage 2 itself. |
 
 ## 17. Decision log
@@ -496,6 +513,10 @@ reversed by a new decision entry, never by silent edit.
 | D28 | 2026-08-05 | Closes OQ-6: `.knowledge/` is an **OKF v0.2 bundle** (Open Knowledge Format, the Google Cloud spec; confirmed post-reset by the owner). Every non-reserved `.md` is a concept with YAML frontmatter carrying a required `type`; optional fields only when truthful (unknown actors omitted, `stale_after` only for genuinely expiring concepts). The bundle root carries the reserved `index.md` (`okf_version: 0.2`), one line per knowledge file grouped by area, so sessions read the index instead of walking files; the maintenance rule is that whoever adds a knowledge file appends its index line in the same change. Onboard bootstraps the empty bundle with its index; the onboard run record is the first concept (`type: run`, `generated.by: major-tom-onboard`). The rendered context also states explicitly that all knowledge (memories, docs, runs, monitors, logs) lives locally in the repository, versioned with the code. |
 | D29 | 2026-08-05 | Canonical renderer, prompted by the second live test (the Execute agent had to improvise a renderer from the README grammar): `templates/render.js`, node with no dependencies, authored at the repo root and shipped inside each plugin by the D23 sync. Modes: `render` (stdout) and `apply` (managed-block write: replace between markers, append without markers, create when missing; outside-marker content never touched). Fails closed on missing files, unbalanced blocks, or unresolved syntax. The renderer agent runs it and never re-implements the grammar; `onboard-check` counts it among the required plugin assets. Grammar whitespace semantics precised in `templates/README.md` to match the implementation. Verified against the three topology fixtures: correct section presence, apply idempotence (apply twice equals render), outside-marker preservation, append on marker-less placeholder. |
 | D30 | 2026-08-05 | Closes OQ-9: the version lineage continues, no reset to 0.1.0. `plugin.json` and `marketplace.json` bump to 0.9.0 with the first post-reset PR, owner-directed; from here every shipped iteration bumps the manifests. |
+| D31 | 2026-08-05 | Dashboard v1, owner-scoped (routing, git history, config, knowledge; basic now, design and tech iterate later). The OQ-13 data-island proposal is implemented: `templates/dashboard.html` is static (hash-routed views: overview, config, git, knowledge; inline CSS/JS, light and dark), fed exclusively through the new `render.js inject` mode that replaces the `major-tom-data` island (JSON validated, `</script` escaped). Serving is on demand: the new `/major-tom:dashboard` command (plugin `commands/` surface, `${CLAUDE_PLUGIN_ROOT}` substitution) starts `templates/dashboard-server.js` (node, no deps, localhost-only, reads the file per request) as a background task and opens the browser; monitors were rejected because they auto-start every session. The server lives in the plugin, never written into the target repo: mechanism belongs to the plugin, the repo carries only `dashboard.html` and its data. Amended by D32: the never-written-into-the-repo clause is reversed for Desktop support. Onboard renders the first snapshot (config, 50-commit git window, knowledge file list); `onboard-check` requires the two new assets. |
+| D32 | 2026-08-05 | Amends D31's server-location clause, forced by the `.claude/launch.json` facts (Claude Desktop Browser-pane surface: per-project, plugins cannot contribute entries, no plugin-path substitution, `autoPort` passes `PORT`): a repo-local copy is required for Desktop. Owner calls: (1) the onboard writes a generated copy of the server to **`.claude/server/`** (mechanism in Claude's config space, never in `.knowledge/`), refreshed on every onboard; (2) `.claude/launch.json` gets a **managed, namespaced entry** `major-tom-dashboard` via `templates/launch-merge.js`: only that entry is rewritten, all user entries and fields preserved, unparseable file refused, autoPort on (server honors `PORT`); (3) the dashboard UI is **vanilla permanently**, the framework option (shadcn/React or Preact build pipeline) is dropped; design iterates inside the single self-contained file. The CLI command prefers the repo copy for surface consistency, falling back to the plugin copy. |
+| D33 | 2026-08-05 | Dashboard v2: the owner's Claude Design reference (`assets/major-tom-design/`) is the visual spec, ported 1:1 to vanilla (the design's runtime and demo data stay in assets as reference only). Owner calls from the port analysis: system font stacks instead of Google Fonts (self-containment wins over IBM Plex fidelity); sections whose data has no producer yet (lifecycle run phases, roadmap) ship with honest empty states wired to optional snapshot keys `lastRun` and `roadmap`; knowledge bodies embed with a 32 KB per-file and 1 MB total window in index order, truncation flagged (first hard numbers for OQ-13); both overview layouts (grid and console) ported. Snapshot schema v2: git entries gain `kind` (conventional prefix), `add`/`del` (numstat); knowledge files gain `type`, `size`, `updated`, `frontmatter`, capped `body`; `decisions` derived from OKF `type: decision` concepts. Verified by a DOM-stub runtime suite (10 checks, including hostile-subject escaping) plus inject and serve smoke tests. |
+| D34 | 2026-08-05 | Amends D32's no-build-pipeline clause, owner-directed: single-file inline CSS+JS was becoming unmaintainable. "No framework" and the single self-contained artifact both stand; what changes is authoring. The dashboard is authored in `templates/dashboard/` (`index.html`, `dashboard.css`, real ES modules: data, state, ui, one per view, main) and `scripts/build-dashboard.js` (node, no dependencies, like sync/render/launch-merge) bundles it into the generated `templates/dashboard.html`: topo-sorted concatenation into one IIFE, CSS inlined, `--check` staleness gate. The bundler enforces a declared subset and fails closed outside it (static named relative `.mjs` imports, no cycles, no dynamic import, unique top-level names across modules). Dev loop needs no build: `dashboard-server.js` gains a directory mode (path-traversal-safe) and the browser loads the modules natively. The authoring directory is excluded from the plugin sync; only the built artifact ships. Behavior verified unchanged: DOM-stub suite green against the built artifact, byte-stable rebuild, dir-mode serve tested. |
 
 ## 18. Changelog
 
@@ -529,3 +550,9 @@ reversed by a new decision entry, never by silent edit.
 | 0.8.0 | 2026-08-05 | D28 closes OQ-6: OKF v0.2 confirmed for `.knowledge/`. Onboard writer bootstraps the bundle `index.md`; Finalize writes the run record as an OKF concept and appends its index entry; section 11 rewritten (bundle, index maintenance rule, explicit locality); template document map gains the index row and the harness states OKF and local-only persistence. Synced to both plugins. |
 | 0.9.0 | 2026-08-05 | Second full onboard passed clean (specialists confirmed and hash-verified, OKF bundle seeded, byte-idempotent re-render, no duplication). D29: canonical `templates/render.js` replaces the agent-improvised renderer; renderer prompt now runs it; `onboard-check` requires it; whitespace semantics precised in the README; template bug fixed (unit without `dependsOn` glued the end marker). Dashboard data-island direction recorded in OQ-13. |
 | 0.9.1 | 2026-08-05 | Release prep, first post-reset PR: D30 closes OQ-9 (lineage continues), plugin and marketplace manifests bumped to 0.9.0, section 15 references refreshed. |
+| 0.10.0 | 2026-08-05 | D31: dashboard v1. Static `dashboard.html` (hash-routed overview/config/git/knowledge over the data island), `render.js inject` mode (island replacement, script-close escaping, inject-idempotent), `dashboard-server.js` (localhost, per-request read), `/major-tom:dashboard` command, onboard renders the first snapshot and Finalize verifies it. Tested: inject with hostile subject strings, server 200/404/kill smoke test. OQ-13 narrowed to window/retention plus design iteration. |
+| 0.11.0 | 2026-08-05 | D32: Claude Desktop integration. New `templates/launch-merge.js` (managed `major-tom-dashboard` entry in `.claude/launch.json`; scenario-tested: create, preserve user entries and unknown fields, idempotent update, refuse unparseable); onboard writer copies the server to `.claude/server/` and runs the merge; server honors `PORT` (autoPort, env-tested); command prefers the repo copy; Finalize verifies both. Framework dropped: dashboard is vanilla permanently. |
+| 0.12.0 | 2026-08-05 | D33: dashboard v2, the owner's Claude Design ported to vanilla. Five views (overview grid/console, roadmap, git with search and kind filters, knowledge tree + viewer, config table/raw), collapsible rail, persisted theme toggle, system fonts, empty states for lastRun/roadmap. Snapshot schema v2 in the onboard builder (kind/numstat, knowledge frontmatter and capped bodies, derived decisions). DOM-stub runtime suite 10/10; templates README carries the island schema contract. |
+| 0.13.0 | 2026-08-05 | D34: dashboard authoring split. `templates/dashboard/` (css file + ES modules architected as an app) plus `scripts/build-dashboard.js` (constrained bundler, fails closed, `--check` gate) emitting the generated single-file artifact; `dashboard-server.js` gains the directory dev mode; sync excludes the authoring dir. Suite re-run green against the built artifact. |
+| 0.13.1 | 2026-08-06 | Owner-directed after a clean live test: `/major-tom:dashboard` accepts `start\|stop` via `$ARGUMENTS` (default start; unknown argument answers with usage). Stop is surgical: kills only PIDs on 4242/4243 whose command line is the dashboard server; start refuses to double-start and points the user to `/major-tom:dashboard stop`. |
+| 0.13.2 | 2026-08-06 | Release prep, second PR: plugin and marketplace manifests bumped to 0.13.1 (D30 cadence), section 15 references refreshed, owner's design reference committed under `assets/major-tom-design/` (the D33 visual spec). |
