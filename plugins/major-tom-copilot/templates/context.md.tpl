@@ -49,6 +49,10 @@ point where simplifying seems necessary, stop and ask the owner.
   - {{this}}
 {{/each}}
 {{/if}}
+- Delegated work runs in a git worktree under `.claude/worktrees/`, never directly on the
+  feature branch: it comes back for the review phase once done and reaches the feature branch
+  only after the verdict. The `vcs-operator` agent owns the branch, worktree, and merge
+  mechanics.
 - Every interaction follows the nine-phase lifecycle: think, understand, decide, spec/plan,
   review, implement, verify, track, publish. No phase is skipped silently.
 - All generated knowledge lives **locally in this repository**, under `{{persistence.root}}/`,
