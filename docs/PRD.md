@@ -460,7 +460,7 @@ merge targeted and verifies the three values landed.
   dashboard snapshot rendered per D31) plus `workflows/README.md` (the workflow script API
   contract, D20), `commands/dashboard.md` (the `/major-tom:dashboard` on-demand server
   command, D31),
-  `plugin.json` v0.14.0 (D30), `config.schema.json` at the plugin root (D3; JSON Schema
+  `plugin.json` v0.15.0 (D30), `config.schema.json` at the plugin root (D3; JSON Schema
   draft-07 for the section 10 config, verified by a 45-case fixture suite),
   `hooks/hooks.json` plus `hooks/writing-rule.js` (D35: the operator writing-rule
   `UserPromptSubmit` hook, Node script with zero dependencies, verified against the
@@ -489,7 +489,7 @@ merge targeted and verifies the three values landed.
   into `plugins/*/templates/` by `scripts/sync-templates.js` (D23), the `dashboard/`
   authoring split excluded.
 - `plugins/major-tom-copilot`: 9 agents (`.agent.md`), synced `templates/`, no manifest yet.
-- `.claude-plugin/marketplace.json` v0.14.0 (D30), dual-plugin.
+- `.claude-plugin/marketplace.json` v0.15.0 (D30), dual-plugin.
 - One skill, `think` (D36, see above). No other skills, no tools, no persistence layer
   bootstrapped yet (D36's `.knowledge/runs/` paths are created on first use, not by an
   onboard run), no docs beyond this PRD.
