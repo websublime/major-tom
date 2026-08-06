@@ -3,6 +3,9 @@
 // The installed plugin cache only contains the plugin directory, so runtime copies must
 // live under each plugin root. This script keeps them byte for byte identical.
 //
+// The dashboard/ subdirectory is the dashboard AUTHORING split (D34), not a runtime
+// asset: the built artifact templates/dashboard.html is what ships. It is excluded here.
+//
 // Usage:
 //   node scripts/sync-templates.js          copy source into every target
 //   node scripts/sync-templates.js --check  exit 1 if any target drifts from source
@@ -16,6 +19,7 @@ const targets = [
   path.join(repoRoot, 'plugins', 'major-tom', 'templates'),
   path.join(repoRoot, 'plugins', 'major-tom-copilot', 'templates'),
 ]
+const EXCLUDE_TOP = new Set(['dashboard'])
 
 function listFiles(dir, base) {
   if (!fs.existsSync(dir)) return []
@@ -23,6 +27,7 @@ function listFiles(dir, base) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name)
     const rel = path.relative(base, full)
+    if (base === dir && EXCLUDE_TOP.has(entry.name)) continue
     if (entry.isDirectory()) out.push(...listFiles(full, base))
     else out.push(rel)
   }
@@ -61,7 +66,13 @@ function check() {
 function sync() {
   for (const target of targets) {
     fs.rmSync(target, { recursive: true, force: true })
-    fs.cpSync(source, target, { recursive: true })
+    fs.cpSync(source, target, {
+      recursive: true,
+      filter: (src) => {
+        const rel = path.relative(source, src)
+        return !(rel && EXCLUDE_TOP.has(rel.split(path.sep)[0]))
+      },
+    })
     console.log(`synced ${path.relative(repoRoot, source)} -> ${path.relative(repoRoot, target)}`)
   }
 }
