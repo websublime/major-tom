@@ -121,13 +121,17 @@ const VALIDATION = {
   },
 }
 
+// notes exists for the same reason RENDER_REPORT and INSTALL_REPORT have one (D53): without
+// it, a writer with something to say that is neither a written path nor a failure has only
+// failures to say it in, and any entry there halts the onboard.
 const WRITE_REPORT = {
   type: 'object',
   additionalProperties: false,
-  required: ['written', 'failures'],
+  required: ['written', 'failures', 'notes'],
   properties: {
     written: { type: 'array', items: { type: 'string' } },
     failures: { type: 'array', items: { type: 'string' } },
+    notes: { type: 'string' },
   },
 }
 
@@ -283,11 +287,12 @@ if (!validation.valid) {
 const write = await agent(
   [
     'You are the writer of the Major Tom onboard Execute phase, in the target repository (current working directory).',
-    '1. Write .claude/major-tom.json with exactly this content, byte for byte, creating .claude/ if needed:',
+    'Nothing below assumes an untouched repository. Where a step says ensure, bring the target to the stated shape and leave everything else that is already there alone; where it says write or copy, the file is this workflow\'s own product and replacing it is intended.',
+    '1. Write .claude/major-tom.json with exactly this content, byte for byte, creating .claude/ if needed, and replacing any file already there: a re-onboard is expected and the main session has already shown the user the diff of the changed answers before relaunching.',
     cfgJson,
-    `2. Create the knowledge root ${cfg.persistence.root}/ with subdirectories: memories, docs, runs, monitors, logs. Put a .gitkeep file in each empty directory.`,
-    `3. Create ${cfg.persistence.root}/index.md, the OKF v0.2 bundle index (D28): YAML frontmatter with okf_version: 0.2, then a heading per area (memories, docs, runs, monitors, logs) each stating it is empty for now, plus one line explaining the maintenance rule: every knowledge file added to the bundle gets a one-line entry here in the same change.`,
-    `4. Copy ${pre2.pluginRoot}/app/launcher.js byte for byte to .claude/server/launcher.js, creating .claude/server/. It takes no substitution of any kind: copy it exactly as it is, never edit it, never rewrite a path inside it. What lands in the repo is a launcher and not a copy of the server (D32 as amended by D44 point 2): launch.json cannot reference the plugin path, so something has to sit in the repo, and a copy of the app would age silently, leaving a user who updates the plugin running the old dashboard until a re-onboard, with nothing to warn them. The launcher resolves the installed plugin at run time instead, so updating the plugin updates the dashboard.`,
+    `2. Ensure the knowledge root ${cfg.persistence.root}/ exists with the subdirectories memories, docs, runs, monitors, logs. Create only what is missing; never delete, empty or replace a directory that is already there, and never remove a file it already carries. Put a .gitkeep file in each empty directory. A directory that already holds files needs no .gitkeep and is not a problem: leave it as it is.`,
+    `3. Ensure ${cfg.persistence.root}/index.md is the OKF v0.2 bundle index (D28): YAML frontmatter with okf_version: 0.2, a heading per area (memories, docs, runs, monitors, logs), and one line stating the maintenance rule, that every knowledge file added to the bundle gets a one-line entry here in the same change. The index must describe the bundle as it actually is on disk. If the file does not exist, create it and state under each area heading that the area is empty for now. If it already exists, do not overwrite it and do not treat that as a problem: it is the normal case, because the think gate (D51) requires a recorded intent before any command of this run may execute and the recorder (D36) creates the knowledge root, ${cfg.persistence.root}/runs/ and, for a substantive intent, this index and its first entry, as a side effect of recording. So: keep every entry the file already carries, add any area heading that is missing and the maintenance-rule line if it is absent, add a one-line entry for every file actually present in an area directory that has no entry yet, and write that an area is empty for now only under the areas whose directory is in fact empty.`,
+    `4. Copy ${pre2.pluginRoot}/app/launcher.js byte for byte to .claude/server/launcher.js, creating .claude/server/ and replacing any launcher already there: it is generated mechanism state, gitignored by step 7 and never edited in the repository. It takes no substitution of any kind: copy it exactly as it is, never edit it, never rewrite a path inside it. What lands in the repo is a launcher and not a copy of the server (D32 as amended by D44 point 2): launch.json cannot reference the plugin path, so something has to sit in the repo, and a copy of the app would age silently, leaving a user who updates the plugin running the old dashboard until a re-onboard, with nothing to warn them. The launcher resolves the installed plugin at run time instead, so updating the plugin updates the dashboard.`,
     `5. Run: node ${pre2.pluginRoot}/templates/launch-merge.js .claude/launch.json`,
     'It merges the managed major-tom-dashboard entry into .claude/launch.json, preserving every other configuration and field. If it exits non-zero (an existing file that does not parse), report that as a failure; never hand-edit the file around it.',
     `6. Run: node ${pre2.pluginRoot}/templates/settings-merge.js .claude`,
@@ -296,7 +301,9 @@ const write = await agent(
     `7. Run: node ${pre2.pluginRoot}/templates/gitignore-merge.js .`,
     'It merges the managed major-tom block into the repo root .gitignore, listing .claude/worktrees/ (the git worktrees for delegated work, D38), .claude/session/ (turn-correlation state, D36) and .claude/server/ (the generated dashboard launcher, D32 as amended by D44): all three are mechanism state that the mechanisms regenerate, never knowledge, so they stay out of version control.',
     'The script owns its managed block (markers # major-tom:begin and # major-tom:end) and preserves every other line, so re-running it changes nothing else. If it exits non-zero (an existing file whose markers are malformed, or a file that cannot be read), report that as a failure; never hand-edit the .gitignore around it.',
-    'Report every path written and every failure. Change nothing else.',
+    'Report every path you wrote or changed in written, every failure in failures, and everything else you have to say in notes: what you found already in place and left alone, the entries you added to an index that already existed, a directory that was already populated, or a deviation you judged necessary and why.',
+    'The failures list has one meaning and one only: a step that did not achieve its goal, such as a script exiting non-zero or a file that could not be written. Any entry in it halts the whole onboard, before the templates are rendered, the specialists are installed and the run record is written. It is not a place for notes, caveats, deviations or observations about pre-existing files. If every step above achieved its goal, failures must be an empty array, even when a file already existed or a directory was already populated.',
+    'Change nothing else.',
   ].join('\n'),
   { label: 'write config + knowledge root', schema: WRITE_REPORT }
 )
