@@ -57,10 +57,21 @@ const KNOWLEDGE_ROOT = '.knowledge'
 const IDENTITY_NAME = 'Fixture Author'
 const IDENTITY_EMAIL = 'fixture@example.test'
 
-// The window constants the spec names literally, asserted on the served payload.
+// The window constants the spec names literally, asserted on the served payload. days and
+// limit are now the configured default of D45 point 3 rather than server constants, so these
+// are what the fixture config below sets and therefore what an unparameterized request must
+// come back with; the floor is still fixed server behavior and not a setting (D45 point 1).
 const WINDOW_DAYS = 30
 const FLOOR_EVENTS = 50
 const CEILING_EVENTS = 500
+
+// The hard bounds of D45 point 2, as the spec states them and not as any module exports them:
+// the suite is written against the specification, so a bound is written here literally and a
+// disagreement with the implementation is exactly what these tests exist to report.
+const DAYS_MIN = 1
+const DAYS_MAX = 365
+const LIMIT_MIN = 50
+const LIMIT_MAX = 500
 
 // How long a start or a request may take before the test fails instead of hanging the
 // suite. Generous, because it is a failure deadline and not a performance budget.
@@ -351,6 +362,12 @@ function defaultConfig() {
       team: { coordinator: 'coordinator', members: ['planner', 'implementer', 'reviewer'] },
     },
     persistence: { root: KNOWLEDGE_ROOT },
+    // The window default, which the config is the single source of for every surface (D45
+    // point 3). A served repository without this block cannot be read at all, which is a
+    // fail-closed condition of its own and is covered by the snapshot suite; the fixtures here
+    // are onboarded repositories, so they carry it, and they carry the values the schema
+    // proposes so the assertions on an unparameterized request read the shipped default.
+    snapshot: { days: WINDOW_DAYS, limit: CEILING_EVENTS },
     stack: { languages: ['javascript'], frameworks: [], databases: [], messaging: [] },
     devops: { ci: '', containers: '', cloud: '' },
     org: { namespace: '@fixture', internalLibraries: [], preferredLibraries: [] },
@@ -483,6 +500,59 @@ function servedRepo(t) {
     intentsLog: [logLine({ at: insideHorizon(2), promptId: 'p-log', summary: 'a logged intent' })],
     commits: [{ message: 'feat: first', date: insideHorizon(8), files: { 'a.txt': 'one\n' } }],
   })
+}
+
+// A fixture built to make the window observable: one commit and one logged intent every eight
+// hours, sixty of each, so the two streams carry the same instants and span twenty days.
+//
+// The sizes are not arbitrary. Sixty entries per stream is the smallest round number that
+// leaves both a wide and a narrow window above the floor of fifty, which is what makes a
+// narrower days observable at all: a window holding fewer than fifty entries is extended to the
+// fifty newest whatever their age, so a fixture with fifty-something entries would answer every
+// narrow window with the same fifty and the parameter would look inert while working perfectly.
+// The eight-hour step then puts three entries in every day, so a window of eighteen days holds
+// fifty-four entries and one of twenty-one holds all sixty, both comfortably clear of the floor
+// and of each other. It also makes the two streams comparable entry for entry: the commits and
+// the intents share their timestamps exactly, so any window that treats them alike must return
+// the same count for both, which is the D45 point 4 assertion in its sharpest form.
+//
+// The commits are empty, which keeps sixty git processes to sixty and not a hundred and twenty:
+// nothing here reads a diff, only dates.
+const WINDOW_FIXTURE_ENTRIES = 60
+const WINDOW_FIXTURE_STEP_HOURS = 8
+const WIDE_DAYS = 21
+const NARROW_DAYS = 18
+const NARROW_LIMIT = 55
+
+function windowRepo(t) {
+  const commits = []
+  const intentsLog = []
+  // Oldest first, which is the order initRepo commits in.
+  for (let i = WINDOW_FIXTURE_ENTRIES - 1; i >= 0; i -= 1) {
+    const at = new Date(NOW - i * WINDOW_FIXTURE_STEP_HOURS * 3600000)
+    commits.push({ message: `feat: entry ${i}`, date: at })
+    intentsLog.push(logLine({ at, promptId: `p-${i}`, summary: `intent ${i}` }))
+  }
+  return initRepo(t, { intentsLog, commits })
+}
+
+// The two streams are cut by one window or the fixture is not testing what it claims to. Every
+// window request below goes through here, so a change that moved only the git side or only the
+// timeline side is caught wherever it happened and not only in the one test that looked for it.
+function assertStreamsMoveTogether(snapshot, label) {
+  assert.equal(
+    snapshot.git.length,
+    snapshot.timeline.events.length,
+    `${label}: the git commits and the timeline events share one window (D42, D45 point 4), and this fixture gives them the same instants, so the two counts must agree`
+  )
+  return snapshot.git.length
+}
+
+// One window request: 200, the two streams in step, and the applied window reported back.
+async function windowRequest(port, target, label) {
+  const res = await getJson(port, target)
+  assert.equal(res.status, 200, `${label} must be served: ${JSON.stringify(res.value)}`)
+  return { count: assertStreamsMoveTogether(res.value, label), window: res.value.timeline.window, value: res.value }
 }
 
 // ---------------------------------------------------------------------------
@@ -676,6 +746,247 @@ test('payload: timeline.window carries the three limits and no byte budget', asy
     ceilingEvents: CEILING_EVENTS,
   })
   assert.equal('byteBudget' in res.value.timeline.window, false)
+})
+
+// ---------------------------------------------------------------------------
+// The window parameters
+// ---------------------------------------------------------------------------
+
+// The point of D45 at the HTTP layer: a request may move the window, and moving it moves both
+// streams. Everything else in this section is about what happens when the request is wrong;
+// this is what happens when it is right.
+test('window: days and limit are applied, and they move both streams together', async (t) => {
+  const dir = windowRepo(t)
+  const { port } = await startServer(t, dir)
+
+  // The whole fixture, from a window wide enough to hold all of it.
+  const wide = await windowRequest(port, `/api/snapshot?days=${WIDE_DAYS}&limit=${LIMIT_MAX}`, `days=${WIDE_DAYS}`)
+  assert.equal(wide.count, WINDOW_FIXTURE_ENTRIES, 'a window wider than the fixture must hold all of it')
+
+  // A narrower horizon returns fewer commits and fewer events, in step. Both counts stay above
+  // the floor, so what is being observed here is the horizon and not the floor standing in.
+  const narrow = await windowRequest(port, `/api/snapshot?days=${NARROW_DAYS}&limit=${LIMIT_MAX}`, `days=${NARROW_DAYS}`)
+  assert.ok(
+    narrow.count < wide.count,
+    `a narrower days must return fewer entries, got ${narrow.count} against ${wide.count}`
+  )
+  assert.ok(narrow.count > FLOOR_EVENTS, `the narrow window must stay above the floor, got ${narrow.count}`)
+
+  // And a narrower ceiling cuts both, at a horizon that holds everything.
+  const capped = await windowRequest(port, `/api/snapshot?days=${WIDE_DAYS}&limit=${NARROW_LIMIT}`, `limit=${NARROW_LIMIT}`)
+  assert.equal(capped.count, NARROW_LIMIT, 'a limit below the number of entries must be the number returned')
+  const floored = await windowRequest(port, `/api/snapshot?days=${WIDE_DAYS}&limit=${LIMIT_MIN}`, `limit=${LIMIT_MIN}`)
+  assert.equal(floored.count, LIMIT_MIN, 'the smallest accepted limit must be the number returned')
+
+  // The entries a narrower window keeps are the newest ones, and they are the same entries the
+  // wider window opened with: a window that returned a different set rather than a prefix would
+  // satisfy every count above and still be wrong.
+  assert.deepEqual(
+    capped.value.git.map((c) => c.subject),
+    wide.value.git.slice(0, NARROW_LIMIT).map((c) => c.subject),
+    'a narrower limit must keep the newest entries, in the same order'
+  )
+  assert.deepEqual(
+    narrow.value.timeline.events.map((e) => e.summary),
+    wide.value.timeline.events.slice(0, narrow.count).map((e) => e.summary),
+    'a narrower horizon must keep the newest events, in the same order'
+  )
+})
+
+// Two independent parameters, not one pair: a caller that wants to change the horizon must not
+// have to restate the ceiling, and the value it leaves out is the project's own default rather
+// than anything this server holds (D45 point 3).
+test('window: either parameter may be omitted, and the configured default fills in', async (t) => {
+  const dir = windowRepo(t)
+  const { port } = await startServer(t, dir)
+
+  const neither = await windowRequest(port, '/api/snapshot', 'no parameters at all')
+  assert.deepEqual(neither.window, { days: WINDOW_DAYS, floorEvents: FLOOR_EVENTS, ceilingEvents: CEILING_EVENTS })
+  assert.equal(neither.count, WINDOW_FIXTURE_ENTRIES, 'the configured window holds the whole fixture')
+
+  // days alone: the configured limit stays in force.
+  const daysOnly = await windowRequest(port, `/api/snapshot?days=${NARROW_DAYS}`, 'days alone')
+  assert.deepEqual(daysOnly.window, { days: NARROW_DAYS, floorEvents: FLOOR_EVENTS, ceilingEvents: CEILING_EVENTS })
+  assert.ok(daysOnly.count < WINDOW_FIXTURE_ENTRIES, 'days alone must still cut the window')
+
+  // limit alone: the configured horizon stays in force.
+  const limitOnly = await windowRequest(port, `/api/snapshot?limit=${LIMIT_MIN}`, 'limit alone')
+  assert.deepEqual(limitOnly.window, { days: WINDOW_DAYS, floorEvents: FLOOR_EVENTS, ceilingEvents: LIMIT_MIN })
+  assert.equal(limitOnly.count, LIMIT_MIN, 'limit alone must still cut the window')
+})
+
+// The page states the window it is showing, so the window it is handed has to be the one it
+// asked for and not the one the project defaults to.
+test('window: timeline.window reports the requested window, not the configured one', async (t) => {
+  const dir = servedRepo(t)
+  const { port } = await startServer(t, dir)
+
+  const res = await getJson(port, '/api/snapshot?days=7&limit=120')
+  assert.equal(res.status, 200)
+  assert.deepEqual(res.value.timeline.window, { days: 7, floorEvents: FLOOR_EVENTS, ceilingEvents: 120 })
+  // The floor is not a parameter and no request can move it (D45 point 1).
+  assert.deepEqual((await getJson(port, `/api/snapshot?days=${DAYS_MAX}&limit=${LIMIT_MIN}`)).value.timeline.window, {
+    days: DAYS_MAX,
+    floorEvents: FLOOR_EVENTS,
+    ceilingEvents: LIMIT_MIN,
+  })
+})
+
+// Both ends of both bounds, refused rather than clamped (D45 point 2). The status is the first
+// half of the contract and the message is the second: it is what the page puts in front of the
+// reader, so it has to name which parameter was wrong, what value arrived and what would be
+// accepted instead. A 400 that only said "bad request" would leave the reader guessing.
+test('window: an out-of-bounds value is a 400 naming the parameter, the value and the range', async (t) => {
+  const dir = servedRepo(t)
+  const { port } = await startServer(t, dir)
+
+  const refusals = [
+    { name: 'days', value: DAYS_MIN - 1, min: DAYS_MIN, max: DAYS_MAX },
+    { name: 'days', value: DAYS_MAX + 1, min: DAYS_MIN, max: DAYS_MAX },
+    { name: 'limit', value: LIMIT_MIN - 1, min: LIMIT_MIN, max: LIMIT_MAX },
+    { name: 'limit', value: LIMIT_MAX + 1, min: LIMIT_MIN, max: LIMIT_MAX },
+  ]
+  for (const refusal of refusals) {
+    const target = `/api/snapshot?${refusal.name}=${refusal.value}`
+    const res = await request(port, target)
+    assert.equal(res.status, 400, `${target} must be a 400: a value outside the bounds is a bad request`)
+    const value = assertErrorShape(res, `400 for ${target}`)
+    assert.match(value.error, new RegExp(`\\b${refusal.name}\\b`), `${target} must name the parameter`)
+    assert.match(value.error, new RegExp(`\\b${refusal.value}\\b`), `${target} must name the value it received`)
+    assert.match(value.error, new RegExp(`\\b${refusal.min}\\b`), `${target} must name the low end of the range`)
+    assert.match(value.error, new RegExp(`\\b${refusal.max}\\b`), `${target} must name the high end of the range`)
+    // Refused and not clamped: nothing was served, so there is no snapshot in the body at all.
+    assert.equal('timeline' in value, false, `${target} must not answer a snapshot as well as an error`)
+  }
+
+  // A refusal of one parameter is a refusal of the request, whatever the other one said.
+  for (const target of [`/api/snapshot?days=0&limit=${LIMIT_MAX}`, `/api/snapshot?days=${DAYS_MAX}&limit=0`]) {
+    assert.equal((await request(port, target)).status, 400, `${target} must be a 400`)
+  }
+})
+
+// The spellings Number() would have accepted and turned into some other number, refused for the
+// same reason the port argument refuses them: a value that has to be reinterpreted to be read is
+// not the value the caller asked for. The asymmetry at the end is the one worth stating: an
+// absent parameter is a silence and means the default, an empty one was typed by somebody and
+// is a value this server cannot honour.
+test('window: a non-numeric or malformed value is a 400', async (t) => {
+  const dir = servedRepo(t)
+  const { port } = await startServer(t, dir)
+
+  const malformed = [
+    'banana',
+    '1e4', // Number would read 10000
+    '30.5',
+    '%2030%20', // " 30 ", which Number would read as 30
+    '', // typed, so a value and not a silence
+    '+30',
+    '-30',
+    '0x1e', // Number would read 30
+    'Infinity',
+    'NaN',
+    '30d',
+  ]
+  for (const name of ['days', 'limit']) {
+    for (const raw of malformed) {
+      const target = `/api/snapshot?${name}=${raw}`
+      const res = await request(port, target)
+      assert.equal(res.status, 400, `${target} must be a 400 rather than a coerced number`)
+      const value = assertErrorShape(res, `400 for ${target}`)
+      assert.match(value.error, new RegExp(`\\b${name}\\b`), `${target} must name the parameter`)
+    }
+  }
+
+  // And the other side of that asymmetry: the parameter simply not being there is the ordinary
+  // request, and it is served.
+  assert.equal((await request(port, '/api/snapshot')).status, 200)
+  assert.equal((await request(port, '/api/snapshot?')).status, 200)
+})
+
+// The distinction the whole task exists for. A bad parameter and a broken repository both come
+// out of the same throw inside the same call, and they must not reach the page as the same
+// answer: one is corrected in the control the reader just used, the other by re-running the
+// onboard, and a page that cannot tell them apart can only ever offer one of the two remedies.
+test('window: a 400 for a bad parameter is distinguishable from the 500 a broken repository gives', async (t) => {
+  const sound = await startServer(t, servedRepo(t))
+  const broken = await startServer(t, initRepo(t, { noConfig: true }))
+
+  const badParameter = await getJson(sound.port, '/api/snapshot?days=0')
+  const badRepository = await getJson(broken.port, '/api/snapshot')
+
+  assert.equal(badParameter.status, 400)
+  assert.equal(badRepository.status, 500)
+  assert.notEqual(badParameter.status, badRepository.status, 'the two failures must not look the same to the page')
+
+  // Each message names its own remedy. The bad request names the parameter and never the
+  // config; the broken repository names the config and never the parameter.
+  assert.match(badParameter.value.error, /\bdays\b/)
+  assert.doesNotMatch(badParameter.value.error, /major-tom\.json/)
+  assert.match(badRepository.value.error, /major-tom\.json/)
+
+  // A well-formed request against the broken repository is still the 500, so the status is
+  // about which input was wrong and not about whether a query string was present at all.
+  assert.equal((await getJson(broken.port, `/api/snapshot?days=${WINDOW_DAYS}&limit=${CEILING_EVENTS}`)).status, 500)
+  // And a bad parameter against the broken repository still diagnoses the repository, because
+  // the repository is diagnosed before the request is: one broken repository has one diagnosis
+  // however malformed the request that found it.
+  const both = await getJson(broken.port, '/api/snapshot?days=0')
+  assert.equal(both.status, 500, 'a broken repository is what a request cannot fix, so it is reported first')
+  assert.match(both.value.error, /major-tom\.json/)
+})
+
+// A 400 is an ordinary answer to an ordinary mistake, not a wound: the process that gave it is
+// still serving, and the very next request is answered normally.
+test('window: the server keeps serving after a 400', async (t) => {
+  const dir = servedRepo(t)
+  const { port, child, out } = await startServer(t, dir)
+
+  for (const target of ['/api/snapshot?days=0', '/api/snapshot?limit=banana', '/api/snapshot?days=']) {
+    assert.equal((await request(port, target)).status, 400, `${target} must be a 400`)
+    // The following request, on the same server, is untouched by the one before it.
+    const after = await getJson(port, '/api/snapshot')
+    assert.equal(after.status, 200, `the server must still answer after refusing ${target}`)
+    assert.equal(after.value.config.project.name, 'fixture-project')
+  }
+
+  assert.equal((await request(port, '/')).status, 200)
+  assert.equal(child.exitCode, null, 'the server must not exit because a request named a bad window')
+  assert.equal(child.signalCode, null)
+  // A refused parameter is a refused input and not a defect, so nothing was logged as one.
+  assert.equal(out.stderr.includes('unhandled error'), false, `unexpected stderr: ${out.stderr}`)
+})
+
+// The window belongs to a listing and not to a file, so the body route neither reads it nor is
+// disturbed by it (D45: a body is a body). The parameters are unread there, and an unread
+// parameter is ignored on both routes alike: nothing a request carries reaches the filesystem,
+// selects a route or is echoed back, so refusing an unread parameter would buy no property and
+// would fail perfectly answerable requests. Refusal is for a parameter that is read and whose
+// value cannot be honoured, which is the only case where the caller can be told what to change.
+test('window: the body route is unaffected by the parameters, and an unread parameter is ignored', async (t) => {
+  const dir = servedRepo(t)
+  const { port } = await startServer(t, dir)
+
+  const snapshot = (await getJson(port, '/api/snapshot')).value
+  const id = fileByPath(snapshot, 'docs/alpha.md').id
+  const expected = bodyOnDisk(dir, 'docs/alpha.md')
+
+  // Values that are a 400 on the snapshot route are nothing at all here.
+  for (const extra of ['days=0', 'limit=banana', 'days=&limit=', `days=${DAYS_MAX + 1}`, 'days=7&limit=100']) {
+    const res = await getJson(port, `/api/knowledge/body?id=${id}&${extra}`)
+    assert.equal(res.status, 200, `the body route must ignore ${extra}`)
+    assert.deepEqual(Object.keys(res.value).sort(), ['body', 'id'])
+    assert.equal(res.value.body, expected)
+  }
+  // Without an id it is still the 404 it always was, and never a 400 about a window.
+  await assertBodyRouteRefuses(port, '/api/knowledge/body?days=0', 'a window parameter and no id')
+
+  // And the snapshot route ignores what it does not read, which is the same rule: an unknown
+  // parameter changes nothing, and it does not excuse a bad known one either.
+  const ignored = await getJson(port, '/api/snapshot?nope=1&days=7&whatever=banana')
+  assert.equal(ignored.status, 200)
+  assert.equal(ignored.value.timeline.window.days, 7)
+  assert.equal((await getJson(port, '/api/snapshot?nope=1')).value.timeline.window.days, WINDOW_DAYS)
+  assert.equal((await request(port, '/api/snapshot?nope=1&days=0')).status, 400)
 })
 
 // ---------------------------------------------------------------------------

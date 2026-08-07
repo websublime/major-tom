@@ -11,10 +11,27 @@
 // It serves two things and nothing else: the built dashboard.html sitting beside it, and the
 // read-only JSON that page fetches. 127.0.0.1 only, GET only, 405 for any other method.
 //
-//   GET /                            the built page
-//   GET /api/snapshot                the snapshot for the served repository, computed here
-//   GET /api/knowledge/body?id=<id>  the body of the one concept that id addresses
-//   anything else                    404
+//   GET /                                    the built page
+//   GET /api/snapshot?days=<n>&limit=<n>     the snapshot for the served repository, computed
+//                                            here, over the window the request asked for
+//   GET /api/knowledge/body?id=<id>          the body of the one concept that id addresses
+//   anything else                            404
+//
+// The two window parameters are the D45 parameter, and both are optional and independent: an
+// absent one leaves the default the served repository's config carries in force. This file
+// holds no default for either, deliberately, because D45 point 3 put the default in the config
+// so that exactly one place decides it.
+//
+// A query parameter this server does not read is ignored, on both routes that take one, and
+// that is a choice rather than an omission. The body route already worked this way and its
+// suite pins it, so the snapshot route agrees with it instead of inventing a second rule for
+// the same kind of request. The reasoning is that an unread parameter cannot make this server
+// do anything: no parameter reaches the filesystem, none is echoed back, and none selects a
+// route, so a refusal would buy no property and would fail requests that arrive with a
+// bookmark's or a proxy's own additions. Refusal is reserved for a parameter that is read and
+// whose value cannot be honoured, which is the only case where the caller can be told what to
+// change. A parameter given twice is read once, at its first occurrence, which is what
+// URLSearchParams.get means; the rest are unread parameters like any other.
 //
 // GET only is meant literally, and HEAD is not exempt: a HEAD request is answered 405 like
 // any other non-GET method. That is a deviation from the HTTP norm, under which a server
@@ -56,10 +73,18 @@
 //
 // 3. A bad repository is a response, not a crash. buildSnapshot throws a SnapshotError on
 //    every fail-closed condition (no .claude/major-tom.json, a config that does not parse, a
-//    missing persistence root), which is answered with a 500 carrying the message, so the
-//    page can tell the user the repository is not onboarded instead of showing a blank view.
-//    Any other exception is a defect: also a 500, but with the stack written to stderr and
-//    never to the client. No request can end this process.
+//    missing persistence root, no snapshot block to read the window default from), which is
+//    answered with a 500 carrying the message, so the page can tell the user the repository is
+//    not onboarded instead of showing a blank view. Any other exception is a defect: also a
+//    500, but with the stack written to stderr and never to the client. No request can end this
+//    process.
+//
+//    A refused window parameter is the one SnapshotError that is not a 500 but a 400, because
+//    a bad request and a broken repository have different remedies and the page has to be able
+//    to tell them apart: one is corrected in the control the reader just used, the other by
+//    re-running the onboard. The two are told apart by SnapshotError.parameter, which names the
+//    offending parameter when a refused override caused the failure and is null for every other
+//    fail-closed condition, and never by matching on the message text.
 //
 // Fail closed at startup, by contrast, is an exit: a missing or non-directory repo root, a
 // port that is not a port, a missing dashboard.html and a port already in use are all
@@ -71,6 +96,14 @@ const http = require('http')
 const fs = require('fs')
 const path = require('path')
 
+// WINDOW_BOUNDS is deliberately not imported here, and that is the strongest reading of the
+// rule it exists to serve: a bound must not be restated in this file. It is not restated and it
+// is not read either, because nothing below needs to know what the bounds are. This file
+// decides one thing about a window parameter, whether the caller wrote an integer, and hands
+// the value to snapshot.js, which owns the bounds, the comparison and the message. Zero copies
+// of a bound cannot drift; one shared copy only cannot drift as long as every reader keeps
+// reading it. If a future check here ever does need a bound, it reads WINDOW_BOUNDS and never
+// writes the number.
 const { buildSnapshot, readConceptBody, SnapshotError } = require('./snapshot.js')
 
 // The one file a request can cause this process to open, resolved from this file's own
@@ -206,6 +239,37 @@ function queryOf(requestTarget) {
   return new URLSearchParams(requestTarget.split('?')[1] || '')
 }
 
+// One window override as buildSnapshot wants to receive it (D45). The three cases, and the
+// asymmetry between the first two is the point:
+//
+//   absent      undefined, which is what tells snapshot.js to apply the configured default;
+//   digits      the number they spell, the only spelling this server converts;
+//   anything
+//   else        the text exactly as it arrived, which snapshot.js refuses.
+//
+// An absent parameter and an empty one are not the same request. ?days= was typed by somebody,
+// so it is a value this server could not honour and it is answered as one; only a parameter
+// that is not in the query string at all means "leave the default alone". That is the same
+// distinction parsePort draws between a port argument that is absent and one that is the empty
+// string, for the same reason: a typed value is a request, not a silence.
+//
+// Digits only, exactly as parsePort tests a port, so a sign, a decimal point, an exponent, a
+// hex literal or surrounding whitespace never reach Number(): Number('') is 0, Number(' 30 ')
+// is 30 and Number('1e4') is 10000, and none of those is a window a caller asked for.
+//
+// What a value that fails that test is not is refused here. It is passed through unconverted,
+// because snapshot.js requires an integer and refuses everything else, and refusing it there
+// is what keeps one producer for the sentence the reader ends up seeing: a malformed value and
+// an out-of-range one then come back phrased identically, both naming the parameter, the value
+// received and the accepted range, and this file writes neither sentence nor holds a bound to
+// write it with. The refusal arrives as a SnapshotError carrying the parameter name, which the
+// handler answers with a 400.
+function windowOverride(query, name) {
+  const raw = query.get(name)
+  if (raw === null) return undefined
+  return /^[0-9]+$/.test(raw) ? Number(raw) : raw
+}
+
 // Routing by literal string comparison. Nothing taken from a request is ever joined to a
 // filesystem path, here or anywhere below (D43 point 8).
 function handle(req, res) {
@@ -223,7 +287,19 @@ function handle(req, res) {
   }
 
   if (route === '/api/snapshot') {
-    sendJson(res, 200, buildSnapshot({ repoRoot }))
+    // The two overrides travel together into one call, which is what makes them one window
+    // (D45 point 4): there is no path here that moves the git stream without the timeline,
+    // because there is no second call to move it with.
+    const query = queryOf(req.url)
+    sendJson(
+      res,
+      200,
+      buildSnapshot({
+        repoRoot,
+        days: windowOverride(query, 'days'),
+        limit: windowOverride(query, 'limit'),
+      })
+    )
     return
   }
 
@@ -265,10 +341,14 @@ const server = http.createServer((req, res) => {
       return
     }
     if (e instanceof SnapshotError) {
-      // A refused input, not a defect: the repository is not onboarded or its config is
-      // broken. The message is the useful part and it goes to the client so the page can
-      // name what is wrong.
-      sendError(res, 500, e.message)
+      // A refused input, not a defect. Which input decides the status, and the error says so
+      // itself: parameter names the window parameter the request got wrong, or is null when
+      // the repository is what is wrong. The message is the useful part either way and it goes
+      // to the client verbatim, because it is what the page shows the reader, and it already
+      // names the parameter, the value received and the accepted range. Nothing here inspects
+      // the text: a status decided by a match on a message is a status that changes when
+      // somebody rewords a sentence.
+      sendError(res, e.parameter === null ? 500 : 400, e.message)
       return
     }
     // A defect. The stack is a fact about this code, not about the caller's repository, so
