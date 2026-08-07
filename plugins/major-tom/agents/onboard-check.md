@@ -24,8 +24,8 @@ else; this path is authoritative (the host substitutes it at load time).
 1. `isGitRepo`: is the cwd inside a git work tree (`git rev-parse --is-inside-work-tree`)?
 2. `hasExistingConfig` / `existingConfig`: does `.claude/major-tom.json` exist? If yes,
    return its parsed content as `existingConfig`; otherwise `existingConfig` is null.
-3. `codebaseMemoryMcpAvailable`: is a codebase-memory MCP server configured and reachable
-   in this environment? Check the configured MCP servers; do not guess.
+3. `codebaseMemoryMcpAvailable`: is the `codebase-memory-mcp` MCP server configured and
+   reachable in this environment? Check the configured MCP servers; do not guess.
 4. `pluginAssetsPresent`: do `config.schema.json`, `templates/context.md.tpl`,
    `templates/claude.md.tpl`, `templates/render.js`, `templates/launch-merge.js`,
    `templates/settings-merge.js`, `templates/gitignore-merge.js`, `app/snapshot.js`,

@@ -372,7 +372,7 @@ function defaultConfig() {
     devops: { ci: '', containers: '', cloud: '' },
     org: { namespace: '@fixture', internalLibraries: [], preferredLibraries: [] },
     sources: { issueTracker: { provider: '', project: '' }, sites: [] },
-    mcp: ['codebase-memory'],
+    mcp: ['codebase-memory-mcp'],
     specialists: [],
   }
 }

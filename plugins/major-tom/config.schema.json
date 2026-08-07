@@ -339,11 +339,11 @@
       }
     },
     "mcp": {
-      "description": "MCP servers the project must have configured. Baseline (D11, amended by D13): codebase-memory is always present; additional servers may be listed, e.g. jira, github, atlassian. Canonical logical names; mapping to the concrete server keys of the environment is the onboard workflow's job.",
+      "description": "MCP servers the project must have configured, each written as the concrete server key it is registered under in this environment (the key `claude mcp list` reports), e.g. codebase-memory-mcp, jira, github, atlassian. Baseline (D11, amended by D13, name corrected by D50): codebase-memory-mcp must be present, and that one entry is what the schema enforces. Every other entry is declarative: it records what the project expects, and nothing verifies it.",
       "type": "array",
       "uniqueItems": true,
       "items": { "type": "string", "minLength": 1 },
-      "contains": { "const": "codebase-memory" }
+      "contains": { "const": "codebase-memory-mcp" }
     },
     "specialists": {
       "description": "Stack specialist agents installed by onboard (D17, D22, D24, D25). Candidates are proposed by the Prepare scan from the authorized source, confirmed by the user in the interview, installed in Execute, and this list is written by Finalize with the actual install outcome. The interview-assembled config carries the confirmed candidates; Finalize overwrites with what really got installed. Empty array when none.",
