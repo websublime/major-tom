@@ -3,20 +3,22 @@
 // Node, no dependencies beyond the vendored YAML parser in ./vendor (D47 point 2).
 //
 // This script is the single producer of the snapshot (D43 point 8): the onboard no longer
-// computes it in prose, so the window rules of D41 (the timeline key and its sources) and
-// D42 (git and timeline share one window) exist in exactly one place and cannot diverge.
-// The consumer contract lives in plugins/major-tom/app/README.md, "Snapshot schema v2";
-// this file implements it and nothing else.
+// computes it in prose, so the window rules of D41 (the timeline key and its sources), D42
+// (git and timeline share one window) and D45 (that window is a parameter) exist in exactly
+// one place and cannot diverge. The consumer contract lives in
+// plugins/major-tom/app/README.md, "Snapshot schema v2"; this file implements it and nothing
+// else.
 //
 // Two entry points, one concept walk:
 //
 //   const { buildSnapshot, readConceptBody } = require('./snapshot.js')  // the server's reads
 //   node snapshot.js [--repo <dir>] [--out <file>]                       // the CLI
 //
-// buildSnapshot({repoRoot}) returns the snapshot object. The CLI, which runs only when this
-// file is the process entry point, is that same call plus argument parsing and output: it is
-// how a human inspects exactly what the server will serve, and it is what the test suite
-// drives.
+// buildSnapshot({repoRoot, days, limit}) returns the snapshot object. days and limit are
+// optional overrides of the window the config carries; absent, the configured value applies.
+// The CLI, which runs only when this file is the process entry point, is that same call plus
+// argument parsing and output, always at the configured window: it is how a human inspects
+// exactly what the server will serve, and it is what the test suite drives.
 //
 // readConceptBody({repoRoot, id}) returns the body of the one concept that id addresses, or
 // null when no concept has it. It lives here rather than in the server so that no caller ever
@@ -27,8 +29,9 @@
 // target repository unless --out points there.
 //
 // Fail closed when <repo>/.claude/major-tom.json is missing, does not parse, is not an
-// object, does not name persistence.root, or names a root that does not exist. No default
-// config is ever improvised. The two entry points fail closed differently, and deliberately:
+// object, does not name persistence.root, names a root that does not exist, or carries no
+// snapshot block for buildSnapshot to read its window from. No default config is ever
+// improvised. The two entry points fail closed differently, and deliberately:
 // every check calls fail(), which throws a SnapshotError, so the library caller sees an
 // exception it can answer with a 500 while the process keeps serving; only the CLI wrapper
 // turns that exception into a stderr line and a non-zero exit. The checks themselves exist
@@ -53,13 +56,45 @@ const crypto = require('node:crypto')
 const { execFileSync } = require('child_process')
 const yaml = require('./vendor/js-yaml.cjs.js')
 
-// The window limits, all three literal and all three always reported in timeline.window.
-// They are a legibility limit and not a weight one (D43 point 4): a reader can hold the last
-// 30 days of a project in their head, and the floor and the ceiling keep that true for a
-// repository that had a quiet month and for one that had a frantic week alike.
-const WINDOW_DAYS = 30
+// The window limits, all three still reported in timeline.window, but only one of them a
+// constant since D45. What did not change is why they exist: they are a legibility limit and
+// not a weight one (D43 point 4), a reader can hold the last 30 days of a project in their
+// head, and the floor and the ceiling keep that true for a repository that had a quiet month
+// and for one that had a frantic week alike. What changed is who chooses them.
+//
+// The horizon and the ceiling are now a configured default that a request may move, so the
+// numbers D41 and D42 fixed, 30 days and 500 entries, appear nowhere in this file as defaults:
+// they live in .claude/major-tom.json (D45 point 3), which is the single source of truth for
+// them, and a fallback here would leave two sources for one number and let them disagree
+// unnoticed. What is here instead are the hard bounds a value must sit inside, whichever of the
+// two it came from, and they are the same bounds config.schema.json states, so an invalid
+// default is caught at onboard validation and not only at read time. That the shipped default
+// for the ceiling happens to equal its maximum is a fact about the config the onboard writes,
+// not a default this file keeps.
+//
+// A value outside the bounds is refused and never clamped (D45 point 2): the ceiling is not
+// decoration, it is what stops a request asking for an unbounded response, and a clamp would
+// serve one window while the caller asked for another.
+const DAYS_MIN = 1
+const DAYS_MAX = 365
+
+// The floor is the one that stays literal. It is server behavior and not a parameter (D45
+// point 1): it exists so the view is never empty, and exposing all three would invite
+// combinations that mean nothing, a floor above the ceiling first among them. It is also the
+// ceiling's own minimum, which is what removes that combination from the parameter space: a
+// request for a ceiling of 10 would return 50 entries and quietly lie about the limit it
+// applied.
 const FLOOR_EVENTS = 50
-const CEILING_EVENTS = 500
+const LIMIT_MIN = FLOOR_EVENTS
+const LIMIT_MAX = 500
+
+// The bounds as one value, exported so a caller that refuses a bad value before calling (the
+// server answering a query string with a 400) reads them from here rather than restating them.
+const WINDOW_BOUNDS = Object.freeze({
+  days: Object.freeze({ min: DAYS_MIN, max: DAYS_MAX }),
+  limit: Object.freeze({ min: LIMIT_MIN, max: LIMIT_MAX }),
+})
+
 const SUMMARY_MAX = 200
 const DAY_MS = 86400000
 
@@ -84,9 +119,18 @@ const FLD_SEP = '\u001f'
 // repository that is not onboarded, a config that does not parse) from a genuine defect, and
 // answer the first with a message instead of a stack trace.
 class SnapshotError extends Error {
-  constructor(msg) {
+  constructor(msg, parameter) {
     super(msg)
     this.name = 'SnapshotError'
+    // Which request parameter the caller got wrong, when a request parameter is what failed,
+    // and null for every other fail-closed condition. It carries the one distinction the
+    // message cannot: a refused days or limit is a bad request, a missing config or a missing
+    // persistence root is a broken repository, and the two have different remedies, so a
+    // server must be able to answer the first with a 400 and the second with a 500 without
+    // matching on message text. The message always names the parameter, the value received and
+    // the accepted range anyway, so a caller that only forwards the text still tells its user
+    // what to change.
+    this.parameter = parameter === undefined ? null : parameter
   }
 }
 
@@ -95,6 +139,20 @@ class SnapshotError extends Error {
 // a bad repository.
 function fail(msg) {
   throw new SnapshotError(msg)
+}
+
+// The same, for the refusal of a window parameter the caller passed in.
+function failParameter(parameter, msg) {
+  throw new SnapshotError(msg, parameter)
+}
+
+// A value as it should read back inside a message: a string is quoted, so an empty or padded
+// one is visible; a container is named rather than dumped; everything else is stringified as
+// itself, which keeps NaN and Infinity legible where JSON.stringify would turn them into null.
+function describeValue(value) {
+  if (typeof value === 'string') return JSON.stringify(value)
+  if (value !== null && typeof value === 'object') return Array.isArray(value) ? 'an array' : 'an object'
+  return String(value)
 }
 
 function parseArgs(argv) {
@@ -177,16 +235,116 @@ function readConfig(repoRoot) {
     fail(`persistence root ${persistenceRoot} does not exist (${e.message}); the repository is not onboarded`)
   }
   if (!stat.isDirectory()) fail(`persistence root ${persistenceRoot} is not a directory`)
-  return { config, persistenceRoot }
+  return { config, configPath, persistenceRoot }
+}
+
+// ---------------------------------------------------------------------------------------
+// the window
+
+// One window parameter, resolved from the override the caller passed and the default the
+// config carries, in that order of precedence: an absent override means the configured value
+// applies, which is what makes the query parameter of D45 point 3 a temporary adjustment made
+// in the page rather than a second place the project's window is decided.
+//
+// Both are refused the same way and for the same reason (D45 point 2), and neither is ever
+// repaired: a non-integer or out-of-range value is answered with an error instead of being
+// pulled back inside the bounds, because a clamp would serve a window nobody asked for and
+// report it as though it had been. Only the source of the bad value differs, and with it the
+// remedy the message names: a bad override is the caller's to fix, a bad default is the
+// config's, and the config's is fixed by re-running the onboard.
+//
+// Integer means integer: a float, a numeric string and NaN are all refused rather than
+// coerced, so the one accepted spelling of a window value is a number the caller meant.
+function resolveParameter(name, override, configured, min, max, configPath) {
+  if (override !== undefined && override !== null) {
+    if (!Number.isInteger(override) || override < min || override > max) {
+      failParameter(
+        name,
+        `${name} must be an integer between ${min} and ${max}, received ${describeValue(override)}`
+      )
+    }
+    return override
+  }
+  if (!Number.isInteger(configured) || configured < min || configured > max) {
+    fail(
+      `${configPath} sets snapshot.${name} to ${describeValue(configured)}; it must be an integer between ` +
+        `${min} and ${max}. Re-run the major-tom onboard to write a valid value`
+    )
+  }
+  return configured
+}
+
+// The window the whole snapshot is cut to: the configured default of D45 point 3, moved by
+// the optional overrides.
+//
+// A config with no snapshot block is refused and never defaulted, which is the direct
+// consequence of that same point: the default lives in the config precisely so that this file
+// carries none, and a fallback here would put the number back in two places. The cost is
+// accepted rather than hidden: a project onboarded before this block existed cannot serve its
+// dashboard until it is re-onboarded, which is exactly the situation D46's session-start hook
+// already reports to the user, that the project's generated artifacts were written by an older
+// plugin and the action is to re-run the onboard. The message says the same thing at the point
+// of failure, so a user who never saw the notice still learns what to do.
+function resolveWindow(config, configPath, options) {
+  const block = config.snapshot
+  if (!isPlainObject(block)) {
+    fail(
+      `${configPath} carries no snapshot block, so the window has no configured default and none is assumed ` +
+        `here. Re-run the major-tom onboard to write it`
+    )
+  }
+  return {
+    days: resolveParameter('days', options.days, block.days, DAYS_MIN, DAYS_MAX, configPath),
+    limit: resolveParameter('limit', options.limit, block.limit, LIMIT_MIN, LIMIT_MAX, configPath),
+  }
+}
+
+// The one window both streams are cut by (D42, made a parameter by D45 point 4), computed once
+// per snapshot and handed to the git walk and the timeline walk as the same value. That is the
+// whole mechanism behind "the parameter moves both streams together": there is one selection
+// object and one selection rule, so a window change is one substitution in one place rather
+// than two that would have to agree, and the ragged reading D42 exists to prevent cannot come
+// back through a stream that was left behind.
+function windowSelection(generatedAtMs, resolved) {
+  return {
+    days: resolved.days,
+    cutoffMs: generatedAtMs - resolved.days * DAY_MS,
+    floor: FLOOR_EVENTS,
+    ceiling: resolved.limit,
+  }
+}
+
+// The selection itself, in exactly the order the prose states, so two runs over the same
+// repository produce the same result and so both streams produce it the same way:
+//   1. take the candidates, already sorted newest first;
+//   2. keep the ones inside the horizon, measured from generatedAt;
+//   3. floor: when that leaves fewer than 50, extend to the 50 newest overall, however old;
+//   4. ceiling: cut to at most the effective limit;
+//   5. report which limit bit last.
+// reason names the last limit that actually removed entries, so a later limit overwrites an
+// earlier one and a limit that removed nothing never claims the omission. Its values are
+// therefore "days", "ceiling" and null, and nothing else. Only the timeline reports it; the
+// git key carries entries and no bookkeeping, which is the D42 field set unchanged.
+function selectInWindow(sorted, selection) {
+  const inWindow = sorted.filter((c) => c.ms >= selection.cutoffMs)
+  let kept = inWindow.length >= selection.floor ? inWindow : sorted.slice(0, selection.floor)
+  let reason = kept.length < sorted.length ? 'days' : null
+  if (kept.length > selection.ceiling) {
+    kept = kept.slice(0, selection.ceiling)
+    reason = 'ceiling'
+  }
+  return { kept, reason }
 }
 
 // ---------------------------------------------------------------------------------------
 // git
 
-// The git window is the timeline window (D42), so both sides of the merged reading end at
-// the same point: the commits of the last 30 days, extended to the 50 most recent when the
-// horizon holds fewer, and cut to 500 when it holds more.
-function collectGit(repoRoot, generatedAtMs) {
+// The git window is the timeline window (D42), so both sides of the merged reading end at the
+// same point: the commits inside the horizon, extended to the 50 most recent when the horizon
+// holds fewer, and cut to the effective limit when it holds more. It is handed the same
+// selection object the timeline gets and applies it through the same selectInWindow, so the
+// horizon a request asks for moves both streams or neither (D45 point 4).
+function collectGit(repoRoot, selection) {
   const format = ['%H', '%aI', '%an', '%s'].join(FLD_SEP)
   let stdout
   try {
@@ -245,11 +403,7 @@ function collectGit(repoRoot, generatedAtMs) {
   // depends on the sort being stable.
   commits.sort(byNewest)
 
-  const cutoff = generatedAtMs - WINDOW_DAYS * DAY_MS
-  const inWindow = commits.filter((c) => c.ms >= cutoff)
-  let selected = inWindow.length >= FLOOR_EVENTS ? inWindow : commits.slice(0, FLOOR_EVENTS)
-  if (selected.length > CEILING_EVENTS) selected = selected.slice(0, CEILING_EVENTS)
-  return selected.map((c) => c.entry)
+  return selectInWindow(commits, selection).kept.map((c) => c.entry)
 }
 
 // ---------------------------------------------------------------------------------------
@@ -573,42 +727,29 @@ function collectEvents(persistenceRoot, concepts) {
   return candidates
 }
 
-// Selection, in exactly the order the prose states, so two runs over the same repository
-// produce the same key:
-//   1. collect every candidate from the three sources;
-//   2. sort newest first by at, ties broken by source order;
-//   3. keep the events inside the last 30 days, measured from generatedAt;
-//   4. floor: when that leaves fewer than 50, extend to the 50 newest overall, however old;
-//   5. ceiling: cut to at most 500;
-//   6. omitted records how many candidates did not make it, the at of the oldest kept event,
-//      and which limit bit last.
-// reason names the last limit that actually removed events, so a later limit overwrites an
-// earlier one and a limit that removed nothing never claims the omission. Its values are
-// therefore "days", "ceiling" and null, and nothing else.
-function buildTimeline(candidates, generatedAtMs) {
+// The timeline key: the candidates of the three sources, sorted newest first with ties broken
+// by source order, cut by the same selectInWindow the git key applies, and the bookkeeping the
+// git key does not carry.
+//
+// window reports the window that was actually applied and not the one the config holds, so a
+// page served under an override states the window it is showing rather than the project's
+// default. floorEvents is the server constant, ceilingEvents is the effective limit.
+//
+// omitted records how many candidates did not make it, the at of the oldest kept event, and
+// which limit bit last; selectInWindow decides the last of the three.
+function buildTimeline(candidates, selection) {
   const sorted = candidates.slice().sort(byNewest)
   const total = sorted.length
-  let reason = null
-
-  const cutoff = generatedAtMs - WINDOW_DAYS * DAY_MS
-  const inWindow = sorted.filter((c) => c.ms >= cutoff)
-  let kept = inWindow.length >= FLOOR_EVENTS ? inWindow : sorted.slice(0, FLOOR_EVENTS)
-  if (kept.length < total) reason = 'days'
-
-  if (kept.length > CEILING_EVENTS) {
-    kept = kept.slice(0, CEILING_EVENTS)
-    reason = 'ceiling'
-  }
-
+  const { kept, reason } = selectInWindow(sorted, selection)
   const events = kept.map((c) => c.event)
 
   const omittedCount = total - events.length
   return {
     events,
     window: {
-      days: WINDOW_DAYS,
-      floorEvents: FLOOR_EVENTS,
-      ceilingEvents: CEILING_EVENTS,
+      days: selection.days,
+      floorEvents: selection.floor,
+      ceilingEvents: selection.ceiling,
     },
     omitted: {
       count: omittedCount,
@@ -624,8 +765,19 @@ function buildTimeline(candidates, generatedAtMs) {
 // The whole computation, and the only place it lives. The server calls this per request; the
 // CLI below calls it once. Throws a SnapshotError on any of the fail-closed conditions and
 // returns the snapshot object otherwise; it reads the filesystem and writes nothing.
+//
+// options.days and options.limit are the window overrides of D45. Both are optional and
+// independent: an absent one leaves the configured default in force, so a caller may move one
+// without having to restate the other.
+//
+// The order of the two judgements is the same one readConceptBody documents, and for the same
+// reason: the repository is diagnosed before the request. The config has to be read first
+// anyway, since it is where the default lives, so a repository that is not onboarded reports
+// that whatever the request asked for. The window is then resolved before anything is walked,
+// so a refused parameter costs no filesystem work beyond the config read.
 function buildSnapshot(options) {
-  const repoRoot = path.resolve((options && options.repoRoot) || process.cwd())
+  const opts = options || {}
+  const repoRoot = path.resolve(opts.repoRoot || process.cwd())
   let repoStat
   try {
     repoStat = fs.statSync(repoRoot)
@@ -639,17 +791,18 @@ function buildSnapshot(options) {
   const generatedAt = new Date().toISOString()
   const generatedAtMs = Date.parse(generatedAt)
 
-  const { config, persistenceRoot } = readConfig(repoRoot)
+  const { config, configPath, persistenceRoot } = readConfig(repoRoot)
+  const selection = windowSelection(generatedAtMs, resolveWindow(config, configPath, opts))
   const concepts = collectConcepts(persistenceRoot)
   const knowledge = buildKnowledge(persistenceRoot, concepts)
 
   return {
     generatedAt,
     config,
-    git: collectGit(repoRoot, generatedAtMs),
+    git: collectGit(repoRoot, selection),
     knowledge,
     decisions: buildDecisions(knowledge.files),
-    timeline: buildTimeline(collectEvents(persistenceRoot, concepts), generatedAtMs),
+    timeline: buildTimeline(collectEvents(persistenceRoot, concepts), selection),
   }
 }
 
@@ -686,6 +839,11 @@ function buildSnapshot(options) {
 //
 // A malformed query string against a sound repository is still a request the server answers
 // with a 404 and never a fault, which is the property the id test exists to hold.
+//
+// It takes no window parameter and reads none: a body is a body, and the window of D45 selects
+// which entries a listing carries, not how much of one file is returned. It therefore never
+// consults the config's snapshot block either, so a body still resolves in a repository whose
+// config predates that block, which buildSnapshot refuses.
 function readConceptBody(options) {
   const repoRoot = path.resolve((options && options.repoRoot) || process.cwd())
   const { persistenceRoot } = readConfig(repoRoot)
@@ -697,7 +855,7 @@ function readConceptBody(options) {
   return null
 }
 
-module.exports = { buildSnapshot, readConceptBody, SnapshotError }
+module.exports = { buildSnapshot, readConceptBody, SnapshotError, WINDOW_BOUNDS }
 
 // ---------------------------------------------------------------------------------------
 // CLI
