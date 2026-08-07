@@ -52,6 +52,9 @@ h1{margin:0;font-size:29px;font-weight:600;letter-spacing:-.02em;text-transform:
   color:var(--dim);font-family:inherit;font-size:11px;cursor:pointer;transition:background .12s ease}
 .pill-btn:hover:enabled{background:var(--accent-soft);color:var(--accent)}
 .pill-btn:disabled{cursor:default;color:var(--dimmer)}
+.win-in{width:46px;padding:1px 4px;border:0;border-bottom:1px solid var(--line2);border-radius:0;
+  background:transparent;color:var(--text);font-family:inherit;font-size:11.5px;text-align:right}
+.win-in:focus{outline:none;border-bottom-color:var(--accent)}
 .btn{padding:7px 16px;border:1px solid var(--line2);border-radius:999px;background:var(--raise);color:var(--text);
   font-family:inherit;font-size:11.5px;cursor:pointer;transition:background .12s ease}
 .btn:hover:enabled{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent)}

@@ -60,6 +60,9 @@ h1{margin:0;font-size:29px;font-weight:600;letter-spacing:-.02em;text-transform:
   color:var(--dim);font-family:inherit;font-size:11px;cursor:pointer;transition:background .12s ease}
 .pill-btn:hover:enabled{background:var(--accent-soft);color:var(--accent)}
 .pill-btn:disabled{cursor:default;color:var(--dimmer)}
+.win-in{width:46px;padding:1px 4px;border:0;border-bottom:1px solid var(--line2);border-radius:0;
+  background:transparent;color:var(--text);font-family:inherit;font-size:11.5px;text-align:right}
+.win-in:focus{outline:none;border-bottom-color:var(--accent)}
 .btn{padding:7px 16px;border:1px solid var(--line2);border-radius:999px;background:var(--raise);color:var(--text);
   font-family:inherit;font-size:11.5px;cursor:pointer;transition:background .12s ease}
 .btn:hover:enabled{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent)}
@@ -107,7 +110,7 @@ button{font-family:inherit}
 //
 // The two routes are the whole client-facing contract of the server:
 //
-//   GET /api/snapshot                the snapshot for the served repository
+//   GET /api/snapshot?days=&limit=   the snapshot for the served repository, over a window
 //   GET /api/knowledge/body?id=<id>  the body of the one concept that id addresses
 //
 // Both are same origin and both are read-only, so no base URL is configurable here: a
@@ -193,8 +196,26 @@ function requestJson(route) {
 // The whole snapshot. Recomputed by the server on every call, so this is equally the load
 // request and the refresh request: D43 point 5's explicit recompute is this same request
 // issued again, and there is no separate verb to call.
-function fetchSnapshot() {
-  return requestJson(SNAPSHOT_ROUTE)
+//
+// `win` is the window of D45: null when the reader has chosen none, in which case no parameter
+// travels and the server applies the configured default, or an object carrying both `days` and
+// `limit`. This is the one place the query is built, and it is built from both keys or from
+// neither, which is what makes the two parameters travel together by construction rather than
+// by discipline: there is no path through this function that puts one of them on the wire
+// without the other. That is D45 point 4 at the client layer, and D42 is why it matters, both
+// streams being cut by one window; a request that moved only one would recreate exactly the
+// ragged reading D42 was written to prevent.
+//
+// The values go out as the reader typed them, never coerced and never clamped here. The bounds
+// are the server's and it refuses rather than clamps (D45 point 2), so a copy of them in this
+// file would be a second source of truth for one rule, and worse, it would replace the server's
+// own sentence, which names the parameter, the value received and the accepted range, with a
+// guess made here.
+function fetchSnapshot(win) {
+  if (win === null || win === undefined) return requestJson(SNAPSHOT_ROUTE)
+  return requestJson(SNAPSHOT_ROUTE
+    + '?days=' + encodeURIComponent(String(win.days == null ? '' : win.days))
+    + '&limit=' + encodeURIComponent(String(win.limit == null ? '' : win.limit)))
 }
 
 // The body of one concept, addressed by the opaque id its listing entry carries. The id is
@@ -480,6 +501,31 @@ const S = {
   // which is all the page has to show once D43 point 2 removed the fallback, and `errorRoute`
   // names the request that failed.
   status: 'loading', busy: false, hasData: false, error: '', errorRoute: '',
+
+  // The window of D45, which is the one the timeline events and the git commits are both cut
+  // by (D42, D45 point 4). Three fields, and the split between them is what the control needs
+  // to stay honest.
+  //
+  // `window` is the window the reader chose, and it is null until a choice is made: null means
+  // no parameters travel and the server applies the configured default, which is what puts a
+  // reload back on the default without anything having to reset it. It is not in localStorage
+  // and not in the URL, deliberately (D45 point 3): the parameter is an adjustment to a reading
+  // session, not a setting, and the config stays the single source of truth for the window a
+  // project shows. The theme and the rail state above are stored, and that precedent was
+  // considered and rejected here, because a stored window would make what this page shows no
+  // longer derivable from the config alone.
+  //
+  // `windowDraft` is what the two fields hold. It is re-synced from the effective window of
+  // every snapshot that lands, so the control states the window on screen rather than a
+  // constant, and it is left exactly as typed when a request is refused, so the reader corrects
+  // the value in place instead of retyping it.
+  //
+  // `windowError` is the message the server sent when it refused the window. It is kept apart
+  // from `error` above on purpose: `error` means no snapshot could be computed, while this one
+  // means the snapshot on screen is untouched and a number in a field is wrong. `windowBusy`
+  // is the in-flight half of the same distinction, true only while a window change is in the
+  // air and not while an ordinary refresh is, so the control states what it is actually doing.
+  window: null, windowDraft: { days: '', limit: '' }, windowError: '', windowBusy: false,
 
   // The body of the currently selected knowledge file, fetched one at a time now that bodies
   // have left the listing (D43 point 4). `bodyId` is the id of the file this body belongs to
@@ -1111,6 +1157,71 @@ function pillLabel() {
   return 'computed ' + pillTime()
 }
 
+// The window control of D45, in the header beside the computed-at pill and the refresh control
+// and deliberately not inside a view. The window cuts two of the six views, the timeline and
+// git, so it belongs where the page's global state already lives and where a reader on any view
+// can see which window is in force. Inside one of those two views it would read as that view's
+// own setting, which is precisely the reading D42 and D45 point 4 exist to prevent: one window
+// cuts both streams, and a control that looked like the timeline's would suggest the git side
+// has another.
+//
+// The affordance: two fields and an explicit apply, not fields that fetch as they change. A
+// reader typing a window one character at a time passes through "3", "36" and "365", and each
+// of those is a different window a live field would go and fetch, so two requests nobody asked
+// for would land before the one that was meant, and the first of them would come back refused.
+// Debouncing would only make that wrong answer arrive later. The submit removes the whole class
+// of problem instead of timing around it, and it is the same act that carries both numbers in
+// one request, so days and limit cannot drift apart. Enter in either field submits too, since a
+// pair of fields with a button beside them is a form and behaves like one.
+//
+// Nothing here validates a number. An invalid value sits in its field until it is submitted and
+// is then refused by the server, which is the only holder of the bounds (D45 point 2); a copy of
+// them in this file would be a second source of truth for one rule and would put a sentence
+// written here in front of the reader instead of the server's own, which names the parameter,
+// the value received and the accepted range.
+//
+// It renders only once a snapshot has landed. Before that there is no effective window to state
+// and the fields would be a pair of empty boxes whose apply could produce nothing but a refusal,
+// which is an invitation rather than a control.
+function windowHtml() {
+  if (!S.hasData) return ''
+  const d = S.windowDraft
+  const field = function (id, key, label) {
+    return '<input id="' + id + '" class="win-in" type="text" inputmode="numeric" autocomplete="off"'
+      + ' aria-label="' + label + '" title="' + label + '" placeholder="' + label + '"'
+      + ' value="' + esc(d[key]) + '">'
+  }
+  return '<span class="pill" title="The window the timeline and the git streams are both read over">'
+    + '<span style="color:var(--dimmer)">window</span>'
+    + field('win-days', 'days', 'days') + '<span style="color:var(--dimmer)">d</span>'
+    + field('win-limit', 'limit', 'limit') + '<span style="color:var(--dimmer)">events</span>'
+    + '<button class="pill-btn" data-act="window" title="Apply this window to both streams"'
+    + (S.busy ? ' disabled' : '') + '>' + (S.windowBusy ? 'applying' : 'apply') + '</button></span>'
+}
+
+// A refused window, stated at the control that sent it. This is a correction and it is built to
+// read as one: it names what was refused, repeats the server's own sentence, and says that the
+// page did not move, which is the fact that separates it from every state below. It carries no
+// retry, because the correction is the retry: fix the number and apply again.
+//
+// The window it states as still showing is read from the snapshot on screen, not from the
+// fields, which are holding the value that was just refused. The two disagree at exactly this
+// moment and only here, so the sentence that resolves them belongs here and nowhere else.
+function windowErrorHtml() {
+  if (!S.windowError) return ''
+  const w = timeline().window
+  const showing = w && w.days != null && w.ceilingEvents != null
+    ? 'Still showing the last window that was accepted: ' + esc(String(w.days)) + ' days, '
+      + esc(String(w.ceilingEvents)) + ' events.'
+    : 'The window on screen did not change.'
+  return '<span class="pill" style="flex:1 1 100%;white-space:normal;align-items:flex-start;'
+    + 'border-color:var(--accent-line)">'
+    + '<span class="chip" style="flex:0 0 auto;color:var(--stop)">window refused</span>'
+    + '<span style="flex:1 1 auto;min-width:0;color:var(--stop);word-break:break-word">'
+    + esc(S.windowError) + '</span>'
+    + '<span style="flex:0 0 auto;color:var(--dimmer)">' + showing + '</span></span>'
+}
+
 // The header pill of D43 point 5: the time of the last computation with the refresh control
 // beside it, in the pill that used to read "snapshot <generatedAt>". Refresh is the same
 // GET /api/snapshot issued again, because the server keeps no cache and has no recompute verb.
@@ -1131,8 +1242,10 @@ function headerHtml() {
     + esc(pillLabel())
     + '<button class="pill-btn" data-act="refresh" title="Recompute the snapshot on the server"'
     + (S.busy ? ' disabled' : '') + '>' + (S.busy ? 'working' : 'refresh') + '</button></span>'
+    + windowHtml()
     + (p.name ? '<span class="pill">' + esc(p.name) + (p.topology ? ' &#183; ' + esc(p.topology) : '') + '</span>' : '')
     + (teamPill ? '<span class="pill accent">' + teamPill + '</span>' : '')
+    + windowErrorHtml()
     + '</div></header>'
 }
 
@@ -1228,8 +1341,32 @@ function requestBody(id) {
   })
 }
 
+// The two window fields, bound after every render because assigning innerHTML destroyed the
+// previous pair along with their listeners.
+//
+// Typing stores the draft and renders nothing. That is the deliberate half: the git filter
+// beside it re-renders on every keystroke because it filters data the page already holds, while
+// a keystroke here changes nothing that is on screen until the window is applied, so re-rendering
+// would only cost the caret its place and force the focus dance that filter needs. It also means
+// a reader typing "365" issues no request at all until they submit.
+function bindWindowFields() {
+  const bind = function (id, key) {
+    const el = document.getElementById(id)
+    if (!el) return
+    el.addEventListener('input', function (e) { S.windowDraft[key] = e.target.value })
+    el.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return
+      S.windowDraft[key] = e.target.value
+      applyWindow()
+    })
+  }
+  bind('win-days', 'days')
+  bind('win-limit', 'limit')
+}
+
 function renderMain() {
   document.getElementById('main').innerHTML = headerHtml() + mainBody()
+  bindWindowFields()
   const q = document.getElementById('git-q')
   if (q) {
     q.addEventListener('input', function (e) {
@@ -1249,16 +1386,38 @@ function render() {
   renderMain()
 }
 
-// The load, the refresh and the retry are one function, because on the server they are one
-// request: GET /api/snapshot recomputes every time and there is no separate recompute verb
-// (D43 point 5). The busy flag is what stops overlapping requests; the disabled control is
-// only the visible half of it.
-function loadSnapshot() {
+// The fields follow the snapshot, never a constant: the window a landed snapshot reports is the
+// effective one the server applied (D45), so reading the control tells the reader what is on
+// screen. A snapshot from a producer older than the timeline key states no window at all, and
+// the fields then say so by being empty rather than by inventing a number this page does not
+// know.
+function syncWindowDraft() {
+  const w = timeline().window
+  S.windowDraft = {
+    days: w && w.days != null ? String(w.days) : '',
+    limit: w && w.ceilingEvents != null ? String(w.ceilingEvents) : ''
+  }
+}
+
+// The load, the refresh, the retry and a window change are one function, because on the server
+// they are one request: GET /api/snapshot recomputes every time and there is no separate
+// recompute verb (D43 point 5). The busy flag is what stops overlapping requests, for the window
+// control exactly as for the refresh one; the disabled controls are only the visible half of it.
+//
+// `requested` tells the four apart where they differ. Undefined means carry the window already
+// in force, which is the boot (none), a refresh and a retry; an object means the reader submitted
+// that window. The distinction is what decides how a refusal is read, below.
+function loadSnapshot(requested) {
   if (S.busy) return
+  const win = requested === undefined ? S.window : requested
   S.busy = true
+  S.windowBusy = requested !== undefined
+  // The previous refusal is about a value that is no longer the one being asked for.
+  S.windowError = ''
   render()
-  fetchSnapshot().then(function (r) {
+  fetchSnapshot(win).then(function (r) {
     S.busy = false
+    S.windowBusy = false
     if (r.ok) {
       try {
         setData(r.data)
@@ -1266,6 +1425,11 @@ function loadSnapshot() {
         S.status = 'ready'
         S.error = ''
         S.errorRoute = ''
+        // Only an accepted window becomes the one in force, so a refused one never quietly
+        // rides along on the next refresh. It stays null until the reader chooses, which is
+        // what keeps a reload on the configured default.
+        S.window = win
+        syncWindowDraft()
         // The bodies on the server may have moved with the rest of the data, so whatever is
         // on screen is re-fetched rather than kept.
         S.bodyStatus = 'idle'
@@ -1274,6 +1438,23 @@ function loadSnapshot() {
         S.errorRoute = 'GET ' + r.route
         S.error = 'the response could not be read as a snapshot (' + (e && e.message ? e.message : String(e)) + ')'
       }
+    } else if (win !== null && r.status === 400) {
+      // The line between a correction and a failure of the page, which is the one judgement in
+      // this control. A 400 answering a request that carried a window is the server refusing an
+      // input the reader typed: the repository is fine, the server is fine, the snapshot on
+      // screen is exactly as valid as it was a second ago, and the single thing that has to
+      // change is a number in a field a few pixels away. Blanking the page into the D48 error
+      // state would destroy a good view to report a typo, and would offer a retry of the very
+      // request that was refused. So this touches none of the page's error state: not `status`,
+      // not `error`, not `hasData`, and not the draft, which keeps the refused value so it can
+      // be corrected in place. The message renders at the control.
+      //
+      // Routed on the request rather than on the status alone, deliberately. What makes a
+      // refusal correctable is that the reader supplied the input that was refused, and the
+      // window is the only input this page ever sends with a snapshot request. A 400 answering
+      // a request that carried no window says something is wrong with a request the reader did
+      // not compose, which is not correctable at this control and belongs in the states below.
+      S.windowError = r.error
     } else {
       S.status = 'failed'
       S.errorRoute = 'GET ' + r.route
@@ -1281,6 +1462,13 @@ function loadSnapshot() {
     }
     render()
   })
+}
+
+// The submit of the window control: both numbers, one request, always. Reading them out of the
+// draft here rather than off the two elements is what makes that true of every path into it,
+// the button and the Enter key alike.
+function applyWindow() {
+  loadSnapshot({ days: S.windowDraft.days, limit: S.windowDraft.limit })
 }
 
 document.addEventListener('click', function (e) {
@@ -1294,6 +1482,7 @@ document.addEventListener('click', function (e) {
   else if (act === 'file') { S.file = Number(v); renderMain() }
   else if (act === 'cfgmode') { S.configMode = v; renderMain() }
   else if (act === 'refresh') { loadSnapshot() }
+  else if (act === 'window') { applyWindow() }
   else if (act === 'bodyretry') { S.bodyStatus = 'idle'; renderMain() }
   else if (act === 'theme') {
     S.theme = S.theme === 'light' ? 'dark' : 'light'

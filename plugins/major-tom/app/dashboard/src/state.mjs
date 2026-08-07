@@ -33,6 +33,31 @@ export const S = {
   // names the request that failed.
   status: 'loading', busy: false, hasData: false, error: '', errorRoute: '',
 
+  // The window of D45, which is the one the timeline events and the git commits are both cut
+  // by (D42, D45 point 4). Three fields, and the split between them is what the control needs
+  // to stay honest.
+  //
+  // `window` is the window the reader chose, and it is null until a choice is made: null means
+  // no parameters travel and the server applies the configured default, which is what puts a
+  // reload back on the default without anything having to reset it. It is not in localStorage
+  // and not in the URL, deliberately (D45 point 3): the parameter is an adjustment to a reading
+  // session, not a setting, and the config stays the single source of truth for the window a
+  // project shows. The theme and the rail state above are stored, and that precedent was
+  // considered and rejected here, because a stored window would make what this page shows no
+  // longer derivable from the config alone.
+  //
+  // `windowDraft` is what the two fields hold. It is re-synced from the effective window of
+  // every snapshot that lands, so the control states the window on screen rather than a
+  // constant, and it is left exactly as typed when a request is refused, so the reader corrects
+  // the value in place instead of retyping it.
+  //
+  // `windowError` is the message the server sent when it refused the window. It is kept apart
+  // from `error` above on purpose: `error` means no snapshot could be computed, while this one
+  // means the snapshot on screen is untouched and a number in a field is wrong. `windowBusy`
+  // is the in-flight half of the same distinction, true only while a window change is in the
+  // air and not while an ordinary refresh is, so the control states what it is actually doing.
+  window: null, windowDraft: { days: '', limit: '' }, windowError: '', windowBusy: false,
+
   // The body of the currently selected knowledge file, fetched one at a time now that bodies
   // have left the listing (D43 point 4). `bodyId` is the id of the file this body belongs to
   // and `bodySeq` is the sequence number of the request that is allowed to write here: a
