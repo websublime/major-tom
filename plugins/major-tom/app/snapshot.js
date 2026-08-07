@@ -3,21 +3,36 @@
 // Node, no dependencies beyond the vendored YAML parser in ./vendor (D47 point 2).
 //
 // This script is the single producer of the snapshot (D43 point 8): the onboard no longer
-// computes it in prose, so the window rules of D33 (body caps), D41 (the timeline key and
-// its sources) and D42 (git and timeline share one window) exist in exactly one place and
-// cannot diverge. The consumer contract lives in templates/README.md, "Snapshot schema v2";
+// computes it in prose, so the window rules of D41 (the timeline key and its sources) and
+// D42 (git and timeline share one window) exist in exactly one place and cannot diverge.
+// The consumer contract lives in plugins/major-tom/app/README.md, "Snapshot schema v2";
 // this file implements it and nothing else.
 //
-// Usage:
-//   node snapshot.js [--repo <dir>] [--out <file>]
+// Two entry points, one concept walk:
 //
-// --repo defaults to the current working directory; --out defaults to stdout. The script
-// writes exactly one file, the --out path, and nothing else anywhere: it never writes into
-// the target repository unless --out points there.
+//   const { buildSnapshot, readConceptBody } = require('./snapshot.js')  // the server's reads
+//   node snapshot.js [--repo <dir>] [--out <file>]                       // the CLI
 //
-// Fail closed, with a message on stderr and a non-zero exit, when <repo>/.claude/major-tom.json
-// is missing, does not parse, is not an object, does not name persistence.root, or names a
-// root that does not exist. No default config is ever improvised.
+// buildSnapshot({repoRoot}) returns the snapshot object. The CLI, which runs only when this
+// file is the process entry point, is that same call plus argument parsing and output: it is
+// how a human inspects exactly what the server will serve, and it is what the test suite
+// drives.
+//
+// readConceptBody({repoRoot, id}) returns the body of the one concept that id addresses, or
+// null when no concept has it. It lives here rather than in the server so that no caller ever
+// holds a knowledge path; its own comment states the case.
+//
+// --repo defaults to the current working directory; --out defaults to stdout. The CLI writes
+// exactly one file, the --out path, and nothing else anywhere: it never writes into the
+// target repository unless --out points there.
+//
+// Fail closed when <repo>/.claude/major-tom.json is missing, does not parse, is not an
+// object, does not name persistence.root, or names a root that does not exist. No default
+// config is ever improvised. The two entry points fail closed differently, and deliberately:
+// every check calls fail(), which throws a SnapshotError, so the library caller sees an
+// exception it can answer with a 500 while the process keeps serving; only the CLI wrapper
+// turns that exception into a stderr line and a non-zero exit. The checks themselves exist
+// once and neither path can drift from the other.
 //
 // Determinism is a hard requirement: two runs over the same unchanged repository produce
 // byte-identical JSON except for generatedAt. Every sort below is total (every tie is broken
@@ -34,19 +49,26 @@
 
 const fs = require('fs')
 const path = require('path')
+const crypto = require('node:crypto')
 const { execFileSync } = require('child_process')
 const yaml = require('./vendor/js-yaml.cjs.js')
 
-// The window limits, all four literal and all four always reported in timeline.window.
+// The window limits, all three literal and all three always reported in timeline.window.
+// They are a legibility limit and not a weight one (D43 point 4): a reader can hold the last
+// 30 days of a project in their head, and the floor and the ceiling keep that true for a
+// repository that had a quiet month and for one that had a frantic week alike.
 const WINDOW_DAYS = 30
 const FLOOR_EVENTS = 50
 const CEILING_EVENTS = 500
-const BYTE_BUDGET = 262144
-// The D33 body caps: 32 KB of body per file, 1 MB of embedded bodies in total.
-const BODY_FILE_CAP = 32768
-const BODY_TOTAL_CAP = 1048576
 const SUMMARY_MAX = 200
 const DAY_MS = 86400000
+
+// The length of a knowledge file's id, in hex characters. 16 hex characters is 64 bits of
+// the SHA-256 of the path: by the birthday bound a bundle would need on the order of 2^32
+// concepts before a collision became likely, and a bundle of four billion files is not a
+// realistic object. Short enough to read in a URL, long enough that the id can be treated as
+// unique without the producer having to check.
+const ID_HEX_LENGTH = 16
 
 const COMMIT_KINDS = ['feat', 'fix', 'docs', 'test', 'chore', 'refactor']
 // A conventional-commit prefix: type, optional scope, optional breaking "!", then the colon.
@@ -58,9 +80,21 @@ const KIND_RE = new RegExp('^(' + COMMIT_KINDS.join('|') + ')(\\([^)]*\\))?!?:')
 const REC_SEP = '\u001e'
 const FLD_SEP = '\u001f'
 
+// The one failure type this file raises. Named so a caller can tell a refused input (a
+// repository that is not onboarded, a config that does not parse) from a genuine defect, and
+// answer the first with a message instead of a stack trace.
+class SnapshotError extends Error {
+  constructor(msg) {
+    super(msg)
+    this.name = 'SnapshotError'
+  }
+}
+
+// Every fail-closed check calls this, and it always throws. The process only ever exits from
+// the CLI wrapper at the bottom of the file: a server must not die because one request named
+// a bad repository.
 function fail(msg) {
-  console.error(`snapshot.js: ${msg}`)
-  process.exit(1)
+  throw new SnapshotError(msg)
 }
 
 function parseArgs(argv) {
@@ -84,24 +118,6 @@ function parseArgs(argv) {
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
-}
-
-// Byte length of a string as it will be written, used for both body caps and the timeline
-// byte budget, so every limit is counted in the same unit the artifact is measured in.
-function byteLength(text) {
-  return Buffer.byteLength(text, 'utf8')
-}
-
-// Cuts a string to at most maxBytes bytes without splitting a UTF-8 character: if the byte
-// at the cut point is a continuation byte the character started earlier, so the cut moves
-// back to that character's boundary. This is the "cut cleanly" of D33.
-function cutToBytes(text, maxBytes) {
-  const buf = Buffer.from(text, 'utf8')
-  if (buf.length <= maxBytes) return { text, truncated: false, bytes: buf.length }
-  let end = maxBytes
-  while (end > 0 && (buf[end] & 0xc0) === 0x80) end -= 1
-  const cut = buf.subarray(0, end)
-  return { text: cut.toString('utf8'), truncated: true, bytes: cut.length }
 }
 
 // Summaries are capped in characters, not bytes: "at most 200 characters" (D41).
@@ -325,8 +341,8 @@ function collectConcepts(persistenceRoot) {
   return concepts
 }
 
-// index.md is read for one purpose only, the order in which bodies are embedded, and is
-// never itself an entry (D33).
+// index.md is read for one purpose only, the order the knowledge files are listed in, and is
+// never itself an entry.
 //
 // How an index line resolves to a file: the index is authored prose, so its lines are not a
 // fixed record format. Every token on the line that looks like a relative path ending in
@@ -360,15 +376,28 @@ function indexOrder(persistenceRoot, conceptPaths) {
   return ordered
 }
 
-// The knowledge key. Files are emitted in the order the body caps are applied, index order
-// first and then the rest in walk order, so the embedded bodies are a visible prefix of the
-// list rather than an arbitrary subset of it.
+// The id a knowledge file is addressed by (D43 point 4, as the body endpoint needs it): a
+// prefix of the SHA-256 of the path relative to the persistence root, hex encoded.
 //
-// The 1 MB total is read as the prose states it, "only while the running total stays under
-// 1 MB": bodies are embedded while the next one still fits the remaining budget, and once
-// one does not fit, embedding stops for that file and for every file after it. body and
-// truncated are both omitted when no body is embedded, which is exactly what the schema's
-// optional markers mean and what the dashboard renders as "body not embedded".
+// Derived from the path and from nothing else, so it is the same on every machine and on
+// every run, and an edit to the file does not change it. Opaque on purpose: the endpoint that
+// serves a body takes one of these and resolves it against the list the concept walk built,
+// so a request can never name a file the walk did not select, and no path travels from the
+// client to the filesystem. The digest is one-way, so the id also carries no path to read out
+// of it.
+function conceptId(relPath) {
+  return crypto.createHash('sha256').update(relPath, 'utf8').digest('hex').slice(0, ID_HEX_LENGTH)
+}
+
+// The knowledge key: one entry per concept, carrying its id, its path, its frontmatter and
+// the file facts, and never its body. Bodies are fetched one at a time from the server
+// instead (D43 point 4), so a listing costs the same whether the bundle holds ten concepts or
+// a thousand, and there is no cap to cut anything against.
+//
+// The order is index order first, then everything the index does not name in walk order. Its
+// reason is presentation, not truncation: index.md is the OKF bundle's progressive-disclosure
+// mechanism (D28), so the order it imposes is the order the bundle's author wants it read,
+// and the listing honors it.
 function buildKnowledge(persistenceRoot, concepts) {
   const byPath = new Map(concepts.map((c) => [c.path, c]))
   const order = indexOrder(persistenceRoot, concepts.map((c) => c.path))
@@ -377,28 +406,16 @@ function buildKnowledge(persistenceRoot, concepts) {
   const finalOrder = order.concat(walkOrder)
 
   const files = []
-  let totalBodyBytes = 0
-  let embedding = true
   for (const rel of finalOrder) {
     const concept = byPath.get(rel)
-    const entry = {
+    files.push({
+      id: conceptId(concept.path),
       path: concept.path,
       type: concept.frontmatter.type === undefined ? null : concept.frontmatter.type,
       size: concept.size,
       updated: concept.updated,
       frontmatter: concept.frontmatter,
-    }
-    if (embedding) {
-      const cut = cutToBytes(concept.body, BODY_FILE_CAP)
-      if (totalBodyBytes + cut.bytes <= BODY_TOTAL_CAP) {
-        totalBodyBytes += cut.bytes
-        entry.body = cut.text
-        if (cut.truncated) entry.truncated = true
-      } else {
-        embedding = false
-      }
-    }
-    files.push(entry)
+    })
   }
   return { files }
 }
@@ -563,12 +580,11 @@ function collectEvents(persistenceRoot, concepts) {
 //   3. keep the events inside the last 30 days, measured from generatedAt;
 //   4. floor: when that leaves fewer than 50, extend to the 50 newest overall, however old;
 //   5. ceiling: cut to at most 500;
-//   6. byte budget: while the JSON encoding of events exceeds 262144 bytes, drop from the
-//      oldest end, always at an event boundary and never mid-event;
-//   7. omitted records how many candidates did not make it, the at of the oldest kept event,
+//   6. omitted records how many candidates did not make it, the at of the oldest kept event,
 //      and which limit bit last.
 // reason names the last limit that actually removed events, so a later limit overwrites an
-// earlier one and a limit that removed nothing never claims the omission.
+// earlier one and a limit that removed nothing never claims the omission. Its values are
+// therefore "days", "ceiling" and null, and nothing else.
 function buildTimeline(candidates, generatedAtMs) {
   const sorted = candidates.slice().sort(byNewest)
   const total = sorted.length
@@ -584,15 +600,7 @@ function buildTimeline(candidates, generatedAtMs) {
     reason = 'ceiling'
   }
 
-  let events = kept.map((c) => c.event)
-  // The budget is measured on the compact JSON encoding of the events array, the same unit
-  // the 262144 literal is written in.
-  if (byteLength(JSON.stringify(events)) > BYTE_BUDGET) {
-    while (events.length > 0 && byteLength(JSON.stringify(events)) > BYTE_BUDGET) {
-      events = events.slice(0, events.length - 1)
-    }
-    reason = 'bytes'
-  }
+  const events = kept.map((c) => c.event)
 
   const omittedCount = total - events.length
   return {
@@ -601,7 +609,6 @@ function buildTimeline(candidates, generatedAtMs) {
       days: WINDOW_DAYS,
       floorEvents: FLOOR_EVENTS,
       ceilingEvents: CEILING_EVENTS,
-      byteBudget: BYTE_BUDGET,
     },
     omitted: {
       count: omittedCount,
@@ -612,11 +619,13 @@ function buildTimeline(candidates, generatedAtMs) {
 }
 
 // ---------------------------------------------------------------------------------------
-// main
+// the snapshot
 
-function main() {
-  const args = parseArgs(process.argv.slice(2))
-  const repoRoot = path.resolve(args.repo)
+// The whole computation, and the only place it lives. The server calls this per request; the
+// CLI below calls it once. Throws a SnapshotError on any of the fail-closed conditions and
+// returns the snapshot object otherwise; it reads the filesystem and writes nothing.
+function buildSnapshot(options) {
+  const repoRoot = path.resolve((options && options.repoRoot) || process.cwd())
   let repoStat
   try {
     repoStat = fs.statSync(repoRoot)
@@ -634,7 +643,7 @@ function main() {
   const concepts = collectConcepts(persistenceRoot)
   const knowledge = buildKnowledge(persistenceRoot, concepts)
 
-  const snapshot = {
+  return {
     generatedAt,
     config,
     git: collectGit(repoRoot, generatedAtMs),
@@ -642,7 +651,65 @@ function main() {
     decisions: buildDecisions(knowledge.files),
     timeline: buildTimeline(collectEvents(persistenceRoot, concepts), generatedAtMs),
   }
+}
 
+// The body of one concept, addressed by the id buildKnowledge minted for it (D43 point 8).
+//
+// Why the lookup lives here rather than in the server: the alternative was to export the
+// concept walk and let the caller match the id and read the file, and that would put a
+// knowledge path in the server's hands. It never holds one. It hands over an opaque id and
+// receives a body or nothing, so "no path parameter is ever taken from a request" is a
+// property of the module boundary rather than a property of how carefully the server was
+// written. The concept walk and the frontmatter split also stay single-sourced: the body this
+// returns is by construction the same body the listing described.
+//
+// The list is recomputed on every call. There is no cache, for the same reason the snapshot
+// route has none: state the server does not keep is state that cannot go stale, and an edit on
+// disk is visible to the next request.
+//
+// The order of the two judgements below is the contract, not an accident of writing. The
+// config is read first and the id is judged second, so the repository is diagnosed before the
+// request is: a repository that is not onboarded throws a SnapshotError whatever the query
+// string said, and a well-formed repository answers a missing, empty or non-string id with
+// null. The reverse order, which this function used to have, made one broken repository
+// report two different things through the one endpoint, a 404 for /api/knowledge/body and a
+// 500 naming the missing config for /api/knowledge/body?id=x, so the diagnosis a caller got
+// depended on how malformed its own request was.
+//
+// What that costs, stated rather than hidden: a call that names no repository at all now
+// reads the working directory's config before it can answer, so readConceptBody({}) is no
+// longer answerable without touching the filesystem, and a malformed id against a broken
+// repository now costs one config read. Neither is paid by the server, which validated its
+// repo root at startup and passes it on every call. The check is cheap in the case that
+// matters: readConfig runs before the id test, but the concept walk still runs after it, so a
+// malformed id never walks the bundle.
+//
+// A malformed query string against a sound repository is still a request the server answers
+// with a 404 and never a fault, which is the property the id test exists to hold.
+function readConceptBody(options) {
+  const repoRoot = path.resolve((options && options.repoRoot) || process.cwd())
+  const { persistenceRoot } = readConfig(repoRoot)
+  const id = options && options.id
+  if (typeof id !== 'string' || id === '') return null
+  for (const concept of collectConcepts(persistenceRoot)) {
+    if (conceptId(concept.path) === id) return concept.body
+  }
+  return null
+}
+
+module.exports = { buildSnapshot, readConceptBody, SnapshotError }
+
+// ---------------------------------------------------------------------------------------
+// CLI
+
+// The only place in this file that writes, and the only place that exits. Every fail-closed
+// condition arrives here as a SnapshotError thrown by fail(), so the message and the non-zero
+// exit are produced once, for argument errors and computation errors alike. Anything that is
+// not a SnapshotError is a defect and is rethrown with its stack intact rather than being
+// dressed up as a user-facing message.
+function main(argv) {
+  const args = parseArgs(argv)
+  const snapshot = buildSnapshot({ repoRoot: args.repo })
   const out = JSON.stringify(snapshot, null, 2) + '\n'
   if (args.out) {
     try {
@@ -655,4 +722,12 @@ function main() {
   }
 }
 
-main()
+if (require.main === module) {
+  try {
+    main(process.argv.slice(2))
+  } catch (e) {
+    if (!(e instanceof SnapshotError)) throw e
+    console.error(`snapshot.js: ${e.message}`)
+    process.exit(1)
+  }
+}
