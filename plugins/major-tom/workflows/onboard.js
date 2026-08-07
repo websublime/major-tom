@@ -204,9 +204,9 @@ if (!input || input.stage !== 'execute') {
     return {
       stage: 'blocked',
       at: 'check',
-      reason: 'codebase-memory MCP not available',
+      reason: 'codebase-memory-mcp MCP not available',
       preconditions: pre,
-      instructions: 'Tell the user the codebase-memory MCP server is required (config baseline, PRD D11/D13) and must be installed before onboarding. Point them to the installation guide: https://deusdata.github.io/codebase-memory-mcp/. Once installed and configured, relaunch /major-tom:onboard.',
+      instructions: 'Tell the user the codebase-memory-mcp MCP server is required (config baseline, PRD D11/D13) and must be installed before onboarding. Point them to the installation guide: https://deusdata.github.io/codebase-memory-mcp/. Once installed and configured, relaunch /major-tom:onboard.',
     }
   }
   if (!pre.pluginAssetsPresent) return blockedOnAssets(pre)
