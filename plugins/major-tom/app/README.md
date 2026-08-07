@@ -36,7 +36,7 @@ Two consequences follow:
 
 | Path | Role |
 |---|---|
-| `snapshot.js` | The computation. Both a CLI and a module: `require('./snapshot.js')` exports `buildSnapshot({repoRoot})`, `readConceptBody({repoRoot, id})` and `SnapshotError`, and `node snapshot.js [--repo <dir>] [--out <file>]` runs only when the file is the process entry point. The single implementation of the D33, D41 and D42 window rules. Zero dependencies beyond `vendor/js-yaml.cjs.js`. |
+| `snapshot.js` | The computation. Both a CLI and a module: `require('./snapshot.js')` exports `buildSnapshot({repoRoot, days, limit})`, `readConceptBody({repoRoot, id})`, `SnapshotError` and `WINDOW_BOUNDS`, and `node snapshot.js [--repo <dir>] [--out <file>]` runs only when the file is the process entry point. The single implementation of the D33, D41, D42 and D45 window rules, and the only holder of the window bounds. Zero dependencies beyond `vendor/js-yaml.cjs.js`. |
 | `server.js` | The endpoints. `node server.js <repo-root> [port]`, Node's own `http` (D44 point 5), bound to 127.0.0.1, GET only, no dependencies. It serves the built page beside it and the read-only JSON that page fetches, and nothing else. |
 | `launcher.js` | The only file the onboard puts in a target project's `.claude/server/`, copied there byte for byte with no substitution of any kind. It resolves the installed plugin at run time and starts its `app/server.js` against the repository it sits in. |
 | `dashboard/` | The authoring split (D34): `index.html`, `dashboard.css` and real ES modules under `src/`. Authoring source, edited in place. |
@@ -44,11 +44,19 @@ Two consequences follow:
 | `vendor/` | Vendored third-party source, with its provenance and its reverification commands in `vendor/README.md`. |
 
 The two entry points of `snapshot.js` fail closed differently and deliberately: every check
-throws a `SnapshotError`, so the server can answer one with a 500 and keep serving, while
+throws a `SnapshotError`, so the server can answer one with a status and keep serving, while
 only the CLI wrapper turns it into a stderr line and a non-zero exit. The CLI stays because
 it is the honest way to inspect exactly what the server will serve, and because
 `tests/snapshot.test.js` drives it. It writes exactly one file, the `--out` path, and
-nothing else anywhere.
+nothing else anywhere. It takes no window flags and always runs at the window the served
+repository's config carries, so what it prints is what the server answers to a request that
+asks for no window.
+
+`SnapshotError` carries a `parameter` field beside its message: the name of the window
+parameter a caller got wrong when a refused override is what failed, and `null` for every
+other fail-closed condition. That one field is the whole difference between a bad request and
+a broken repository, and it is what lets the server answer the first with a 400 and the second
+with a 500 without ever matching on message text.
 
 `launcher.js` resolves rather than records (D44 points 2 and 3). The Claude Desktop
 `launch.json` surface is per-project and performs no plugin-path substitution, so the
@@ -119,12 +127,14 @@ it got.
 | Request | Response |
 |---|---|
 | `GET /` | 200, the built `dashboard.html` sitting beside the server, `text/html; charset=utf-8`. Read from disk on every request. |
-| `GET /api/snapshot` | 200, the snapshot for the served repository as JSON, computed on this request. |
+| `GET /api/snapshot` | 200, the snapshot for the served repository as JSON, computed on this request, over the window the repository's config carries. |
+| `GET /api/snapshot?days=<n>&limit=<n>` | 200, the same, over the window the request asks for (D45). Either parameter may be omitted independently, and an omitted one leaves the configured default in force. |
+| `GET /api/snapshot` with a window parameter that is refused | 400 carrying the `SnapshotError` message, which names the parameter, the value received and the accepted range. |
 | `GET /api/knowledge/body?id=<id>` | 200 `{id, body}`, the body of the one concept that id addresses. |
 | `GET /api/knowledge/body` with an absent, empty or unknown id | 404. All three are the same fact here, that no concept is addressed, so they get one answer. |
 | any other route | 404. The route is never named back to the caller. |
 | any other method, `HEAD` included | 405. |
-| a repository that fails closed (not onboarded, config that does not parse, missing persistence root) | 500 carrying the `SnapshotError` message, so the page can name what is wrong. The process keeps serving. |
+| a repository that fails closed (not onboarded, config that does not parse, missing persistence root, no `snapshot` block, a configured window value outside the bounds) | 500 carrying the `SnapshotError` message, so the page can name what is wrong. The process keeps serving. |
 | any other exception | 500 `internal server error; see the server log`. The stack goes to stderr and never to the client. |
 
 Every response that is not a success carries the same JSON body, `{"error": "<message>"}`,
@@ -135,6 +145,69 @@ any non-2xx response as JSON without first inspecting its status or its content 
 Startup failures are an exit rather than a response, because no request can fix them: a
 missing or non-directory repo root, a port that is not a port, a missing `dashboard.html`
 and a port already in use are all reported on stderr and the process leaves.
+
+### The window parameters
+
+`days` and `limit` are optional and independent: a parameter absent from the query string
+leaves the configured default in force, while a parameter that is present and empty (`?days=`)
+was typed by somebody and is answered as a value that could not be honoured. That is the same
+distinction the port parsing draws between an argument that was not given and one that is the
+empty string.
+
+The server converts one spelling and one only: digits, exactly as the port is tested, so a
+sign, a decimal point, an exponent, a hex literal or surrounding whitespace never reach
+`Number()`. A value that fails that test is not refused here. It travels to `snapshot.js`
+unconverted and is refused there, which is what keeps one producer for the sentence the reader
+ends up seeing: a malformed value and an out-of-range one come back phrased identically.
+
+**A bound lives in exactly one place, and that place is `snapshot.js`.** It owns the bounds,
+the comparison and the message; `config.schema.json` states the same bounds for the configured
+default so an invalid default is caught at onboard validation rather than at read time; and
+`server.js` holds none. It does not import `WINDOW_BOUNDS` either, because nothing in it needs
+to know what a bound is: it decides whether the caller wrote an integer and hands the value on.
+The client holds none for the same reason and validates nothing, so the reader always sees the
+server's own sentence rather than one written next to a copy of the numbers. Anyone adding a
+range check in a second file recreates the drift this arrangement exists to remove; a check
+that genuinely needs a bound reads `WINDOW_BOUNDS` and never writes the number again.
+
+The 400 and the 500 are told apart by `SnapshotError.parameter` and never by the message text,
+because a status decided by matching a sentence is a status that changes when somebody rewords
+the sentence. A refused `days` or `limit` is a bad request whose remedy is the control the
+reader just used; a repository that is not onboarded, a config that does not parse, a missing
+persistence root, a missing `snapshot` block and a configured value outside the bounds are all
+broken-repository conditions whose remedy is re-running the onboard, and they stay 500s even
+when the request that met them carried a perfectly good window.
+
+A query parameter this server does not read is ignored, on both routes that take one, and that
+is a choice rather than an omission. The body route already worked this way and its suite pins
+it, so the snapshot route agrees with it instead of inventing a second rule for the same kind
+of request. An unread parameter cannot make this server do anything: none reaches the
+filesystem, none is echoed back and none selects a route, so a refusal would buy no property
+and would fail requests carrying a bookmark's or a proxy's own additions. Refusal is reserved
+for a parameter that is read and whose value cannot be honoured, which is the only case where
+the caller can be told what to change. A parameter given twice is read once, at its first
+occurrence, which is what `URLSearchParams.get` means; the rest are unread parameters like any
+other.
+
+`GET /api/knowledge/body` takes no window parameter and reads none: a body is a body, and the
+window selects which entries a listing carries, not how much of one file is returned. It never
+consults the config's `snapshot` block either, so a body still resolves in a repository whose
+config predates that block, which `GET /api/snapshot` refuses.
+
+The page, as the first client of this contract, carries the control in the header beside the
+computed-at pill and the refresh control, because the window cuts two of the six views and
+belongs where the page's global state already lives. Two fields and an explicit apply, never a
+fetch per keystroke: a reader typing a horizon passes through `3`, `36` and `365`, and each of
+those is a window a live field would go and fetch. The apply is also the one act that puts both
+numbers on the wire, so the query is built from both keys or from neither and the two cannot
+travel apart. A chosen window is held in memory only: it is not written back to the config, not
+stored and not put in the page URL, so a reload returns to the configured default and the
+config stays the single source of truth for what the project shows, and a refused window never
+becomes the one in force. A 400 answering a request that carried a window renders as a
+correction at the control, leaving the snapshot on screen and the page's error state untouched,
+which is the difference between a typo and a repository nobody can read; a 400 answering a
+request that carried none is not correctable there and falls through to the page's ordinary
+error state.
 
 ### Two properties that are load-bearing, not incidental
 
@@ -188,7 +261,7 @@ mean a second response path whose only job is to compute a full body and then di
 The contract the server serves and the page reads. It moved here from `templates/README.md`
 in the D43 cut-over, because the application it describes no longer lives under `templates/`
 and the renderer no longer touches it. `snapshot.js` is its single implementation: the
-onboard computes none of it in prose, so the window rules of D41 and D42 exist in exactly
+onboard computes none of it in prose, so the window rules of D41, D42 and D45 exist in exactly
 one place and cannot diverge.
 
 Determinism is a hard requirement: two runs over the same unchanged repository produce
@@ -197,22 +270,73 @@ in sorted order, and `generatedAt` is read once and is the single clock every wi
 measured from.
 
 Six required keys: `generatedAt` (ISO), `config` (the validated `.claude/major-tom.json`
-object), `git`, `knowledge`, `decisions` and `timeline`. Two optional keys with no producer
+object, the `snapshot` block this window is read from included), `git`, `knowledge`,
+`decisions` and `timeline`. Two optional keys with no producer
 yet, omitted entirely rather than emitted empty, for which the dashboard shows honest empty
 states: `lastRun` (`{id, workflow, mode, duration, phases: [{name, artifact, status,
 elapsed}]}`) and `roadmap` (`{milestones: [{title, version, status, pct, tasks: [{ref,
 title, status, owner}]}]}`).
 
+### The window (D45)
+
+The window the whole snapshot is cut to is a parameter with a configured default. Two numbers
+decide it and a third is fixed behavior:
+
+| Value | Where it comes from | Bounds |
+|---|---|---|
+| `days` | `snapshot.days` in `.claude/major-tom.json`, moved by the `days` override | 1 to 365 |
+| `limit` | `snapshot.limit` in `.claude/major-tom.json`, moved by the `limit` override | 50 to 500 |
+| the floor of 50 | a constant in `snapshot.js` | not a parameter |
+
+`snapshot` is a required top-level block of the config, `{days, limit}`, both keys required,
+shipped defaulting to 30 and 500. It belongs to the snapshot rather than to the dashboard
+because `snapshot.js` is what applies it and the dashboard is only its first consumer, so a
+second consumer inherits the same window without anything changing here.
+
+The floor is not exposed (D45 point 1). It exists so the view is never empty, and exposing all
+three would invite combinations that mean nothing, a floor above the ceiling first among them.
+`limit`'s minimum of 50 is the same number, which is what removes that combination from the
+parameter space: a ceiling of 10 would return 50 entries and quietly lie about the limit it
+applied.
+
+**A value outside the bounds is refused and never clamped** (D45 point 2), whichever of the two
+sources it came from. The ceiling is not decoration, it is what stops a request asking for an
+unbounded response, and a clamp would serve one window while the caller asked for another. In
+the library that is a thrown `SnapshotError`; the same bounds in `config.schema.json` catch an
+invalid configured default at onboard validation rather than at read time. Integer means
+integer, so a float, a numeric string and `NaN` are refused rather than coerced.
+
+**A config with no `snapshot` block is a fail-closed condition and no default is improvised.**
+The default lives in the config precisely so that `snapshot.js` carries none, and a fallback
+here would put the number back in two places and let them disagree unnoticed. The cost is
+accepted rather than hidden: a project onboarded before this block existed cannot serve its
+dashboard until it is re-onboarded, which is what D46's session-start hook already reports, and
+the failure message says the same thing at the point of failure so a user who never saw the
+notice still learns what to do.
+
+**The two streams share one selection object, not two applications of the same numbers**
+(D45 point 4). `buildSnapshot` resolves the window once, builds one selection carrying the
+horizon, the floor and the ceiling, and hands that same object to the git walk and to the
+timeline walk, which cut with one shared function. A window change is therefore one
+substitution in one place. D42 made the two windows identical, and a parameter that moved one
+stream without the other would recreate exactly the ragged reading D42 exists to prevent, so
+splitting this into two parallel computations of the same numbers is the one refactor to
+refuse here.
+
+`timeline.window` reports the window that was **effectively applied**, not the one the config
+holds, so a page served under an override states what it is showing rather than what it asked
+for. The `git` key carries entries and no bookkeeping, which is the D42 field set unchanged.
+
 ### `git`
 
 `[{hash, date, author, subject, kind, add, del}]`, newest first, in the same window as the
-timeline (D42): the commits of the last 30 days, with a floor of the 50 most recent commits
-when the horizon holds fewer and a ceiling of 500 when it holds more. A repository with no
-commits, or a directory that is not a git repository, yields an empty array rather than a
-failure.
+timeline (D42): the commits inside the horizon, with a floor of the 50 most recent commits
+when the horizon holds fewer and the effective `limit` as the ceiling when it holds more. A
+repository with no commits, or a directory that is not a git repository, yields an empty array
+rather than a failure.
 
-- `date` is the author date (`%aI`), which is also the field the 30-day horizon measures, so
-  display and window read one clock. It differs from the committer date on rebased history.
+- `date` is the author date (`%aI`), which is also the field the horizon measures, so display
+  and window read one clock. It differs from the committer date on rebased history.
 - `kind` is the conventional-commit type of the subject and requires the colon, so `fix the
   build` is `other` while `fix: the build` is `fix`. An optional scope and an optional
   breaking `!` are accepted, so `feat(hooks)!:` is `feat`. The six-item list `feat`, `fix`,
@@ -296,7 +420,7 @@ committed snapshot built on it would be empty for anyone else.
 | `events[].summary` | At most 200 characters; the full text stays in the concept or the log line |
 | `events[].summaryTruncated` | `true` exactly when the summary was cut |
 | `events[].path` | Path of the backing file relative to the persistence root, or `null` when the event has no own file |
-| `window` | The limits the builder applied: `{days: 30, floorEvents: 50, ceilingEvents: 500}` |
+| `window` | The limits the builder actually applied: `{days, floorEvents, ceilingEvents}`, where `days` and `ceilingEvents` are the effective `days` and `limit` of this request and `floorEvents` is the constant 50 |
 | `omitted` | `{count, oldestKept, reason}`, the stated-omission record |
 
 Selection algorithm, in order: sort every candidate newest first, ties broken by source
@@ -309,10 +433,12 @@ the last limit that actually removed events, so its values are `"days"`, `"ceili
 
 There is no byte budget. `timeline.window` carries no `byteBudget` member and `"bytes"` is
 not one of the values `omitted.reason` can take: the 256 KB cut went with the embedded
-snapshot (D43 point 4). The 30-day window with its floor of 50 and its ceiling of 500
-survives, re-motivated as a legibility limit rather than a weight one: a reader can hold the
-last 30 days of a project in their head, and the floor and the ceiling keep that true for a
-repository that had a quiet month and for one that had a frantic week alike.
+snapshot (D43 point 4). The window survives, re-motivated as a legibility limit rather than a
+weight one: a reader can hold about a month of a project in their head, and the floor and the
+ceiling keep that true for a repository that had a quiet month and for one that had a frantic
+week alike. What D45 changed is who chooses the horizon and the ceiling, not why they exist,
+and the shipped defaults of 30 days and 500 entries are the numbers D41 and D42 fixed, now
+written in the config rather than in the code.
 
 Nothing is ever pruned at the source: the runs area stays the source of truth (D18) and
 older events are reached by opening the files, never by paginating the page. Commits are not
@@ -321,10 +447,17 @@ why both windows carry the same limits (D42).
 
 ## Tests
 
-`tests/snapshot.test.js` drives the CLI over throwaway fixture repositories and also asserts
-the byte size and SHA-256 of the vendored bundle, so a swapped vendor file fails the suite.
+`tests/snapshot.test.js` drives the CLI and the module over throwaway fixture repositories,
+covers the window (the configured default, an override winning over it, both bounds of both
+parameters refused at both ends, a bad configured default, a missing `snapshot` block, and a
+narrower window dropping commits and events in step), and also asserts the byte size and
+SHA-256 of the vendored bundle, so a swapped vendor file fails the suite.
 `tests/server.test.js` starts the real server as a child process on a real socket and
-asserts the route contract, the JSON error shape, the id resolution, the absence of caching
-and the startup refusals. Both are Node built-ins only (`node:test`, `node:assert/strict`),
-run with `node tests/<file>`, and are written against the specification rather than against
-the implementation.
+asserts the route contract, the JSON error shape, the id resolution, the absence of caching,
+the startup refusals and the window parameters, including that a refused parameter is a 400
+distinguishable from the 500 a broken repository gives. `tests/dashboard-dom.test.js` runs the
+built `dashboard.html` against a DOM stub and covers the header control, the request it issues
+carrying both parameters, the 400 rendered as an inline correction, and the window line
+reflecting the window actually applied. All three are Node built-ins only (`node:test`,
+`node:assert/strict`), run with `node tests/<file>`, and are written against the specification
+rather than against the implementation.
