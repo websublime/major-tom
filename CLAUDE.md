@@ -30,7 +30,8 @@ phase skipped silently.
 | Doc | Role |
 |---|---|
 | `docs/PRD.md` | Product truth: decisions (D-ids), open questions (OQ-ids), changelog. Read before working. |
-| `templates/README.md` | Rendering contract: grammar, whitespace semantics, snapshot schema, authoring split. |
+| `templates/README.md` | Rendering contract: the two renderer modes, placeholder grammar, whitespace semantics, the authoring-to-plugin sync, template inventory. |
+| `plugins/major-tom/app/README.md` | The dashboard application: why it lives inside the plugin, HTTP contract, snapshot schema v2, dashboard authoring split and build. |
 | `plugins/major-tom/workflows/README.md` | Workflow script API contract and hard runtime constraints. |
 | `assets/major-tom-design/` | Dashboard visual spec (reference only; its runtime never ships). |
 | `temp/` | Read-only archive from before the reset. Off limits. |
@@ -41,9 +42,9 @@ phase skipped silently.
   plugin and marketplace manifest versions with the PR (D30 cadence). After the merge:
   sync main, delete the branch, create the tags (`claude plugin tag plugins/major-tom`
   for `major-tom--vX.Y.Z`, plus the lineage tag `vX.Y.Z`) and push them.
-- Generated artifacts are never edited by hand: `templates/dashboard.html` comes from
-  `templates/dashboard/` via the build; `plugins/*/templates/` come from `templates/` via
-  the sync.
+- Generated artifacts are never edited by hand: `plugins/major-tom/app/dashboard.html`
+  comes from `plugins/major-tom/app/dashboard/` via the build; `plugins/*/templates/` come
+  from `templates/` via the sync.
 - No em or en dashes in repository files; grep after every edit batch.
 - Converse in Portuguese; write all artifacts (code, docs, commits) in English.
 

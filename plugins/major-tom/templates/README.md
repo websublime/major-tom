@@ -5,19 +5,15 @@ lives at the repository root (D19) because it is shared by both plugins: the sin
 source for both distribution variants (PRD packaging rule): the Copilot CLI output is derived
 from the same source as the Claude Code output, never authored apart.
 
-## Dashboard authoring split (D34)
+## The dashboard is not here
 
-The dashboard is authored in `templates/dashboard/` (`index.html` skeleton,
-`dashboard.css`, and real ES modules under `src/`: data, state, ui, one module per view,
-main) and built into the single-file artifact `templates/dashboard.html` by
-`node scripts/build-dashboard.js`. The artifact is GENERATED: never edit it directly, and
-`--check` fails when it is stale. The bundler enforces a declared subset and fails closed
-outside it: static named relative `.mjs` imports only, no cycles, no dynamic import,
-unique top-level declarations across modules (they share one scope after bundling).
-Dev loop without a build: serve the authoring directory
-(`node templates/dashboard-server.js templates/dashboard <port>`) and the browser loads
-the modules natively; edit and refresh. The authoring directory is excluded from the
-plugin sync: only the built artifact ships.
+The dashboard application (its computation, its server, its page and its launcher) is
+authored inside the plugin, at `plugins/major-tom/app/`, and never under `templates/`
+(D44 point 1). Nothing under `templates/` renders, generates or serves any part of it.
+
+Its authoring split, its build, its HTTP contract, and the snapshot schema that used to be
+documented here, are in `plugins/major-tom/app/README.md`; the schema is the section
+"Snapshot schema v2" there.
 
 ## Authoring vs runtime (D23)
 
@@ -33,11 +29,12 @@ the `onboard-check` plugin agent via `${CLAUDE_PLUGIN_ROOT}` substitution.
 
 The canonical renderer is `templates/render.js` (D29): node, no dependencies, shipped
 inside each plugin by the sync. The Execute-phase renderer agent runs it and never
-re-implements the grammar. Two modes: `render <tpl> <config.json>` writes to stdout;
-`apply <tpl> <config.json> <target>` renders and applies the managed-block semantics
-(replace between markers, append when the target has none, create when missing; content
-outside the markers is never touched). It fails closed: missing files, unbalanced blocks,
-or unresolved `{{` in the output are errors, never improvised around.
+re-implements the grammar. It has exactly two modes, and both carry the templates.
+`render <tpl> <config.json>` writes to stdout; `apply <tpl> <config.json> <target>`
+renders and applies the managed-block semantics (replace between markers, append when the
+target has none, create when missing; content outside the markers is never touched). It
+fails closed: missing files, unbalanced blocks, or unresolved `{{` in the output are
+errors, never improvised around.
 
 - Render context: the validated `.claude/major-tom.json` object, exactly as written. No value
   reaches a template that did not pass schema validation first.
@@ -49,6 +46,10 @@ or unresolved `{{` in the output are errors, never improvised around.
   `<!-- major-tom:begin -->` and `<!-- major-tom:end -->` markers. On re-render, only the
   content between markers is replaced; anything the user wrote outside the markers is
   untouched.
+
+The renderer carries no dashboard path of any kind. It renders templates and writes managed
+blocks; the D43 cut-over removed the one mode that ever touched the dashboard page, along
+with the data island that mode existed to fill.
 
 ## Placeholder grammar
 
@@ -63,90 +64,6 @@ A minimal mustache-compatible subset, no engine dependency:
 Anything beyond this subset is a design change: extend this table first, then `render.js`,
 then the templates.
 
-The dashboard is the exception to the grammar: `dashboard.html` is fully static and gets
-its data through `render.js inject`, which replaces only the content of the
-`<script type="application/json" id="major-tom-data">` island (escaping `</script` inside
-the JSON).
-
-Snapshot schema v2 (D33, extended by D41 and D42). Required: `generatedAt` (ISO), `config`
-(the validated config), `git` (`[{hash, date, author, subject, kind, add, del}]`, same
-window as the timeline: commits of the last 30 days, with a floor of the 50 most recent
-commits when the horizon holds fewer and a ceiling of 500 when it holds more, newest
-first; `date` is the author date (`%aI`), which is also the field the 30-day horizon
-measures, so display and window read one clock, and which differs from the committer date
-on rebased history; `kind` is the conventional-commit type of the subject and requires the
-colon, so `fix the build` is `other` while `fix: the build` is `fix`, with an optional
-scope and an optional breaking `!` accepted, so `feat(hooks)!:` is `feat`, and with the
-six-item list `feat`, `fix`, `docs`, `test`, `chore`, `refactor` exhaustive, so `perf:` is
-`other`), `knowledge`
-(`{files: [{path, type, size, updated, frontmatter, body?, truncated?}]}`, body embedded
-up to 32 KB per file and 1 MB total in index order, truncated flagged; `size` is the byte
-size of the file on disk, frontmatter included, not the size of the body; OKF concepts
-only, meaning non-reserved `.md` files carrying frontmatter, so `runs/intents.log` and the
-generated `dashboard.html` are not listed, `index.md` is reserved at every depth and not
-only at the bundle root, and a `.md` whose frontmatter is absent, does not parse, or parses
-to something other than a mapping is not a concept and is skipped silently, never failing
-the run), `decisions`
-(`[{id, text, date, status}]`, derived from OKF concepts with `type: decision` in the order
-of `knowledge.files`: `id` from `frontmatter.id` and `text` from `frontmatter.title`, both
-falling back to the path; `status` is `open` only when the frontmatter says exactly that
-and `closed` otherwise; `date` is `frontmatter.date` when the concept declares it and the
-file mtime otherwise, because a decision's date is a property of the decision and the mtime
-already travels as `knowledge.files[].updated`), `timeline` (below). Optional, no
-producer yet, the dashboard shows empty states when absent: `lastRun` (`{id, workflow,
-mode, duration, phases: [{name, artifact, status, elapsed}]}`) and `roadmap`
-(`{milestones: [{title, version, status, pct, tasks: [{ref, title, status, owner}]}]}`).
-
-`knowledge.files` is ordered by `index.md` first and then by the walk of the persistence
-root, which visits entries sorted by name at every depth and does not follow symlinks. The
-index is authored prose, not a record format, so a line resolves to a file this way: every
-token on the line that looks like a relative path ending in `.md` is taken in order, a
-leading `./` or `/` is stripped, and the first candidate that matches a collected concept
-and has not been taken by an earlier line wins. A candidate that names no collected concept
-(`index.md` among them, since it is never a concept) or that was already taken is passed
-over for the next candidate on the same line, and a line where no candidate qualifies
-contributes nothing. Anything the index does not name keeps its walk order after the named
-files. This is a real coupling and not a detail: a change to the index line format the
-onboard writes can silently reorder `knowledge.files` and therefore change which files keep
-their bodies under the 1 MB budget.
-
-The snapshot's producer is `plugins/major-tom/app/snapshot.js`, the single implementation of
-the window rules stated here and below; the onboard workflow runs that script and no longer
-computes any of this in prose. The contract stays in this file because `render.js inject`
-consumes the snapshot it produces.
-
-`timeline` (D41) is `{events, window, omitted}`, the event index the `#timeline` view and
-the overview strip render. Sources, all under the persistence root and nowhere else:
-`runs/intents.log` (trivial and task intents), the substantive intent concepts, and the run
-records. `.claude/session/` is never read: it is gitignored mechanism state, keyed by
-`prompt_id` and mutated in place, so a committed snapshot built on it would be empty for
-anyone else.
-
-| Field | Meaning |
-|---|---|
-| `events[]` | Newest first. One object per intent or run. |
-| `events[].at` | ISO timestamp of the event |
-| `events[].kind` | `"intent"` or `"run"` |
-| `events[].tier` | `trivial`, `task` or `substantive` for intents; `null` for runs |
-| `events[].type` | The intent's request type (free-form, D39); `null` for runs |
-| `events[].promptId`, `events[].sessionId` | Correlation ids as persisted at the source; the view groups by an 8-character `sessionId` prefix |
-| `events[].summary` | At most 200 characters; the full text stays in the concept or the log line |
-| `events[].summaryTruncated` | `true` exactly when the summary was cut |
-| `events[].path` | Path of the backing file relative to the persistence root, or `null` when the event has no own file |
-| `window` | The limits the builder applied: `{days: 30, floorEvents: 50, ceilingEvents: 500, byteBudget: 262144}` |
-| `omitted` | `{count, oldestKept, reason}`, the stated-omission record |
-
-Selection algorithm, in order: take the events of the last `days`; when that yields fewer
-than `floorEvents`, take the `floorEvents` most recent instead; when it yields more than
-`ceilingEvents`, keep the `ceilingEvents` most recent; then drop from the oldest end until
-the serialized key fits `byteBudget`, cutting at an event boundary and never mid-event.
-`omitted.count` is how many events the limits removed, `omitted.oldestKept` the `at` of the
-oldest event that survived, and `omitted.reason` is `"days"`, `"ceiling"`, `"bytes"` or
-`null` when nothing was omitted. Nothing is ever pruned at the source: the runs area stays
-the source of truth (D18) and older events are reached by opening the files, never by
-paginating this page. Commits are not copied into `events`: they stay in `git` and the view
-merges the two client-side, which is why both windows carry the same three limits (D42).
-
 Whitespace semantics, exactly as `render.js` implements them: a line holding only a block
 tag is consumed with its line break; a skipped block leaves nothing behind; runs of blank
 lines collapse to one; trailing spaces are trimmed. A value that may be empty must be
@@ -160,11 +77,8 @@ that ends it; close the inline block before the line break.
 |---|---|---|
 | `context.md.tpl` | `AGENTS.md` in the target repo root | second draft, restructured after the owner's reference analysis (role header, north star, hard rules, document map) |
 | `claude.md.tpl` | `CLAUDE.md` in the target repo root, importing `@AGENTS.md` | done |
-| `render.js` | not a template: the canonical renderer both templates go through, plus the dashboard `inject` mode | done, fixture-verified (three topologies, apply idempotence, outside-marker preservation, island injection) |
-| `dashboard/` | authoring split for the dashboard (D34): `index.html` + `dashboard.css` + ES modules; built by `scripts/build-dashboard.js`; excluded from the plugin sync | authoring source |
-| `dashboard.html` | GENERATED from `dashboard/` (never edit directly). Injected into `<persistence.root>/dashboard.html` via `render.js inject` (never the mustache grammar), with the snapshot produced by `plugins/major-tom/app/snapshot.js` and no longer by prose inside the onboard workflow: single-file vanilla port of the owner's Claude Design reference (D33): collapsible rail, six hash-routed views (overview grid/console with the last-five-events strip, timeline merging `timeline` events with `git` commits, roadmap, git with search and kind filters, knowledge tree + viewer, config table/raw), persisted theme toggle, system fonts, honest empty states for lastRun/roadmap | v2 (D33, D34, D41); window and retention settled and built, design iteration and the lastRun/roadmap producers under OQ-13 |
-| `dashboard-server.js` | not a template: localhost static server. Onboard copies it to `.claude/server/` in the target repo (D32); `/major-tom:dashboard` and Desktop's launch.json both run that copy. Honors the `PORT` env var (autoPort). | done, smoke-tested |
-| `launch-merge.js` | not a template: merges the managed `major-tom-dashboard` entry into the target's `.claude/launch.json` (Claude Desktop preview surface), preserving every other entry and field; refuses an unparseable file | done, scenario-tested |
+| `render.js` | not a template: the canonical renderer both templates go through, with exactly two modes, `render` and `apply` | done, fixture-verified (three topologies, apply idempotence, outside-marker preservation) |
+| `launch-merge.js` | not a template: merges the managed `major-tom-dashboard` entry into the target's `.claude/launch.json` (Claude Desktop preview surface), preserving every other entry and field; refuses an unparseable file. The entry's `program` is the launcher the onboard writes, `.claude/server/launcher.js` (overridable by a second argument), and its `args` is an empty array: the launcher takes only the port, which `autoPort` supplies, and there is no dashboard path to pass because no dashboard artifact is written any more (D44). `args` stays present and empty rather than absent, so that re-running the merge actively clears a path an older onboard wrote there | done, scenario-tested |
 | `settings-merge.js` | not a template: merges the three session defaults (`env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` `"1"`, `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` `"1"`, `alwaysThinkingEnabled` `true`, D37) into the target's Claude Code settings: `.claude/settings.local.json` when it exists, else `.claude/settings.json` when it exists, else a fresh `.claude/settings.json`; every other key and every other `env` entry preserved; fails closed, writing nothing, when the existing file does not parse, is not a JSON object, or has a non-object `env` | done, scenario-tested |
 | `gitignore-merge.js` | not a template: writes the mechanism-state ignore rules (`.claude/worktrees/`, `.claude/session/`, `.claude/server/`, D38 and D40) into the target repo's `.gitignore` as a managed block between the line markers `# major-tom:begin` and `# major-tom:end`: creates the file when missing, replaces only the block when the markers are present, appends the block when the file has none; every other line preserved, existing duplicate entries neither removed nor deduplicated, idempotent; fails closed, writing nothing, on malformed markers (begin without end, end without begin, end before begin, duplicates) or an unreadable file | done, scenario-tested |
 
