@@ -34,12 +34,24 @@ const IDENTITY_NAME = 'Fixture Author'
 const IDENTITY_EMAIL = 'fixture@example.test'
 const IDENTITY = `${IDENTITY_NAME} <${IDENTITY_EMAIL}>`
 
-// The window constants the spec names literally. They are a legibility limit, not a weight
-// one: the byte caps the schema used to carry are gone (D43 point 4), the window is not.
+// The window the fixtures are built around. It is a legibility limit and not a weight one:
+// the byte caps the schema used to carry are gone (D43 point 4), the window is not.
+//
+// Since D45 only the floor is a constant of the script; the horizon and the ceiling are the
+// default the config carries, which every fixture below writes as exactly these values through
+// defaultConfig(). The tests that assert 30 and 500 are therefore asserting the configured
+// default, and the parameter tests further down are the ones that move it.
 const WINDOW_DAYS = 30
 const FLOOR_EVENTS = 50
 const CEILING_EVENTS = 500
 const SUMMARY_CAP = 200
+
+// The hard bounds the script enforces on both parameters and the schema states for the
+// default, written out here rather than imported so the suite tests the specification.
+const DAYS_MIN = 1
+const DAYS_MAX = 365
+const LIMIT_MIN = 50
+const LIMIT_MAX = 500
 
 const MINUTE = 60 * 1000
 const HOUR = 60 * MINUTE
@@ -111,6 +123,9 @@ function defaultConfig() {
       team: { coordinator: 'coordinator', members: ['planner', 'implementer', 'reviewer'] },
     },
     persistence: { root: KNOWLEDGE_ROOT },
+    // The window's default lives in the config since D45 and the script carries none, so every
+    // fixture states it. These are the values D41 and D42 fixed and the schema proposes.
+    snapshot: { days: WINDOW_DAYS, limit: CEILING_EVENTS },
     stack: { languages: ['javascript'], frameworks: [], databases: [], messaging: [] },
     devops: { ci: '', containers: '', cloud: '' },
     org: { namespace: '@fixture', internalLibraries: [], preferredLibraries: [] },
@@ -1279,6 +1294,201 @@ test('body: the list is recomputed on every call, so nothing goes stale', (t) =>
 })
 
 // ---------------------------------------------------------------------------
+// The window parameter (D45)
+// ---------------------------------------------------------------------------
+
+// The window is a configured default that a request may move inside hard bounds: days from 1
+// to 365, limit from 50 to 500, the floor of 50 staying server behavior and never a parameter.
+// The overrides only exist on the library entry point, the CLI always running at the
+// configured window, so every test below drives buildSnapshot directly.
+
+// A config whose snapshot block is exactly this window.
+function configWithWindow(window) {
+  const config = defaultConfig()
+  config.snapshot = window
+  return config
+}
+
+function buildWith(dir, overrides) {
+  return require(SCRIPT).buildSnapshot(Object.assign({ repoRoot: dir }, overrides || {}))
+}
+
+// Refused, and refused by throwing: the call must not come back with a snapshot computed at
+// some repaired window, which is what "refused, never clamped" means in practice.
+function assertRefused(dir, overrides, pattern, label) {
+  const { SnapshotError } = require(SCRIPT)
+  assert.throws(
+    () => buildWith(dir, overrides),
+    (err) => {
+      assert.ok(err instanceof SnapshotError, `${label} must throw a SnapshotError, got ${err && err.name}`)
+      assert.match(err.message, pattern, `${label} message`)
+      return true
+    },
+    `${label} must be refused rather than clamped`
+  )
+}
+
+test('window: the configured default is read from the config, for both parameters', (t) => {
+  const dir = initRepo(t, { config: configWithWindow({ days: 7, limit: 123 }) })
+  const snapshot = buildWith(dir)
+  assert.deepEqual(snapshot.timeline.window, { days: 7, floorEvents: FLOOR_EVENTS, ceilingEvents: 123 })
+
+  // An explicitly absent override is an absent override: the configured value stands.
+  const undefinedOverrides = buildWith(dir, { days: undefined, limit: undefined })
+  assert.deepEqual(undefinedOverrides.timeline.window, { days: 7, floorEvents: FLOOR_EVENTS, ceilingEvents: 123 })
+  const nullOverrides = buildWith(dir, { days: null, limit: null })
+  assert.deepEqual(nullOverrides.timeline.window, { days: 7, floorEvents: FLOOR_EVENTS, ceilingEvents: 123 })
+})
+
+test('window: an explicit override wins over the configured value, for both parameters', (t) => {
+  const dir = initRepo(t, { config: configWithWindow({ days: 7, limit: 123 }) })
+
+  assert.equal(buildWith(dir, { days: 90 }).timeline.window.days, 90)
+  assert.equal(buildWith(dir, { limit: 456 }).timeline.window.ceilingEvents, 456)
+
+  // Either one alone leaves the other at the configured value: the two are independent.
+  assert.equal(buildWith(dir, { days: 90 }).timeline.window.ceilingEvents, 123)
+  assert.equal(buildWith(dir, { limit: 456 }).timeline.window.days, 7)
+
+  const both = buildWith(dir, { days: 90, limit: 456 })
+  assert.deepEqual(both.timeline.window, { days: 90, floorEvents: FLOOR_EVENTS, ceilingEvents: 456 })
+})
+
+test('window: an override outside the bounds is refused at both ends, never clamped', (t) => {
+  const dir = initRepo(t, {})
+
+  // The message names the parameter, the value received and the accepted range, because that
+  // message is what the page ends up showing the user.
+  assertRefused(dir, { days: DAYS_MIN - 1 }, /days.*integer.*between 1 and 365.*received 0/, 'days 0')
+  assertRefused(dir, { days: DAYS_MAX + 1 }, /days.*integer.*between 1 and 365.*received 366/, 'days 366')
+  assertRefused(dir, { limit: LIMIT_MIN - 1 }, /limit.*integer.*between 50 and 500.*received 49/, 'limit 49')
+  assertRefused(dir, { limit: LIMIT_MAX + 1 }, /limit.*integer.*between 50 and 500.*received 501/, 'limit 501')
+
+  // Negative and very large values are the same refusal and not a special case.
+  assertRefused(dir, { days: -30 }, /days/, 'days -30')
+  assertRefused(dir, { limit: 100000 }, /limit/, 'limit 100000')
+
+  // And the refusal left the process usable, so a server answers the next request.
+  assert.equal(buildWith(dir).timeline.window.days, WINDOW_DAYS)
+})
+
+test('window: the boundary values themselves are accepted', (t) => {
+  const dir = initRepo(t, {})
+  assert.equal(buildWith(dir, { days: DAYS_MIN }).timeline.window.days, DAYS_MIN)
+  assert.equal(buildWith(dir, { days: DAYS_MAX }).timeline.window.days, DAYS_MAX)
+  assert.equal(buildWith(dir, { limit: LIMIT_MIN }).timeline.window.ceilingEvents, LIMIT_MIN)
+  assert.equal(buildWith(dir, { limit: LIMIT_MAX }).timeline.window.ceilingEvents, LIMIT_MAX)
+
+  // The floor is never a parameter: it stays 50 whatever the ceiling is set to, including at
+  // the ceiling's own minimum, where the two meet.
+  assert.equal(buildWith(dir, { limit: LIMIT_MIN }).timeline.window.floorEvents, FLOOR_EVENTS)
+})
+
+test('window: a non-integer override is refused rather than coerced', (t) => {
+  const dir = initRepo(t, {})
+  const bad = [30.5, '30', ' 30 ', '1e2', 'banana', NaN, Infinity, -Infinity, true, {}, []]
+  for (const value of bad) {
+    assertRefused(dir, { days: value }, /days must be an integer between 1 and 365/, `days ${String(value)}`)
+    assertRefused(dir, { limit: value }, /limit must be an integer between 50 and 500/, `limit ${String(value)}`)
+  }
+})
+
+test('window: a configured default outside the bounds is refused', (t) => {
+  const cases = [
+    { window: { days: 0, limit: CEILING_EVENTS }, pattern: /snapshot\.days.*0.*between 1 and 365/ },
+    { window: { days: 366, limit: CEILING_EVENTS }, pattern: /snapshot\.days.*366.*between 1 and 365/ },
+    { window: { days: WINDOW_DAYS, limit: 49 }, pattern: /snapshot\.limit.*49.*between 50 and 500/ },
+    { window: { days: WINDOW_DAYS, limit: 501 }, pattern: /snapshot\.limit.*501.*between 50 and 500/ },
+    { window: { days: 30.5, limit: CEILING_EVENTS }, pattern: /snapshot\.days.*30\.5/ },
+    { window: { days: '30', limit: CEILING_EVENTS }, pattern: /snapshot\.days.*"30"/ },
+    { window: { days: WINDOW_DAYS }, pattern: /snapshot\.limit.*undefined/ },
+  ]
+  for (const entry of cases) {
+    const dir = initRepo(t, { config: configWithWindow(entry.window) })
+    // The remedy the message names is the onboard, since the value it complains about is the
+    // config's and not the caller's.
+    assertRefused(dir, {}, entry.pattern, `configured ${JSON.stringify(entry.window)}`)
+    assertRefused(dir, {}, /[Rr]e-run the major-tom onboard/, `configured ${JSON.stringify(entry.window)} remedy`)
+  }
+
+  // The CLI, which passes no override at all, fails on the same condition and exits non-zero.
+  const dir = initRepo(t, { config: configWithWindow({ days: 0, limit: CEILING_EVENTS }) })
+  const result = runSnapshotExpectingFailure(t, dir)
+  assertFailedClosed(result)
+  assert.match(result.stderr, /snapshot\.days/)
+})
+
+test('window: an override moves git and timeline together, both for days and for limit', (t) => {
+  // Both streams carry the same distribution: 60 entries in the last hour and 20 more spread
+  // from 3 to 22 days back, so 80 in total and all of them inside the configured 30-day
+  // default. 60 is above the floor of 50, which is what lets a narrower horizon actually bite:
+  // below the floor the window would extend back to the 50 newest and hide the effect.
+  const RECENT = 60
+  const OLDER = 20
+  const recentAt = (i) => new Date(NOW - i * MINUTE)
+  const olderAt = (j) => new Date(NOW - (2 + j) * DAY)
+
+  const bulkCommits = []
+  for (let j = OLDER; j >= 1; j--) bulkCommits.push({ message: `chore: older ${j}`, date: olderAt(j) })
+  for (let i = RECENT; i >= 1; i--) bulkCommits.push({ message: `chore: recent ${i}`, date: recentAt(i) })
+
+  const intentsLog = []
+  for (let j = 1; j <= OLDER; j++) {
+    intentsLog.push(logLine({ at: olderAt(j), promptId: `p-older-${j}`, summary: `older ${j}` }))
+  }
+  for (let i = 1; i <= RECENT; i++) {
+    intentsLog.push(logLine({ at: recentAt(i), promptId: `p-recent-${i}`, summary: `recent ${i}` }))
+  }
+
+  const dir = initRepo(t, { bulkCommits, intentsLog })
+
+  // At the configured default both streams carry everything.
+  const wide = buildWith(dir)
+  assert.equal(wide.git.length, RECENT + OLDER)
+  assert.equal(wide.timeline.events.length, RECENT + OLDER)
+
+  // A narrower horizon drops the same 20 entries from both, and drops them in step: neither
+  // stream keeps anything the other lost, which is the ragged reading D42 exists to prevent.
+  const narrowDays = buildWith(dir, { days: 2 })
+  assert.equal(narrowDays.git.length, RECENT, 'the git stream must follow the days parameter')
+  assert.equal(narrowDays.timeline.events.length, RECENT, 'the timeline must follow the days parameter')
+  assert.equal(narrowDays.git[0].subject, 'chore: recent 1')
+  assert.equal(narrowDays.git[RECENT - 1].subject, `chore: recent ${RECENT}`)
+  assert.equal(narrowDays.timeline.events[0].summary, 'recent 1')
+  assert.equal(narrowDays.timeline.events[RECENT - 1].summary, `recent ${RECENT}`)
+  const cutoff = NOW - 2 * DAY
+  for (const entry of narrowDays.git) assert.ok(new Date(entry.date).getTime() >= cutoff, entry.subject)
+  for (const event of narrowDays.timeline.events) assert.ok(new Date(event.at).getTime() >= cutoff, event.summary)
+  assert.equal(narrowDays.timeline.omitted.count, OLDER)
+  assert.equal(narrowDays.timeline.omitted.reason, 'days')
+
+  // A narrower ceiling cuts both streams to the same length, at the same point in time.
+  const narrowLimit = buildWith(dir, { limit: 50 })
+  assert.equal(narrowLimit.git.length, 50, 'the git stream must follow the limit parameter')
+  assert.equal(narrowLimit.timeline.events.length, 50, 'the timeline must follow the limit parameter')
+  assert.equal(narrowLimit.git[49].subject, 'chore: recent 50')
+  assert.equal(narrowLimit.timeline.events[49].summary, 'recent 50')
+  assert.equal(narrowLimit.timeline.omitted.count, RECENT + OLDER - 50)
+  assert.equal(narrowLimit.timeline.omitted.reason, 'ceiling')
+
+  // The same holds when the default is the narrow one and no override is passed at all: the
+  // parameter and the configured default are one window, not two mechanisms.
+  const configured = initRepo(t, { bulkCommits, intentsLog, config: configWithWindow({ days: 2, limit: 500 }) })
+  const fromConfig = buildWith(configured)
+  assert.equal(fromConfig.git.length, RECENT)
+  assert.equal(fromConfig.timeline.events.length, RECENT)
+})
+
+test('window: timeline.window reports the effective values, not the configured ones', (t) => {
+  const dir = initRepo(t, { config: configWithWindow({ days: 30, limit: 500 }) })
+  const snapshot = buildWith(dir, { days: 3, limit: 77 })
+  // The page states the window it is actually showing, so the override has to be what is
+  // reported; deepEqual on the whole object, so a fourth member would fail here too.
+  assert.deepEqual(snapshot.timeline.window, { days: 3, floorEvents: FLOOR_EVENTS, ceilingEvents: 77 })
+  assert.deepEqual(snapshot.config.snapshot, { days: 30, limit: 500 }, 'the config travels unchanged')
+})
+
+// ---------------------------------------------------------------------------
 // Fail closed
 // ---------------------------------------------------------------------------
 
@@ -1290,6 +1500,55 @@ test('fail closed: a missing .claude/major-tom.json', (t) => {
 test('fail closed: a config that does not parse', (t) => {
   const dir = initRepo(t, { rawConfig: '{ "schemaVersion": 1, this is not json }\n' })
   assertFailedClosed(runSnapshotExpectingFailure(t, dir))
+})
+
+test('fail closed: a config with no snapshot block', (t) => {
+  // Owner-decided (D45 point 3): the default lives in the config so the script carries none,
+  // and a project onboarded before the block existed is refused rather than served at some
+  // improvised window. The message says what is missing and that the onboard writes it.
+  const config = defaultConfig()
+  delete config.snapshot
+  const dir = initRepo(t, { config })
+
+  const result = runSnapshotExpectingFailure(t, dir)
+  assertFailedClosed(result)
+  assert.match(result.stderr, /snapshot block/)
+  assert.match(result.stderr, /[Rr]e-run the major-tom onboard/)
+
+  const { buildSnapshot, SnapshotError } = require(SCRIPT)
+  assert.throws(
+    () => buildSnapshot({ repoRoot: dir }),
+    (err) => err instanceof SnapshotError && /snapshot block/.test(err.message)
+  )
+  // An override does not stand in for the missing block either: the config is what has to
+  // carry the default, and a request that happens to name both values is still refused.
+  assert.throws(
+    () => buildSnapshot({ repoRoot: dir, days: 7, limit: 100 }),
+    (err) => err instanceof SnapshotError && /snapshot block/.test(err.message)
+  )
+
+  // A block of the wrong shape is the same condition and not a different one.
+  for (const value of [null, 'thirty', 30, []]) {
+    const wrong = defaultConfig()
+    wrong.snapshot = value
+    const wrongDir = initRepo(t, { config: wrong })
+    assert.throws(
+      () => buildSnapshot({ repoRoot: wrongDir }),
+      (err) => err instanceof SnapshotError && /snapshot block/.test(err.message),
+      `snapshot: ${JSON.stringify(value)} must be refused`
+    )
+  }
+
+  // The body reader takes no window and reads none, so it still answers here: a body is a
+  // body, and only the windowed listing depends on the block.
+  const sound = initRepo(t, { knowledge: { 'docs/alpha.md': concept('type: doc\ntitle: Alpha', 'alpha body') } })
+  const id = fileByPath(runSnapshot(t, sound), 'docs/alpha.md').id
+  const { readConceptBody } = require(SCRIPT)
+  fs.writeFileSync(
+    path.join(dir, KNOWLEDGE_ROOT, 'docs', 'alpha.md'),
+    concept('type: doc\ntitle: Alpha', 'alpha body')
+  )
+  assert.equal(readConceptBody({ repoRoot: dir, id }), '\nalpha body\n')
 })
 
 test('fail closed: a persistence root that does not exist', (t) => {

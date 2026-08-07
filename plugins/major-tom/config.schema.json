@@ -11,6 +11,7 @@
     "project",
     "execution",
     "persistence",
+    "snapshot",
     "stack",
     "devops",
     "org",
@@ -121,6 +122,28 @@
         "root": {
           "description": "Root directory of every generated artifact (memories, docs, runs, monitors, logs). Fixed by decision D2.",
           "const": ".knowledge"
+        }
+      }
+    },
+    "snapshot": {
+      "description": "Window the dashboard snapshot is computed over (D45). The block belongs to the snapshot and not to the dashboard: plugins/major-tom/app/snapshot.js is what applies it, and the dashboard is only its first consumer, so a second consumer inherits the same window without anything changing here. Both values are the project's default; a reader may adjust them for one request, within the same bounds, and a request outside them is refused and never quietly clamped.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["days", "limit"],
+      "properties": {
+        "days": {
+          "description": "How many days back the dashboard looks. The same span applies to the git commits and to the timeline events, which always move together (D42, D45 point 4). 30 keeps about a month of work in view, which is roughly what a reader can hold in their head. Accepted range: 1 to 365.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 365,
+          "default": 30
+        },
+        "limit": {
+          "description": "How many entries the dashboard shows at most, counted per stream: at most this many commits and at most this many timeline events. It is what keeps a frantic month legible. A quiet project still shows its 50 most recent entries however old they are, and that floor is fixed behavior rather than a setting (D45 point 1), which is why this value never goes below it. Accepted range: 50 to 500.",
+          "type": "integer",
+          "minimum": 50,
+          "maximum": 500,
+          "default": 500
         }
       }
     },
