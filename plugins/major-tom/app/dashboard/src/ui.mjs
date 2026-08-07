@@ -1,6 +1,6 @@
 // Shared fragments: escaping, status colors, reusable row and card builders.
 
-import { LASTRUN } from './data.mjs'
+import { lastRun } from './data.mjs'
 
 export function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -41,8 +41,9 @@ export function decisionRow(d) {
 }
 
 export function phaseVms() {
-  if (!LASTRUN || !Array.isArray(LASTRUN.phases)) return null
-  return LASTRUN.phases.map(function (p, i) {
+  const run = lastRun()
+  if (!run || !Array.isArray(run.phases)) return null
+  return run.phases.map(function (p, i) {
     const st = p.status || 'pending'
     return {
       num: String(i + 1).padStart(2, '0'), name: p.name || '', artifact: p.artifact || '', status: st,

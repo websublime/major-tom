@@ -1,6 +1,6 @@
-// Config: sectioned key/value tables or the raw JSON, straight from the island.
+// Config: sectioned key/value tables or the raw JSON, straight from the served snapshot.
 
-import { CFG } from '../data.mjs'
+import { cfg } from '../data.mjs'
 import { S } from '../state.mjs'
 import { esc } from '../ui.mjs'
 
@@ -11,18 +11,19 @@ function fmtV(v) {
 }
 
 export function vConfig() {
+  const config = cfg()
   const bar = '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:0 4px">'
     + '<div class="seg">'
     + '<button data-act="cfgmode" data-v="table" class="' + (S.configMode === 'table' ? 'active' : '') + '">table</button>'
     + '<button data-act="cfgmode" data-v="raw" class="' + (S.configMode === 'raw' ? 'active' : '') + '">raw json</button></div>'
-    + '<span style="color:var(--dim);font-size:11.5px">.claude/major-tom.json &#183; schemaVersion ' + esc(CFG.schemaVersion != null ? CFG.schemaVersion : '?') + '</span>'
+    + '<span style="color:var(--dim);font-size:11.5px">.claude/major-tom.json &#183; schemaVersion ' + esc(config.schemaVersion != null ? config.schemaVersion : '?') + '</span>'
     + '<span class="chip" style="margin-left:auto;display:flex;align-items:center;gap:8px;padding:5px 12px;background:var(--ok-soft);color:var(--ok);font-size:11.5px"><span class="dot"></span>validated at onboard</span></div>'
   if (S.configMode === 'raw') {
     return bar + '<section class="panel"><div class="panel-head"><span class="eyebrow">raw</span></div>'
-      + '<pre class="body" style="white-space:pre;overflow:auto">' + esc(JSON.stringify(CFG, null, 2)) + '</pre></section>'
+      + '<pre class="body" style="white-space:pre;overflow:auto">' + esc(JSON.stringify(config, null, 2)) + '</pre></section>'
   }
-  const sections = Object.keys(CFG).map(function (key) {
-    const v = CFG[key]
+  const sections = Object.keys(config).map(function (key) {
+    const v = config[key]
     let rows
     if (Array.isArray(v)) rows = v.length ? v.map(function (x, i) { return { k: '[' + i + ']', v: fmtV(x) } }) : [{ k: '[ ]', v: '(empty)' }]
     else if (typeof v === 'object' && v !== null) rows = Object.keys(v).map(function (k) { return { k: k, v: fmtV(v[k]) } })

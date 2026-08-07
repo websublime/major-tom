@@ -1,10 +1,10 @@
 // Roadmap: overall progress plus one section per milestone with its tasks.
 
-import { ROADMAP } from '../data.mjs'
+import { roadmap } from '../data.mjs'
 import { esc, milestoneVm } from '../ui.mjs'
 
 export function vRoadmap() {
-  const ms = ROADMAP.map(milestoneVm)
+  const ms = roadmap().map(milestoneVm)
   if (!ms.length) return '<section class="panel"><div class="empty">No roadmap data yet. This view fills in when the track phase starts writing milestones into the snapshot.</div></section>'
   const done = ms.filter(function (m) { return m.status === 'done' }).length
   const active = ms.filter(function (m) { return m.status === 'active' }).length
