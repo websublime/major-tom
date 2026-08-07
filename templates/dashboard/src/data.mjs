@@ -61,7 +61,10 @@ export const DECISIONS = Array.isArray(DATA.decisions) ? DATA.decisions : FILES
   .map(function (f) {
     return {
       id: f.frontmatter.id || f.path, text: f.frontmatter.title || f.path,
-      date: f.updated || '', status: f.frontmatter.status === 'open' ? 'open' : 'closed'
+      // date precedence mirrors buildDecisions in plugins/major-tom/app/snapshot.js:
+      // the declared frontmatter date, the file mtime otherwise. The two derivations of
+      // this one field are deliberately coupled, so keep them in step.
+      date: f.frontmatter.date || f.updated || '', status: f.frontmatter.status === 'open' ? 'open' : 'closed'
     }
   })
 
