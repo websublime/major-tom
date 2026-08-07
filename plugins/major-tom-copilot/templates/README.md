@@ -72,15 +72,48 @@ Snapshot schema v2 (D33, extended by D41 and D42). Required: `generatedAt` (ISO)
 (the validated config), `git` (`[{hash, date, author, subject, kind, add, del}]`, same
 window as the timeline: commits of the last 30 days, with a floor of the 50 most recent
 commits when the horizon holds fewer and a ceiling of 500 when it holds more, newest
-first), `knowledge`
+first; `date` is the author date (`%aI`), which is also the field the 30-day horizon
+measures, so display and window read one clock, and which differs from the committer date
+on rebased history; `kind` is the conventional-commit type of the subject and requires the
+colon, so `fix the build` is `other` while `fix: the build` is `fix`, with an optional
+scope and an optional breaking `!` accepted, so `feat(hooks)!:` is `feat`, and with the
+six-item list `feat`, `fix`, `docs`, `test`, `chore`, `refactor` exhaustive, so `perf:` is
+`other`), `knowledge`
 (`{files: [{path, type, size, updated, frontmatter, body?, truncated?}]}`, body embedded
-up to 32 KB per file and 1 MB total in index order, truncated flagged; OKF concepts only,
-meaning non-reserved `.md` files carrying frontmatter, so `runs/intents.log` and the
-generated `dashboard.html` are not listed), `decisions`
-(derived from OKF concepts with `type: decision`), `timeline` (below). Optional, no
+up to 32 KB per file and 1 MB total in index order, truncated flagged; `size` is the byte
+size of the file on disk, frontmatter included, not the size of the body; OKF concepts
+only, meaning non-reserved `.md` files carrying frontmatter, so `runs/intents.log` and the
+generated `dashboard.html` are not listed, `index.md` is reserved at every depth and not
+only at the bundle root, and a `.md` whose frontmatter is absent, does not parse, or parses
+to something other than a mapping is not a concept and is skipped silently, never failing
+the run), `decisions`
+(`[{id, text, date, status}]`, derived from OKF concepts with `type: decision` in the order
+of `knowledge.files`: `id` from `frontmatter.id` and `text` from `frontmatter.title`, both
+falling back to the path; `status` is `open` only when the frontmatter says exactly that
+and `closed` otherwise; `date` is `frontmatter.date` when the concept declares it and the
+file mtime otherwise, because a decision's date is a property of the decision and the mtime
+already travels as `knowledge.files[].updated`), `timeline` (below). Optional, no
 producer yet, the dashboard shows empty states when absent: `lastRun` (`{id, workflow,
 mode, duration, phases: [{name, artifact, status, elapsed}]}`) and `roadmap`
 (`{milestones: [{title, version, status, pct, tasks: [{ref, title, status, owner}]}]}`).
+
+`knowledge.files` is ordered by `index.md` first and then by the walk of the persistence
+root, which visits entries sorted by name at every depth and does not follow symlinks. The
+index is authored prose, not a record format, so a line resolves to a file this way: every
+token on the line that looks like a relative path ending in `.md` is taken in order, a
+leading `./` or `/` is stripped, and the first candidate that matches a collected concept
+and has not been taken by an earlier line wins. A candidate that names no collected concept
+(`index.md` among them, since it is never a concept) or that was already taken is passed
+over for the next candidate on the same line, and a line where no candidate qualifies
+contributes nothing. Anything the index does not name keeps its walk order after the named
+files. This is a real coupling and not a detail: a change to the index line format the
+onboard writes can silently reorder `knowledge.files` and therefore change which files keep
+their bodies under the 1 MB budget.
+
+The snapshot's producer is `plugins/major-tom/app/snapshot.js`, the single implementation of
+the window rules stated here and below; the onboard workflow runs that script and no longer
+computes any of this in prose. The contract stays in this file because `render.js inject`
+consumes the snapshot it produces.
 
 `timeline` (D41) is `{events, window, omitted}`, the event index the `#timeline` view and
 the overview strip render. Sources, all under the persistence root and nowhere else:
@@ -129,7 +162,7 @@ that ends it; close the inline block before the line break.
 | `claude.md.tpl` | `CLAUDE.md` in the target repo root, importing `@AGENTS.md` | done |
 | `render.js` | not a template: the canonical renderer both templates go through, plus the dashboard `inject` mode | done, fixture-verified (three topologies, apply idempotence, outside-marker preservation, island injection) |
 | `dashboard/` | authoring split for the dashboard (D34): `index.html` + `dashboard.css` + ES modules; built by `scripts/build-dashboard.js`; excluded from the plugin sync | authoring source |
-| `dashboard.html` | GENERATED from `dashboard/` (never edit directly). Injected into `<persistence.root>/dashboard.html` via `render.js inject` (never the mustache grammar): single-file vanilla port of the owner's Claude Design reference (D33): collapsible rail, six hash-routed views (overview grid/console with the last-five-events strip, timeline merging `timeline` events with `git` commits, roadmap, git with search and kind filters, knowledge tree + viewer, config table/raw), persisted theme toggle, system fonts, honest empty states for lastRun/roadmap | v2 (D33, D34, D41); window and retention settled and built, design iteration and the lastRun/roadmap producers under OQ-13 |
+| `dashboard.html` | GENERATED from `dashboard/` (never edit directly). Injected into `<persistence.root>/dashboard.html` via `render.js inject` (never the mustache grammar), with the snapshot produced by `plugins/major-tom/app/snapshot.js` and no longer by prose inside the onboard workflow: single-file vanilla port of the owner's Claude Design reference (D33): collapsible rail, six hash-routed views (overview grid/console with the last-five-events strip, timeline merging `timeline` events with `git` commits, roadmap, git with search and kind filters, knowledge tree + viewer, config table/raw), persisted theme toggle, system fonts, honest empty states for lastRun/roadmap | v2 (D33, D34, D41); window and retention settled and built, design iteration and the lastRun/roadmap producers under OQ-13 |
 | `dashboard-server.js` | not a template: localhost static server. Onboard copies it to `.claude/server/` in the target repo (D32); `/major-tom:dashboard` and Desktop's launch.json both run that copy. Honors the `PORT` env var (autoPort). | done, smoke-tested |
 | `launch-merge.js` | not a template: merges the managed `major-tom-dashboard` entry into the target's `.claude/launch.json` (Claude Desktop preview surface), preserving every other entry and field; refuses an unparseable file | done, scenario-tested |
 | `settings-merge.js` | not a template: merges the three session defaults (`env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` `"1"`, `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` `"1"`, `alwaysThinkingEnabled` `true`, D37) into the target's Claude Code settings: `.claude/settings.local.json` when it exists, else `.claude/settings.json` when it exists, else a fresh `.claude/settings.json`; every other key and every other `env` entry preserved; fails closed, writing nothing, when the existing file does not parse, is not a JSON object, or has a non-object `env` | done, scenario-tested |
