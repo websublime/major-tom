@@ -134,13 +134,14 @@ function createElement(id) {
   return element
 }
 
-// The one input the client reaches for by id, #git-q in the git view. It carries what the
-// handler touches: the value it reads off the event target, and the focus and selection calls
-// that put the caret back after the re-render.
-function createInput(value) {
+// An input the client reaches for by id: #git-q in the git view, and #win-days and #win-limit
+// in the header's window control. It carries what the handlers touch: the value they read off
+// the event target, and the focus and selection calls the git filter makes to put the caret
+// back after its re-render.
+function createInput(id, value) {
   const listeners = new Map()
   return {
-    id: 'git-q',
+    id,
     value,
     focused: 0,
     selection: null,
@@ -261,20 +262,28 @@ function createEnv(options) {
   const replaced = []
   const media = []
 
-  // #git-q lives inside the HTML the client just wrote, so it exists only while that HTML
+  // Every input lives inside the HTML the client just wrote, so one exists only while that HTML
   // carries it, and it is a new element after every render: assigning innerHTML in a page
   // destroys the old input along with its listeners, and a stub that returned the same object
   // forever would hide a listener leak instead of catching one.
+  //
+  // Between renders the same object comes back, which is what a page does too, and it is what
+  // the window control depends on: typing in one of its fields deliberately re-renders nothing,
+  // so the value the reader typed lives on the element and diverges from the value= attribute
+  // still written in the HTML, exactly as it does in a browser.
+  const inputs = new Map()
   let inputRender = -1
-  let input = null
-  function gitInput() {
-    if (main.innerHTML.indexOf('id="git-q"') === -1) return null
-    if (input === null || inputRender !== main.renders) {
-      const match = main.innerHTML.match(/<input id="git-q"[^>]*\svalue="([^"]*)"/)
-      input = createInput(match ? match[1] : '')
+  function namedInput(id) {
+    if (main.innerHTML.indexOf(`id="${id}"`) === -1) return null
+    if (inputRender !== main.renders) {
+      inputs.clear()
       inputRender = main.renders
     }
-    return input
+    if (!inputs.has(id)) {
+      const match = main.innerHTML.match(new RegExp(`<input id="${id}"[^>]*\\svalue="([^"]*)"`))
+      inputs.set(id, createInput(id, match ? match[1] : ''))
+    }
+    return inputs.get(id)
   }
 
   const documentListeners = new Map()
@@ -287,7 +296,7 @@ function createEnv(options) {
       if (id === 'rail') return rail
       if (id === 'main') return main
       if (id === 'app') return app
-      if (id === 'git-q') return gitInput()
+      if (id === 'git-q' || id === 'win-days' || id === 'win-limit') return namedInput(id)
       return null
     },
     addEventListener(type, handler) {
@@ -353,7 +362,12 @@ function createEnv(options) {
     history: { replaced },
     media,
     storage: store,
-    gitInput,
+    gitInput() {
+      return namedInput('git-q')
+    },
+    windowInput(which) {
+      return namedInput(which === 'days' ? 'win-days' : 'win-limit')
+    },
     documentListeners,
     windowListeners,
     fireOnDocument(type, event) {
@@ -449,6 +463,52 @@ function typeInFilter(env, text) {
   assert.equal(handlers.length, 1, 'the filter must carry exactly one input listener per render')
   input.value = text
   handlers[0]({ target: input })
+}
+
+// Typing a whole value into one field of the window control, character by character, which is
+// the case the control is shaped around: every intermediate value is itself a window, so the
+// count of requests this produces is the assertion that matters wherever it is used.
+function typeInWindow(env, which, text) {
+  const input = env.windowInput(which)
+  assert.ok(input, `the header must render the ${which} field of the window control`)
+  const handlers = input.listeners.get('input') || []
+  assert.equal(handlers.length, 1, 'a window field must carry exactly one input listener per render')
+  for (const character of String(text)) {
+    input.value += character
+    handlers[0]({ target: input })
+  }
+}
+
+function clearWindowField(env, which) {
+  const input = env.windowInput(which)
+  assert.ok(input, `the header must render the ${which} field of the window control`)
+  input.value = ''
+  ;(input.listeners.get('input') || [])[0]({ target: input })
+}
+
+function pressEnterInWindow(env, which) {
+  const input = env.windowInput(which)
+  assert.ok(input, `the header must render the ${which} field of the window control`)
+  const handlers = input.listeners.get('keydown') || []
+  assert.equal(handlers.length, 1, 'a window field must carry exactly one keydown listener per render')
+  handlers[0]({ key: 'Enter', target: input })
+}
+
+// The window a request put on the wire, as the two parameters it carried or did not.
+function windowOf(request) {
+  return {
+    days: request.params.has('days') ? request.params.get('days') : null,
+    limit: request.params.has('limit') ? request.params.get('limit') : null,
+  }
+}
+
+// The window the control currently states, read off the rendered fields rather than off the
+// state behind them.
+function windowFields(env) {
+  const days = env.windowInput('days')
+  const limit = env.windowInput('limit')
+  assert.ok(days && limit, 'the window control must render both of its fields')
+  return { days: days.value, limit: limit.value }
 }
 
 // Evaluates the bundle. The first render and the first request happen inside this call, so
@@ -731,6 +791,15 @@ function servedShape() {
   const snapshot = snapshotFixture()
   delete snapshot.roadmap
   delete snapshot.lastRun
+  return snapshot
+}
+
+// A snapshot as the server answers it for a chosen window (D45): timeline.window reports the
+// window that was actually applied, which is what the page states back to the reader. The floor
+// is server behavior and never a parameter, so it does not move.
+function windowedShape(days, limit) {
+  const snapshot = snapshotFixture()
+  snapshot.timeline.window = { days, floorEvents: 50, ceilingEvents: limit }
   return snapshot
 }
 
@@ -1151,6 +1220,274 @@ test('refresh: a failure over a loaded page states itself above the view it coul
   env.net.take(SNAPSHOT_ROUTE).json(200, snapshotFixture())
   await settle()
   lacks(env.main.innerHTML, 'the repository moved under the server', 'a recovery must clear the banner')
+})
+
+// ---------------------------------------------------------------------------
+// The window control (D45)
+// ---------------------------------------------------------------------------
+
+test('window: the control renders in the header of every view, not only the two it cuts', async () => {
+  const env = await bootLoaded()
+
+  // In the header, beside the pill and the refresh control it shares a row with, and not inside
+  // a view: the window cuts the timeline and the git streams together (D42, D45 point 4), so a
+  // reader on any of the six sees which window is in force.
+  const header = env.main.innerHTML.slice(0, env.main.innerHTML.indexOf('</header>'))
+  has(header, 'id="win-days"', 'the days field must be in the header')
+  has(header, 'id="win-limit"', 'the limit field must be in the header')
+  has(header, 'data-act="window"', 'the apply control must be in the header')
+  has(header, 'data-act="refresh"', 'the header row is the one the refresh control already lives in')
+
+  for (const view of ['overview', 'roadmap', 'timeline', 'git', 'knowledge', 'config']) {
+    click(env, 'view', view)
+    has(env.main.innerHTML, 'id="win-days"', `the control must render on the ${view} view`)
+    has(env.main.innerHTML, 'id="win-limit"', `the control must render on the ${view} view`)
+    assert.equal(controls(env, 'window').length, 1,
+      `the ${view} view must carry exactly one window control, the header's`)
+  }
+})
+
+test('window: the fields state the effective window the snapshot reported, not a constant', async () => {
+  // 45 and 120 are neither the D41 numbers nor anything this page could hold: the only way they
+  // reach the fields is by being read off the snapshot the server served.
+  const env = await bootLoaded({ snapshot: windowedShape(45, 120) })
+
+  assert.deepEqual(windowFields(env), { days: '45', limit: '120' },
+    'the control must state the window the server applied')
+  lacks(env.main.innerHTML, 'value="30"', 'no default may be hard-coded into the control')
+})
+
+test('window: changing days re-issues the snapshot request carrying both parameters', async () => {
+  const env = await bootLoaded()
+  assert.deepEqual(windowFields(env), { days: '30', limit: '500' })
+
+  clearWindowField(env, 'days')
+  typeInWindow(env, 'days', '7')
+  // Typing is not a request. "7" was reached through no intermediate value here, but clearing
+  // the field and typing it is already three input events, and a control that fetched on change
+  // would have issued three requests by now.
+  assert.equal(env.net.countFor(SNAPSHOT_ROUTE), 1, 'typing must not talk to the server')
+
+  click(env, 'window')
+  assert.equal(env.net.countFor(SNAPSHOT_ROUTE), 2, 'applying must re-issue the snapshot request')
+  const request = env.net.lastFor(SNAPSHOT_ROUTE)
+  // Both, always: the two streams share one window (D42), so a request that moved only the days
+  // would let the limit drift away from it.
+  assert.deepEqual(windowOf(request), { days: '7', limit: '500' },
+    'the request must carry both parameters even though only one was touched')
+
+  request.json(200, windowedShape(7, 500))
+  await settle()
+  assert.deepEqual(windowFields(env), { days: '7', limit: '500' },
+    'the control must state the window that came back')
+
+  // Nowhere but in this page: not in storage and not in the URL, so a reload returns to the
+  // configured default (D45 point 3).
+  assert.deepEqual([...env.storage.keys()].sort(), [],
+    'the chosen window must not be stored, whatever precedent the theme and the rail set')
+  for (const url of env.history.replaced) {
+    lacks(url, 'days', 'the chosen window must not be written into the URL either')
+  }
+})
+
+test('window: changing limit re-issues the request carrying both parameters too', async () => {
+  const env = await bootLoaded()
+
+  clearWindowField(env, 'limit')
+  typeInWindow(env, 'limit', '100')
+  assert.equal(env.net.countFor(SNAPSHOT_ROUTE), 1, 'three keystrokes are still no request')
+
+  click(env, 'window')
+  assert.deepEqual(windowOf(env.net.lastFor(SNAPSHOT_ROUTE)), { days: '30', limit: '100' },
+    'the days must travel with the limit that was touched')
+
+  env.net.take(SNAPSHOT_ROUTE).json(200, windowedShape(30, 100))
+  await settle()
+  assert.deepEqual(windowFields(env), { days: '30', limit: '100' })
+
+  // And the window in force is what an ordinary refresh keeps asking for, so the view cannot
+  // silently fall back to the configured default under the reader.
+  click(env, 'refresh')
+  assert.deepEqual(windowOf(env.net.lastFor(SNAPSHOT_ROUTE)), { days: '30', limit: '100' },
+    'a refresh must keep the window that is on screen')
+})
+
+test('window: Enter in a field applies the same request the control does', async () => {
+  const env = await bootLoaded()
+
+  clearWindowField(env, 'days')
+  typeInWindow(env, 'days', '14')
+  pressEnterInWindow(env, 'days')
+
+  assert.equal(env.net.countFor(SNAPSHOT_ROUTE), 2, 'Enter must submit the control')
+  assert.deepEqual(windowOf(env.net.lastFor(SNAPSHOT_ROUTE)), { days: '14', limit: '500' },
+    'the keyboard path must carry both parameters, exactly as the button does')
+})
+
+test('window: a refused window renders the server message at the control and keeps the view', async () => {
+  const env = await bootLoaded()
+  click(env, 'view', 'git')
+
+  clearWindowField(env, 'days')
+  typeInWindow(env, 'days', '900')
+  click(env, 'window')
+  assert.deepEqual(windowOf(env.net.lastFor(SNAPSHOT_ROUTE)), { days: '900', limit: '500' })
+
+  env.net.take(SNAPSHOT_ROUTE).json(400, {
+    error: 'days must be an integer between 1 and 365, received 900',
+  })
+  await settle()
+
+  const html = env.main.innerHTML
+  // A correction: it says what was refused, repeats the server's sentence, and states that the
+  // page did not move.
+  has(html, '>window refused<', 'the refusal must be stated at the control')
+  has(html, 'days must be an integer between 1 and 365, received 900',
+    'the server message must be repeated verbatim, since it names the parameter, the value and the range')
+  has(html, 'Still showing the last window that was accepted: 30 days, 500 events.',
+    'the refusal must state that the window on screen did not change')
+
+  // Not a failure of the page: none of the states that mean the snapshot could not be computed.
+  lacks(html, '>no data<', 'a refused number must never blank the page')
+  lacks(html, 'GET /api/snapshot failed', 'a refused number is not a failed request to report')
+  lacks(html, 'Showing the last snapshot that loaded.', 'the stale banner belongs to a failed recompute')
+  lacks(html, 'stale, last computed ', 'the pill must not call the data stale')
+  has(html, 'computed ', 'the pill must still state the computation that is on screen')
+
+  // The view and its data are untouched, and so is the value that has to be corrected.
+  has(html, '<h1 class="sans">git</h1>', 'the view must be the one the reader was on')
+  has(html, '5 of 5 commits', 'the data must still be on screen')
+  has(html, 'fix(server): refuse a path-shaped id', 'every commit must still be there')
+  assert.deepEqual(windowFields(env), { days: '900', limit: '500' },
+    'the refused value must stay in its field so it can be corrected in place')
+})
+
+test('window: a corrected value after a refusal renders normally again', async () => {
+  const env = await bootLoaded()
+
+  clearWindowField(env, 'days')
+  typeInWindow(env, 'days', '0')
+  click(env, 'window')
+  env.net.take(SNAPSHOT_ROUTE).json(400, {
+    error: 'days must be an integer between 1 and 365, received 0',
+  })
+  await settle()
+  has(env.main.innerHTML, '>window refused<', 'the refusal must be on screen before the correction')
+
+  clearWindowField(env, 'days')
+  typeInWindow(env, 'days', '90')
+  click(env, 'window')
+  assert.deepEqual(windowOf(env.net.lastFor(SNAPSHOT_ROUTE)), { days: '90', limit: '500' })
+  env.net.take(SNAPSHOT_ROUTE).json(200, windowedShape(90, 500))
+  await settle()
+
+  const html = env.main.innerHTML
+  lacks(html, '>window refused<', 'the refusal must be gone once a window was accepted')
+  lacks(html, 'received 0', 'the old message must not survive the correction')
+  assert.deepEqual(windowFields(env), { days: '90', limit: '500' }, 'the control must state the new window')
+  has(html, 'feat(dashboard): fetch the snapshot over http', 'the view must render the data of the new window')
+
+  // And the refused window never became the one in force: the request the refresh issues is the
+  // one that was accepted.
+  click(env, 'refresh')
+  assert.deepEqual(windowOf(env.net.lastFor(SNAPSHOT_ROUTE)), { days: '90', limit: '500' })
+})
+
+test('window: a change in flight cannot be turned into two overlapping requests', async () => {
+  const env = await bootLoaded()
+
+  clearWindowField(env, 'days')
+  typeInWindow(env, 'days', '7')
+  click(env, 'window')
+
+  // The visible half, the discipline the refresh control already follows: the control says what
+  // it is doing and is disabled while it does it, and so is the refresh control beside it,
+  // because one request is in the air and it does not matter which control put it there.
+  const inFlight = controls(env, 'window')
+  assert.ok(inFlight.length > 0, 'the window control must stay on screen while it works')
+  for (const control of inFlight) {
+    assert.equal(control.disabled, true, 'a window change in flight must render its control disabled')
+  }
+  has(env.main.innerHTML, '>applying<', 'the control must state that it is applying')
+  for (const control of controls(env, 'refresh')) {
+    assert.equal(control.disabled, true, 'the refresh control must be disabled by the same request')
+  }
+
+  // The half that actually holds: a click and an Enter that reach the handlers anyway are both
+  // refused, and so is a refresh.
+  click(env, 'window', undefined, { force: true })
+  pressEnterInWindow(env, 'days')
+  click(env, 'refresh', undefined, { force: true })
+  assert.equal(env.net.countFor(SNAPSHOT_ROUTE), 2, 'nothing may put a second request in the air')
+
+  env.net.take(SNAPSHOT_ROUTE).json(200, windowedShape(7, 500))
+  await settle()
+  for (const control of controls(env, 'window')) {
+    assert.equal(control.disabled, false, 'the control must be usable again once the request landed')
+  }
+  has(env.main.innerHTML, '>apply<', 'the control must stop saying it is applying')
+})
+
+test('window: the timeline states the window that was chosen', async () => {
+  const env = await bootLoaded()
+  click(env, 'view', 'timeline')
+  has(env.main.innerHTML, 'Window: last 30 days, floor 50 events, ceiling 500 events.',
+    'the view must state the window it loaded with')
+
+  clearWindowField(env, 'days')
+  typeInWindow(env, 'days', '7')
+  clearWindowField(env, 'limit')
+  typeInWindow(env, 'limit', '120')
+  click(env, 'window')
+  env.net.take(SNAPSHOT_ROUTE).json(200, windowedShape(7, 120))
+  await settle()
+
+  has(env.main.innerHTML, 'Window: last 7 days, floor 50 events, ceiling 120 events.',
+    'the window line must state the chosen window, since the server reports the effective one')
+  lacks(env.main.innerHTML, 'ceiling 500 events', 'the constant it used to state must be gone')
+  // The floor is server behavior and never a parameter (D45 point 1), so it did not move.
+  has(env.main.innerHTML, 'floor 50 events', 'the floor is not a parameter and must not change')
+})
+
+test('window: a fresh page carries no window parameters and starts from the configured default', async () => {
+  const env = boot()
+
+  // Nothing has been chosen, so nothing is asked for and the server applies the configured
+  // default. This is also why the control is not on screen yet: there is no effective window to
+  // state and a pair of empty fields would be an invitation, not a control.
+  const first = env.net.calls[0]
+  assert.equal(first.url, SNAPSHOT_ROUTE, 'the boot must ask for no window at all')
+  assert.deepEqual(windowOf(first), { days: null, limit: null })
+  lacks(env.main.innerHTML, 'data-act="window"', 'there is no window to offer before a snapshot lands')
+
+  first.json(200, windowedShape(45, 120))
+  await settle()
+  assert.deepEqual(windowFields(env), { days: '45', limit: '120' },
+    'the window comes from the response, so the configured default is what a fresh page shows')
+
+  // A refresh before any choice still asks for nothing, so a page nobody touched keeps following
+  // the config rather than pinning the first window it happened to be served.
+  click(env, 'refresh')
+  assert.deepEqual(windowOf(env.net.lastFor(SNAPSHOT_ROUTE)), { days: null, limit: null })
+  env.net.take(SNAPSHOT_ROUTE).json(200, windowedShape(45, 120))
+  await settle()
+
+  // Choose one, then reload. A reload here is what it is in a browser: a fresh boot over
+  // whatever the last page left behind, which for the window is nothing at all (D45 point 3).
+  clearWindowField(env, 'days')
+  typeInWindow(env, 'days', '5')
+  click(env, 'window')
+  env.net.take(SNAPSHOT_ROUTE).json(200, windowedShape(5, 120))
+  await settle()
+  assert.deepEqual(windowFields(env), { days: '5', limit: '120' }, 'the chosen window must be in force')
+
+  const reloaded = boot({ storage: Object.fromEntries(env.storage), hash: env.location.hash })
+  assert.equal(reloaded.net.calls[0].url, SNAPSHOT_ROUTE,
+    'a reload must ask for no window: the chosen one is an adjustment to a reading session, not a setting')
+  reloaded.net.take(SNAPSHOT_ROUTE).json(200, windowedShape(45, 120))
+  await settle()
+  assert.deepEqual(windowFields(reloaded), { days: '45', limit: '120' },
+    'the reloaded page must be back on the configured default')
 })
 
 // ---------------------------------------------------------------------------

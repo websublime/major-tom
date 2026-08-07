@@ -4,7 +4,7 @@
 //
 // The two routes are the whole client-facing contract of the server:
 //
-//   GET /api/snapshot                the snapshot for the served repository
+//   GET /api/snapshot?days=&limit=   the snapshot for the served repository, over a window
 //   GET /api/knowledge/body?id=<id>  the body of the one concept that id addresses
 //
 // Both are same origin and both are read-only, so no base URL is configurable here: a
@@ -90,8 +90,26 @@ function requestJson(route) {
 // The whole snapshot. Recomputed by the server on every call, so this is equally the load
 // request and the refresh request: D43 point 5's explicit recompute is this same request
 // issued again, and there is no separate verb to call.
-export function fetchSnapshot() {
-  return requestJson(SNAPSHOT_ROUTE)
+//
+// `win` is the window of D45: null when the reader has chosen none, in which case no parameter
+// travels and the server applies the configured default, or an object carrying both `days` and
+// `limit`. This is the one place the query is built, and it is built from both keys or from
+// neither, which is what makes the two parameters travel together by construction rather than
+// by discipline: there is no path through this function that puts one of them on the wire
+// without the other. That is D45 point 4 at the client layer, and D42 is why it matters, both
+// streams being cut by one window; a request that moved only one would recreate exactly the
+// ragged reading D42 was written to prevent.
+//
+// The values go out as the reader typed them, never coerced and never clamped here. The bounds
+// are the server's and it refuses rather than clamps (D45 point 2), so a copy of them in this
+// file would be a second source of truth for one rule, and worse, it would replace the server's
+// own sentence, which names the parameter, the value received and the accepted range, with a
+// guess made here.
+export function fetchSnapshot(win) {
+  if (win === null || win === undefined) return requestJson(SNAPSHOT_ROUTE)
+  return requestJson(SNAPSHOT_ROUTE
+    + '?days=' + encodeURIComponent(String(win.days == null ? '' : win.days))
+    + '&limit=' + encodeURIComponent(String(win.limit == null ? '' : win.limit)))
 }
 
 // The body of one concept, addressed by the opaque id its listing entry carries. The id is
