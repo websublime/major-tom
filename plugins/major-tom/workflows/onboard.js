@@ -331,7 +331,9 @@ const [render, install] = await parallel([
       [
         'Install exactly this user-confirmed specialist list into the target repository (current working directory), per your agent-installer role. The list was confirmed in the onboard interview (D24); install nothing beyond it and substitute nothing:',
         JSON.stringify(cfg.specialists || [], null, 2),
-        'Download each agent from its stated source, verify the body you write matches the download (frontmatter derivation from API metadata is the expected transformation; the body itself stays byte-identical, check it by hash), and install into .claude/agents/.',
+        'Download each agent from its stated source, verify the body you write matches the download byte for byte by hash (D24), and install into .claude/agents/.',
+        'Derive each installed agent\'s tools frontmatter by the tool policy your role defines (D52), never from the upstream libs field: the read-only built-ins Read, Glob, Grep, plus one mcp__<server>__* entry per server in this project\'s mcp config list, in this order:',
+        JSON.stringify(cfg.mcp || [], null, 2),
         'If the list is empty, install nothing and say so in notes. Report every entry actually installed as {name, source}, and anything skipped or failed with the reason in skipped/notes.',
       ].join('\n'),
       { label: 'install specialists', phase: 'Execute', schema: INSTALL_REPORT, agentType: 'major-tom:agent-installer' }
