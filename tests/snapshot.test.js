@@ -34,13 +34,11 @@ const IDENTITY_NAME = 'Fixture Author'
 const IDENTITY_EMAIL = 'fixture@example.test'
 const IDENTITY = `${IDENTITY_NAME} <${IDENTITY_EMAIL}>`
 
-// The window constants the spec names literally.
+// The window constants the spec names literally. They are a legibility limit, not a weight
+// one: the byte caps the schema used to carry are gone (D43 point 4), the window is not.
 const WINDOW_DAYS = 30
 const FLOOR_EVENTS = 50
 const CEILING_EVENTS = 500
-const BYTE_BUDGET = 262144
-const BODY_CAP = 32768
-const BODY_TOTAL_CAP = 1048576
 const SUMMARY_CAP = 200
 
 const MINUTE = 60 * 1000
@@ -548,7 +546,7 @@ test('git: a repository with no commits yields an empty array', (t) => {
 // knowledge
 // ---------------------------------------------------------------------------
 
-test('knowledge: a concept carries path, type, frontmatter, body and updated', (t) => {
+test('knowledge: a concept carries id, path, type, frontmatter and updated', (t) => {
   const dir = initRepo(t, {
     knowledge: {
       'docs/alpha.md': concept('type: doc\ntitle: Alpha', 'a short body'),
@@ -563,13 +561,31 @@ test('knowledge: a concept carries path, type, frontmatter, body and updated', (
   const alpha = fileByPath(snapshot, 'docs/alpha.md')
   assert.equal(alpha.type, 'doc')
   assert.deepEqual(alpha.frontmatter, { type: 'doc', title: 'Alpha' })
-  assert.ok(alpha.body.includes('a short body'))
-  assert.ok(!alpha.truncated)
   assert.equal(new Date(alpha.updated).getTime(), updated.getTime())
+  assert.deepEqual(Object.keys(alpha).sort(), ['frontmatter', 'id', 'path', 'size', 'type', 'updated'])
 
   // path is relative to the persistence root, with forward slashes, at any depth.
   const nested = fileByPath(snapshot, 'memories/deep/nested.md')
   assert.equal(nested.type, 'memory')
+})
+
+test('knowledge: no entry carries a body or a truncated flag', (t) => {
+  // Bodies leave the listing entirely (D43 point 4) and are fetched one at a time instead,
+  // so neither a short body nor a very long one is ever embedded, and nothing is ever cut,
+  // so nothing is ever flagged as cut either.
+  const dir = initRepo(t, {
+    knowledge: {
+      'docs/short.md': conceptExact('type: doc\ntitle: Short', 'y'.repeat(10)),
+      'docs/long.md': conceptExact('type: doc\ntitle: Long', 'x'.repeat(2000000)),
+    },
+  })
+  const snapshot = runSnapshot(t, dir)
+
+  assert.equal(snapshot.knowledge.files.length, 2)
+  for (const file of snapshot.knowledge.files) {
+    assert.equal('body' in file, false, `${file.path} must carry no body at all`)
+    assert.equal('truncated' in file, false, `${file.path} must carry no truncated key at all`)
+  }
 })
 
 test('knowledge: size is the byte size of the file on disk', (t) => {
@@ -601,63 +617,54 @@ test('knowledge: index.md, dashboard.html, intents.log and a file without frontm
   assert.equal(paths.includes('docs/plain.md'), false)
 })
 
-test('knowledge: a body over 32768 bytes is cut and flagged truncated', (t) => {
-  // conceptExact so the body on disk is exactly these bytes: no blank line, no trailing
-  // newline, no line break anywhere near the cut.
-  const dir = initRepo(t, {
-    knowledge: { 'docs/long.md': conceptExact('type: doc\ntitle: Long', 'x'.repeat(40000)) },
-  })
-  const snapshot = runSnapshot(t, dir)
-
-  const long = fileByPath(snapshot, 'docs/long.md')
-  assert.equal(long.truncated, true)
-  assert.equal(Buffer.byteLength(long.body), BODY_CAP)
-  assert.match(long.body, /^x+$/)
-})
-
-test('knowledge: a body under the per-file cap is embedded whole and not flagged', (t) => {
-  const body = 'y'.repeat(1000)
-  const dir = initRepo(t, {
-    knowledge: { 'docs/short.md': conceptExact('type: doc\ntitle: Short', body) },
-  })
-  const snapshot = runSnapshot(t, dir)
-
-  const short = fileByPath(snapshot, 'docs/short.md')
-  assert.equal(short.body, body)
-  assert.ok(!short.truncated)
-})
-
-test('knowledge: body embedding stops when the 1048576-byte total is reached', (t) => {
-  // Forty files, each with a body of 40000 bytes, so each embedded body is the per-file cap
-  // of 32768. 1048576 / 32768 is exactly 32, so the thirty-third file is the first without
-  // a body: after 32 bodies the running total is no longer under the 1 MB budget.
+test('knowledge: every entry carries an opaque hex id, unique across the bundle', (t) => {
   const knowledge = {}
   const order = []
   for (let i = 0; i < 40; i++) {
     const rel = `docs/f${String(i).padStart(2, '0')}.md`
     order.push(rel)
-    knowledge[rel] = conceptExact(`type: doc\ntitle: File ${i}`, 'x'.repeat(40000))
+    knowledge[rel] = concept(`type: doc\ntitle: File ${i}`, `body ${i}`)
   }
+  // Two files with identical contents, so an id derived from the body rather than from the
+  // path would collide here.
+  knowledge['memories/twin-a.md'] = concept('type: memory\ntitle: Twin', 'the same body')
+  knowledge['memories/twin-b.md'] = concept('type: memory\ntitle: Twin', 'the same body')
   const dir = initRepo(t, { knowledge, index: order })
   const snapshot = runSnapshot(t, dir)
 
-  assert.deepEqual(snapshot.knowledge.files.map((f) => f.path), order)
-
-  const hasBody = snapshot.knowledge.files.map((f) => typeof f.body === 'string')
-  const firstWithout = hasBody.indexOf(false)
-  assert.ok(firstWithout > 0, 'the first files must keep their bodies')
-  assert.equal(hasBody.slice(firstWithout).includes(true), false, 'embedding must stop, never resume')
-  assert.equal(firstWithout, BODY_TOTAL_CAP / BODY_CAP)
-
-  for (const file of snapshot.knowledge.files.slice(0, firstWithout)) {
-    assert.equal(Buffer.byteLength(file.body), BODY_CAP)
-    assert.equal(file.truncated, true)
+  const ids = snapshot.knowledge.files.map((f) => f.id)
+  assert.equal(ids.length, 42)
+  for (const file of snapshot.knowledge.files) {
+    assert.equal(typeof file.id, 'string')
+    assert.match(file.id, /^[0-9a-f]+$/, `${file.path} must carry a hex id`)
+    assert.ok(file.id.length >= 8, `${file.path} id must be long enough to be unique in practice`)
+    // Opaque: the id says nothing about the path it addresses.
+    assert.equal(file.id.includes('/'), false)
+    assert.equal(file.id.includes('.md'), false)
   }
-  for (const file of snapshot.knowledge.files.slice(firstWithout)) {
-    assert.equal('body' in file, false, `${file.path} must carry no body at all`)
-  }
+  assert.equal(new Set(ids).size, ids.length, 'ids must be unique across the bundle')
 })
 
+test('knowledge: the id of a path is the same on two separate runs and in two repositories', (t) => {
+  const knowledge = { 'docs/alpha.md': concept('type: doc\ntitle: Alpha', 'alpha body') }
+  const first = initRepo(t, { knowledge })
+
+  const one = runSnapshot(t, first)
+  const two = runSnapshot(t, first)
+  assert.equal(fileByPath(two, 'docs/alpha.md').id, fileByPath(one, 'docs/alpha.md').id)
+
+  // The id derives from the path relative to the persistence root and from nothing else, so
+  // a different checkout in a different directory, and a body edited in between, address the
+  // same concept by the same id.
+  const second = initRepo(t, { knowledge: { 'docs/alpha.md': concept('type: doc\ntitle: Alpha', 'a rewritten body') } })
+  assert.notEqual(second, first)
+  const other = runSnapshot(t, second)
+  assert.equal(fileByPath(other, 'docs/alpha.md').id, fileByPath(one, 'docs/alpha.md').id)
+})
+
+// The ordering survives the removal of the byte caps that first motivated it: index.md is
+// the OKF bundle's progressive-disclosure mechanism (D28), so the order it imposes is the
+// order its author wants the bundle read, and the listing now presents rather than truncates.
 test('knowledge: the files listed in index.md come first, in index order', (t) => {
   const dir = initRepo(t, {
     // The index lists beta before alpha and never mentions gamma.
@@ -847,15 +854,17 @@ test('timeline: a five-field legacy line has a null session id', (t) => {
   assert.equal(event.kind, 'intent')
 })
 
-test('timeline: window always carries the four literal limits', (t) => {
+test('timeline: window always carries the three literal limits and no byte budget', (t) => {
   const dir = initRepo(t, {})
   const snapshot = runSnapshot(t, dir)
+  // deepEqual on the whole object, so a fourth member would fail here: the byte budget left
+  // the schema with D43 point 4 and nothing replaced it.
   assert.deepEqual(snapshot.timeline.window, {
     days: WINDOW_DAYS,
     floorEvents: FLOOR_EVENTS,
     ceilingEvents: CEILING_EVENTS,
-    byteBudget: BYTE_BUDGET,
   })
+  assert.equal('byteBudget' in snapshot.timeline.window, false)
 })
 
 test('timeline: a summary over 200 characters is cut and flagged', (t) => {
@@ -911,7 +920,7 @@ test('timeline: omitted.reason is days when only the horizon bites', (t) => {
 })
 
 test('timeline: omitted.reason is ceiling when only the 500 limit bites', (t) => {
-  // 505 events, all inside the horizon, all small enough that the byte budget never bites.
+  // 505 events, all inside the horizon, so the ceiling is the only limit that can bite.
   const lines = []
   for (let i = 1; i <= 505; i++) {
     lines.push(logLine({ at: new Date(NOW - i * MINUTE), promptId: `p-${i}`, summary: `event ${i}` }))
@@ -926,11 +935,12 @@ test('timeline: omitted.reason is ceiling when only the 500 limit bites', (t) =>
   assert.equal(snapshot.timeline.events[CEILING_EVENTS - 1].summary, 'event 500')
 })
 
-test('timeline: omitted.reason is bytes when only the byte budget bites', (t) => {
+test('timeline: a large volume of events is never cut by weight', (t) => {
   // Sixty events, all inside the horizon, so neither the horizon nor the ceiling bites and
-  // the floor has nothing to extend. Each carries a very long promptId, since the summary
-  // is capped at 200 characters and 500 ordinary events never reach 262144 bytes: with the
-  // ceiling at 500 the budget can only be reached by wide events.
+  // the floor has nothing to extend. Each carries a very wide promptId, so the serialized
+  // events run to hundreds of kilobytes: under the old 262144-byte budget this fixture lost
+  // events and reported reason "bytes". No byte limit exists any more (D43 point 4), so all
+  // sixty survive and nothing is omitted.
   const wideId = 'p-' + 'i'.repeat(5000)
   const lines = []
   for (let i = 1; i <= 60; i++) {
@@ -940,16 +950,12 @@ test('timeline: omitted.reason is bytes when only the byte budget bites', (t) =>
   const snapshot = runSnapshot(t, dir)
 
   const events = snapshot.timeline.events
-  assert.ok(events.length > 0, 'the budget must not empty the list')
-  assert.ok(events.length < 60, 'the budget must drop something')
-  assert.ok(
-    Buffer.byteLength(JSON.stringify(events)) <= BYTE_BUDGET,
-    `the serialized events must fit ${BYTE_BUDGET} bytes`
-  )
-  assert.equal(snapshot.timeline.omitted.reason, 'bytes')
-  assert.equal(snapshot.timeline.omitted.count, 60 - events.length)
-  // Dropping happens at the oldest end, so the newest event always survives.
+  assert.equal(events.length, 60)
+  assert.ok(Buffer.byteLength(JSON.stringify(events)) > 262144, 'the fixture must exceed the budget that used to exist')
+  assert.equal(snapshot.timeline.omitted.count, 0)
+  assert.equal(snapshot.timeline.omitted.reason, null)
   assert.equal(events[0].summary, 'wide event 1')
+  assert.equal(events[59].summary, 'wide event 60')
 })
 
 test('timeline: omitted.reason is null when nothing is omitted', (t) => {
@@ -1037,6 +1043,239 @@ test('determinism: two runs over an unchanged repository differ only in generate
   // Comparing the re-serialized objects also compares key order, so a reordered walk is a
   // failure here even though the values match.
   assert.equal(JSON.stringify(second), JSON.stringify(first))
+})
+
+// ---------------------------------------------------------------------------
+// The library entry point
+// ---------------------------------------------------------------------------
+
+// The server imports the computation instead of spawning it, so the module export and the
+// CLI have to be the same computation and have to fail on the same conditions. They differ
+// in one thing only: the CLI exits, the library throws.
+
+test('library: buildSnapshot returns exactly what the CLI writes', (t) => {
+  const dir = initRepo(t, {
+    index: ['docs/beta.md', 'docs/alpha.md'],
+    knowledge: {
+      'docs/alpha.md': concept('type: decision\nid: D1\ntitle: A decision\nstatus: open', 'why'),
+      'docs/beta.md': concept('type: doc\ntitle: Beta', 'beta body'),
+    },
+    intentsLog: [logLine({ at: insideHorizon(2), promptId: 'p-log', summary: 'a logged intent' })],
+    commits: [{ message: 'feat: first', date: insideHorizon(8), files: { 'a.txt': 'one\n' } }],
+  })
+
+  const fromCli = runSnapshot(t, dir)
+  const fromLibrary = require(SCRIPT).buildSnapshot({ repoRoot: dir })
+
+  assert.equal(new Date(fromLibrary.generatedAt).toISOString(), fromLibrary.generatedAt)
+  delete fromCli.generatedAt
+  delete fromLibrary.generatedAt
+  // Re-serialized, so key order is compared too.
+  assert.equal(JSON.stringify(fromLibrary), JSON.stringify(fromCli))
+})
+
+test('library: a fail-closed condition throws and the caller survives it', (t) => {
+  const { buildSnapshot } = require(SCRIPT)
+  const broken = initRepo(t, { noConfig: true })
+  const sound = initRepo(t, { knowledge: { 'docs/alpha.md': concept('type: doc\ntitle: Alpha', 'alpha body') } })
+
+  let caught = null
+  try {
+    buildSnapshot({ repoRoot: broken })
+  } catch (err) {
+    caught = err
+  }
+  assert.ok(caught instanceof Error, 'the library path must throw')
+  assert.match(caught.message, /major-tom\.json/)
+
+  // The throw left the process usable, which is the whole point: a server must answer the
+  // next request rather than exit because this one named a repository that is not onboarded.
+  const snapshot = buildSnapshot({ repoRoot: sound })
+  assert.equal(fileByPath(snapshot, 'docs/alpha.md').type, 'doc')
+})
+
+// ---------------------------------------------------------------------------
+// The body reader
+// ---------------------------------------------------------------------------
+
+// readConceptBody({repoRoot, id}) is the whole implementation of the body endpoint, and it
+// lives beside the concept walk so that no caller ever holds a knowledge path: the server
+// hands over an opaque id and gets a body or nothing back. The tests below are therefore about
+// two things, that an id the listing minted resolves to exactly the body the listing described,
+// and that everything else resolves to nothing at all.
+
+// The id of a persistence-root-relative path, computed the way the spec states it: a prefix of
+// the hex SHA-256 of the path. The prefix length is read from an id the snapshot actually
+// minted, so this helper never fixes a length the schema does not fix.
+function idOfPath(rel, sampleId) {
+  return crypto.createHash('sha256').update(rel, 'utf8').digest('hex').slice(0, sampleId.length)
+}
+
+// The body of a fixture file as the file itself holds it: everything after the line that
+// closes the frontmatter, read here rather than reconstructed from what was written.
+function bodyOnDisk(dir, rel) {
+  const lines = fs.readFileSync(path.join(dir, KNOWLEDGE_ROOT, rel), 'utf8').split('\n')
+  const end = lines.indexOf('---', 1)
+  assert.notEqual(end, -1, `${rel} must have a closing frontmatter fence`)
+  return lines.slice(end + 1).join('\n')
+}
+
+test('body: a minted id returns exactly that file body', (t) => {
+  const dir = initRepo(t, {
+    index: ['docs/alpha.md'],
+    knowledge: {
+      'docs/alpha.md': conceptExact('type: doc\ntitle: Alpha', '# Alpha\n\nthe alpha body\n'),
+      'memories/deep/nested.md': conceptExact('type: memory\ntitle: Nested', 'the nested body'),
+    },
+  })
+  const { readConceptBody } = require(SCRIPT)
+  const snapshot = runSnapshot(t, dir)
+
+  for (const rel of ['docs/alpha.md', 'memories/deep/nested.md']) {
+    const id = fileByPath(snapshot, rel).id
+    assert.equal(readConceptBody({ repoRoot: dir, id }), bodyOnDisk(dir, rel), `body of ${rel}`)
+  }
+
+  // Byte for byte, and each id addresses its own file and not the other one.
+  assert.equal(
+    readConceptBody({ repoRoot: dir, id: fileByPath(snapshot, 'docs/alpha.md').id }),
+    '# Alpha\n\nthe alpha body\n'
+  )
+  assert.equal(
+    readConceptBody({ repoRoot: dir, id: fileByPath(snapshot, 'memories/deep/nested.md').id }),
+    'the nested body'
+  )
+})
+
+test('body: the split is the one the concept walk uses', (t) => {
+  // A body carrying a line that looks like a frontmatter fence, and a leading blank line from
+  // the ordinary concept shape: the reader must return everything after the first closing
+  // fence and must not cut at the second one.
+  const dir = initRepo(t, {
+    knowledge: { 'docs/fenced.md': concept('type: doc\ntitle: Fenced', 'before\n---\nafter') },
+  })
+  const { readConceptBody } = require(SCRIPT)
+  const snapshot = runSnapshot(t, dir)
+  const id = fileByPath(snapshot, 'docs/fenced.md').id
+
+  assert.equal(readConceptBody({ repoRoot: dir, id }), '\nbefore\n---\nafter\n')
+  assert.equal(readConceptBody({ repoRoot: dir, id }), bodyOnDisk(dir, 'docs/fenced.md'))
+})
+
+test('body: an id no file carries returns null, index.md included', (t) => {
+  const dir = initRepo(t, {
+    index: ['docs/alpha.md'],
+    knowledge: { 'docs/alpha.md': concept('type: doc\ntitle: Alpha', 'alpha body') },
+  })
+  const { readConceptBody } = require(SCRIPT)
+  const snapshot = runSnapshot(t, dir)
+  const sampleId = fileByPath(snapshot, 'docs/alpha.md').id
+
+  // An id that was never minted: the same shape, addressing a path that does not exist.
+  assert.equal(readConceptBody({ repoRoot: dir, id: idOfPath('docs/never-written.md', sampleId) }), null)
+  assert.equal(readConceptBody({ repoRoot: dir, id: 'f'.repeat(sampleId.length) }), null)
+
+  // index.md is reserved and is never a concept, so it never gets an id and its id can never
+  // be resolved: the bundle index is not fetchable through the body endpoint.
+  const indexId = idOfPath('index.md', sampleId)
+  assert.equal(snapshot.knowledge.files.some((f) => f.id === indexId), false, 'index.md must never be listed')
+  assert.equal(readConceptBody({ repoRoot: dir, id: indexId }), null)
+})
+
+test('body: a malformed id returns null instead of throwing', (t) => {
+  const dir = initRepo(t, {
+    knowledge: {
+      'docs/alpha.md': concept('type: doc\ntitle: Alpha', 'alpha body'),
+      'docs/d1.md': concept('type: decision\nid: D1\ntitle: A decision', 'why'),
+    },
+  })
+  const { readConceptBody, SnapshotError } = require(SCRIPT)
+
+  // A malformed query string is a 404 and not a server fault, so every one of these returns
+  // null; any throw here fails the test by itself.
+  const malformed = [
+    '',
+    undefined,
+    null,
+    42,
+    {},
+    ['docs/alpha.md'],
+    // Path-shaped values, which are exactly what the id addressing exists to make unusable:
+    // the reader compares them against minted ids and never joins them to anything.
+    '../../../../etc/passwd',
+    '/etc/passwd',
+    'docs/alpha.md',
+    'docs/d1.md',
+  ]
+  for (const id of malformed) {
+    assert.equal(readConceptBody({ repoRoot: dir, id }), null, `id ${JSON.stringify(id)} must resolve to nothing`)
+  }
+  assert.equal(readConceptBody({ repoRoot: dir }), null, 'an absent id must resolve to nothing')
+
+  // This case used to read `readConceptBody({})` and assert null, on the reading that an
+  // absent id resolves to nothing "before anything is read". That reading was the defect: it
+  // was the id test standing in front of the config read, which made one broken repository
+  // report two different things through the one endpoint, a 404 for a request without an id
+  // and a 500 naming the missing config for a request with one. The config is now read first,
+  // so the repository is diagnosed before the request is, and the corrected contract is the
+  // pair below: a sound repository answers null whatever the id was (asserted above), and a
+  // broken one throws whatever the id was, absent id included.
+  //
+  // The repository is named explicitly here, which the old assertion could not do: with the
+  // config read first, `readConceptBody({})` reads whatever repository the process happens to
+  // be running in, and this file must not assert an answer that depends on that.
+  const broken = initRepo(t, { noConfig: true })
+  for (const call of [{ repoRoot: broken }, { repoRoot: broken, id: '' }, { repoRoot: broken, id: 'docs/alpha.md' }]) {
+    assert.throws(
+      () => readConceptBody(call),
+      (err) => err instanceof SnapshotError && /major-tom\.json/.test(err.message),
+      `a broken repository must be diagnosed the same way for ${JSON.stringify(call.id)}`
+    )
+  }
+})
+
+test('body: a fail-closed condition throws and the caller survives it', (t) => {
+  const { readConceptBody, SnapshotError } = require(SCRIPT)
+  const broken = initRepo(t, { noConfig: true })
+  const sound = initRepo(t, { knowledge: { 'docs/alpha.md': concept('type: doc\ntitle: Alpha', 'alpha body') } })
+  const snapshot = runSnapshot(t, sound)
+  const id = fileByPath(snapshot, 'docs/alpha.md').id
+
+  // An un-onboarded repository is reported the same way through both entry points, so the
+  // page can name what is wrong instead of showing an empty body.
+  let caught = null
+  try {
+    readConceptBody({ repoRoot: broken, id })
+  } catch (err) {
+    caught = err
+  }
+  assert.ok(caught instanceof SnapshotError, 'a fail-closed condition must throw a SnapshotError')
+  assert.match(caught.message, /major-tom\.json/)
+
+  // And the throw left the process usable, which is what lets a server answer the next request.
+  assert.equal(readConceptBody({ repoRoot: sound, id }), '\nalpha body\n')
+})
+
+test('body: the list is recomputed on every call, so nothing goes stale', (t) => {
+  const dir = initRepo(t, {
+    knowledge: { 'docs/alpha.md': concept('type: doc\ntitle: Alpha', 'the first body') },
+  })
+  const { readConceptBody } = require(SCRIPT)
+  const snapshot = runSnapshot(t, dir)
+  const id = fileByPath(snapshot, 'docs/alpha.md').id
+  assert.equal(readConceptBody({ repoRoot: dir, id }), '\nthe first body\n')
+
+  // The id derives from the path, so it survives an edit to the file; the body it resolves to
+  // is read from disk on this call and is the edited one.
+  fs.writeFileSync(
+    path.join(dir, KNOWLEDGE_ROOT, 'docs', 'alpha.md'),
+    concept('type: doc\ntitle: Alpha', 'the second body')
+  )
+  assert.equal(readConceptBody({ repoRoot: dir, id }), '\nthe second body\n')
+
+  // And a file that stops being a concept stops resolving at all.
+  fs.writeFileSync(path.join(dir, KNOWLEDGE_ROOT, 'docs', 'alpha.md'), '# No frontmatter here\n')
+  assert.equal(readConceptBody({ repoRoot: dir, id }), null)
 })
 
 // ---------------------------------------------------------------------------
