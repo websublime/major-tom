@@ -2,23 +2,20 @@
 // client side with the commit stream, newest first, grouped by day and then by session.
 // Commits are never duplicated into the key; the merge happens here.
 
-import { COMMITS, TIMELINE, clock } from '../data.mjs'
+import { clock, commits, timeline } from '../data.mjs'
 import { esc } from '../ui.mjs'
 
+// The two limits that can bite, and the only two the server can now report: D43 point 4
+// dropped the 256 KB timeline budget, so "bytes" left the set of reasons along with it. An
+// unrecognised reason still prints verbatim rather than being swallowed, which is how a
+// snapshot from an older producer still states honestly why it dropped events.
 const REASON_TEXT = {
   days: 'days (the day horizon)',
-  ceiling: 'ceiling (the event ceiling)',
-  bytes: 'bytes (the byte budget)'
+  ceiling: 'ceiling (the event ceiling)'
 }
 
 function stated(v) {
   return v == null || v === '' ? 'not stated' : String(v)
-}
-
-function kbBytes(n) {
-  const v = Number(n)
-  if (n == null || !isFinite(v)) return 'not stated'
-  return v >= 1024 ? Math.round(v / 1024) + ' KB' : v + ' bytes'
 }
 
 function reasonText(r) {
@@ -54,7 +51,7 @@ function groupLabel(it) {
 // The merged stream: timeline events plus commits, one chronological order, newest first.
 // Items with an unparseable date keep their place at the end rather than being dropped.
 export function timelineStream() {
-  const commits = COMMITS.map(function (c) {
+  const commitItems = commits().map(function (c) {
     const ms = Date.parse(c.date)
     return {
       stream: 'commit', kind: 'commit', mark: c.sha, label: c.kind, color: c.kindColor,
@@ -62,7 +59,7 @@ export function timelineStream() {
       date: c.date, when: c.when, at: isNaN(ms) ? null : ms
     }
   })
-  const events = TIMELINE.events.map(function (e) {
+  const events = timeline().events.map(function (e) {
     return {
       stream: 'event', kind: e.kind, mark: e.kind === 'run' ? 'run' : 'intent',
       label: e.kind === 'run' ? '' : (e.tier || 'intent') + (e.type ? ' ' + e.type : ''),
@@ -70,7 +67,7 @@ export function timelineStream() {
       date: e.date, when: e.when, at: e.at
     }
   })
-  return events.concat(commits).sort(function (a, b) {
+  return events.concat(commitItems).sort(function (a, b) {
     if (a.at == null && b.at == null) return 0
     if (a.at == null) return 1
     if (b.at == null) return -1
@@ -86,7 +83,7 @@ export function timelineRow(it) {
     + (isCommit ? '' : ' style="color:' + it.color + '"') + '>' + esc(it.mark) + '</span>'
     + '<span class="ellip" style="flex:0 0 122px;color:' + it.color + ';font-size:11px">' + esc(it.label) + '</span>'
     + '<span class="ellip" style="flex:1 1 auto;min-width:0">' + esc(it.text) + '</span>'
-    + (it.truncated ? '<span class="chip" style="flex:0 0 auto;color:var(--warn)" title="summary cut at the snapshot cap">truncated</span>' : '')
+    + (it.truncated ? '<span class="chip" style="flex:0 0 auto;color:var(--warn)" title="summary cut at the 200-character cap">truncated</span>' : '')
     + (it.path ? '<span class="ellip" style="flex:0 1 190px;color:var(--dimmer);font-size:11px;text-align:right">' + esc(it.path) + '</span>' : '')
     + '<span style="flex:0 0 42px;text-align:right;color:var(--dimmer);font-size:11px">' + esc(clock(it.date) || it.when) + '</span>'
     + '</div>'
@@ -95,15 +92,16 @@ export function timelineRow(it) {
 // Plain text, always rendered: the window this view stands on and every omission it was
 // told about. Truncation is never silent (D41).
 export function timelineWindowLine() {
-  if (!TIMELINE.present) {
+  const t = timeline()
+  if (!t.present) {
     return 'This snapshot carries no timeline key: no recorded events and no window to state. '
       + 'Any rows below are commits from the git window.'
   }
-  const w = TIMELINE.window
-  const o = TIMELINE.omitted
+  const w = t.window
+  const o = t.omitted
   const head = w
     ? 'Window: last ' + stated(w.days) + ' days, floor ' + stated(w.floorEvents) + ' events, ceiling '
-      + stated(w.ceilingEvents) + ' events, byte budget ' + kbBytes(w.byteBudget) + '.'
+      + stated(w.ceilingEvents) + ' events.'
     : 'Window: not stated in this snapshot.'
   let tail
   if (!o) {
@@ -119,10 +117,12 @@ export function timelineWindowLine() {
 
 export function vTimeline() {
   const stream = timelineStream()
+  const eventCount = timeline().events.length
+  const commitCount = commits().length
   const bar = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:0 4px">'
-    + '<span style="color:var(--dim);font-size:11.5px">' + TIMELINE.events.length + ' recorded event'
-    + (TIMELINE.events.length === 1 ? '' : 's') + ' &#183; ' + COMMITS.length + ' commit'
-    + (COMMITS.length === 1 ? '' : 's') + '</span>'
+    + '<span style="color:var(--dim);font-size:11.5px">' + eventCount + ' recorded event'
+    + (eventCount === 1 ? '' : 's') + ' &#183; ' + commitCount + ' commit'
+    + (commitCount === 1 ? '' : 's') + '</span>'
     + '<span style="margin-left:auto;color:var(--dim);font-size:11.5px">' + stream.length + ' in the merged stream</span></div>'
   const note = '<div style="padding:0 6px;color:var(--dim);font-size:11.5px;line-height:1.65">'
     + esc(timelineWindowLine()) + '</div>'

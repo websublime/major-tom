@@ -1,14 +1,14 @@
 // Overview: lifecycle (grid or console layout), roadmap brief, knowledge counts,
 // recent git, decisions. Sections without a data producer render empty states.
 
-import { COMMITS, COUNTS, DECISIONS, LASTRUN, ROADMAP, ROOT } from '../data.mjs'
+import { commits, counts, decisions, lastRun, roadmap, root } from '../data.mjs'
 import { S } from '../state.mjs'
 import { commitRow, decisionRow, esc, milestoneVm, phaseVms } from '../ui.mjs'
 import { timelineRow, timelineStream } from './timeline.mjs'
 
-function lifecycleGrid(phases) {
+function lifecycleGrid(phases, run) {
   return '<section class="panel"><div class="panel-head"><span class="eyebrow">lifecycle</span>'
-    + '<span style="color:var(--dimmer);font-size:11.5px">' + esc(LASTRUN.id || '') + '</span>'
+    + '<span style="color:var(--dimmer);font-size:11.5px">' + esc(run.id || '') + '</span>'
     + '<span class="chip" style="margin-left:auto;padding:4px 11px;color:var(--text);font-size:11.5px">'
     + phases.filter(function (p) { return p.status === 'done' }).length + '/' + phases.length + ' done</span></div>'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px">'
@@ -23,12 +23,12 @@ function lifecycleGrid(phases) {
     }).join('') + '</div></section>'
 }
 
-function lifecycleConsole(phases) {
+function lifecycleConsole(phases, run) {
   return '<section class="panel"><div class="panel-head">'
     + '<span class="chip" style="width:26px;height:26px;border-radius:10px;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent);display:grid;place-items:center">&#9656;</span>'
-    + '<span class="sans" style="font-size:14px;font-weight:600">' + esc(LASTRUN.id || '') + '</span>'
-    + '<span style="color:var(--dim);font-size:11.5px">' + esc(LASTRUN.workflow || '') + '</span>'
-    + '<span class="chip" style="margin-left:auto;padding:4px 11px;font-size:11.5px">' + esc((LASTRUN.duration || '') + (LASTRUN.mode ? ' · ' + LASTRUN.mode : '')) + '</span></div>'
+    + '<span class="sans" style="font-size:14px;font-weight:600">' + esc(run.id || '') + '</span>'
+    + '<span style="color:var(--dim);font-size:11.5px">' + esc(run.workflow || '') + '</span>'
+    + '<span class="chip" style="margin-left:auto;padding:4px 11px;font-size:11.5px">' + esc((run.duration || '') + (run.mode ? ' · ' + run.mode : '')) + '</span></div>'
     + '<div style="display:flex;flex-direction:column;gap:3px">'
     + phases.map(function (p) {
       return '<div style="display:flex;align-items:center;gap:13px;padding:9px 12px;border-radius:13px;background:' + (p.status === 'active' ? 'var(--accent-soft)' : 'var(--tile)') + '">'
@@ -43,12 +43,13 @@ function lifecycleConsole(phases) {
 
 export function vOverview() {
   const phases = phaseVms()
+  const run = lastRun()
   const bar = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:0 4px">'
     + '<div class="seg">'
     + '<button data-act="layout" data-v="A" class="' + (S.layout === 'A' ? 'active' : '') + '">grid</button>'
     + '<button data-act="layout" data-v="B" class="' + (S.layout === 'B' ? 'active' : '') + '">console</button>'
     + '</div>'
-    + (LASTRUN ? '<span style="margin-left:auto;color:var(--dim);font-size:11.5px">last run <span style="color:var(--text)">' + esc(LASTRUN.id || '') + '</span>' + (LASTRUN.duration ? ' &#183; ' + esc(LASTRUN.duration) : '') + '</span>' : '')
+    + (run ? '<span style="margin-left:auto;color:var(--dim);font-size:11.5px">last run <span style="color:var(--text)">' + esc(run.id || '') + '</span>' + (run.duration ? ' &#183; ' + esc(run.duration) : '') + '</span>' : '')
     + '</div>'
 
   let lifecycle
@@ -56,10 +57,10 @@ export function vOverview() {
     lifecycle = '<section class="panel"><div class="panel-head"><span class="eyebrow">lifecycle</span></div>'
       + '<div class="empty">No runs recorded yet. The lifecycle tiles light up when workflow runs start writing phase records.</div></section>'
   } else {
-    lifecycle = S.layout === 'A' ? lifecycleGrid(phases) : lifecycleConsole(phases)
+    lifecycle = S.layout === 'A' ? lifecycleGrid(phases, run) : lifecycleConsole(phases, run)
   }
 
-  const ms = ROADMAP.map(milestoneVm)
+  const ms = roadmap().map(milestoneVm)
   const roadmapBrief = '<section class="panel" style="grid-column:span 7">'
     + '<div class="panel-head"><span class="eyebrow">roadmap</span><a href="#/roadmap" style="margin-left:auto;font-size:11.5px">open &#8594;</a></div>'
     + (ms.length ? '<div style="display:flex;flex-direction:column;gap:8px">' + ms.map(function (m) {
@@ -73,10 +74,10 @@ export function vOverview() {
     + '</section>'
 
   const knowledgePanel = '<section class="panel" style="grid-column:span 5">'
-    + '<div class="panel-head"><span class="eyebrow">' + esc(ROOT) + '</span>'
+    + '<div class="panel-head"><span class="eyebrow">' + esc(root()) + '</span>'
     + '<span style="margin-left:auto;color:var(--dimmer);font-size:11px">okf 0.2 bundle</span></div>'
     + '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">'
-    + COUNTS.map(function (c) {
+    + counts().map(function (c) {
       return '<div class="tile" style="padding:12px;display:flex;flex-direction:column;gap:2px">'
         + '<span class="sans" style="font-size:24px;font-weight:600;letter-spacing:-.02em">' + c.n + '</span>'
         + '<span style="color:var(--dim);font-size:11px">' + esc(c.label) + '</span></div>'
@@ -91,18 +92,20 @@ export function vOverview() {
       : '<div class="empty">No activity in the snapshot yet: no recorded events and no commits.</div>')
     + '</section>'
 
+  const commitList = commits()
   const gitPanel = '<section class="panel" style="grid-column:span 7">'
     + '<div class="panel-head"><span class="eyebrow">git history</span><a href="#/git" style="margin-left:auto;font-size:11.5px">full log &#8594;</a></div>'
-    + (COMMITS.length ? '<div style="display:flex;flex-direction:column;gap:2px">' + COMMITS.slice(0, 7).map(commitRow).join('') + '</div>'
+    + (commitList.length ? '<div style="display:flex;flex-direction:column;gap:2px">' + commitList.slice(0, 7).map(commitRow).join('') + '</div>'
       : '<div class="empty">No commits in the snapshot.</div>')
     + '</section>'
 
+  const decisionList = decisions()
   const decisionsPanel = '<section class="panel" style="grid-column:span 5">'
     + '<div class="panel-head"><span class="eyebrow">decisions</span>'
     + '<span style="margin-left:auto;color:var(--dimmer);font-size:11px">'
-    + DECISIONS.filter(function (d) { return d.status !== 'open' }).length + ' closed &#183; '
-    + DECISIONS.filter(function (d) { return d.status === 'open' }).length + ' open</span></div>'
-    + (DECISIONS.length ? '<div style="display:flex;flex-direction:column;gap:2px">' + DECISIONS.slice(0, 7).map(decisionRow).join('') + '</div>'
+    + decisionList.filter(function (d) { return d.status !== 'open' }).length + ' closed &#183; '
+    + decisionList.filter(function (d) { return d.status === 'open' }).length + ' open</span></div>'
+    + (decisionList.length ? '<div style="display:flex;flex-direction:column;gap:2px">' + decisionList.slice(0, 7).map(decisionRow).join('') + '</div>'
       : '<div class="empty">No decision records in the bundle yet (OKF concepts with type: decision).</div>')
     + '</section>'
 

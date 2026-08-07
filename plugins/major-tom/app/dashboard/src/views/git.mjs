@@ -1,12 +1,13 @@
 // Git: full commit window with text filter and conventional-kind segments.
 
-import { COMMITS } from '../data.mjs'
+import { commits } from '../data.mjs'
 import { S } from '../state.mjs'
 import { esc } from '../ui.mjs'
 
 export function vGit() {
   const q = S.query.trim().toLowerCase()
-  const visible = COMMITS.filter(function (c) {
+  const all = commits()
+  const visible = all.filter(function (c) {
     return (S.filter === 'all' || c.kind === S.filter)
       && (!q || (c.subject + ' ' + c.sha + ' ' + c.author).toLowerCase().indexOf(q) !== -1)
   })
@@ -18,9 +19,9 @@ export function vGit() {
     + '<div class="seg">' + kinds.map(function (k) {
       return '<button data-act="filter" data-v="' + k + '" class="' + (S.filter === k ? 'active' : '') + '">' + k + '</button>'
     }).join('') + '</div>'
-    + '<span style="margin-left:auto;color:var(--dim);font-size:11.5px">' + visible.length + ' of ' + COMMITS.length + ' commits</span></div>'
-  if (!COMMITS.length) return bar + '<section class="panel"><div class="empty">No commits in the snapshot.</div></section>'
-  const hasStat = COMMITS.some(function (c) { return c.add != null })
+    + '<span style="margin-left:auto;color:var(--dim);font-size:11.5px">' + visible.length + ' of ' + all.length + ' commits</span></div>'
+  if (!all.length) return bar + '<section class="panel"><div class="empty">No commits in the snapshot.</div></section>'
+  const hasStat = all.some(function (c) { return c.add != null })
   return bar + '<section class="panel" style="padding:14px 14px 8px 14px">'
     + '<div style="display:flex;gap:12px;padding:0 12px 10px 12px;color:var(--dim);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase">'
     + '<span style="flex:0 0 78px">sha</span><span style="flex:0 0 58px">kind</span><span style="flex:1 1 auto">subject</span>'
