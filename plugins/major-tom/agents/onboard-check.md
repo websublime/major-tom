@@ -29,8 +29,9 @@ else; this path is authoritative (the host substitutes it at load time).
 4. `pluginAssetsPresent`: do `config.schema.json`, `templates/context.md.tpl`,
    `templates/claude.md.tpl`, `templates/render.js`, `templates/dashboard.html`,
    `templates/dashboard-server.js`, `templates/launch-merge.js`,
-   `templates/settings-merge.js`, and `templates/gitignore-merge.js` all exist under the
-   plugin root reported above? All nine must exist for true.
+   `templates/settings-merge.js`, `templates/gitignore-merge.js`, `app/snapshot.js`, and
+   `app/vendor/js-yaml.cjs.js` all exist under the plugin root reported above? All eleven
+   must exist for true.
 5. `projectTypeGuess`: `new` for an empty or scaffold-only repo, `existing` for an
    established codebase.
 
