@@ -1,5 +1,5 @@
 {
-  "description": "Injects the operator writing rule and session context before every reply; gates mutating tools on a recorded intent for the current prompt; on a fresh session start, reports when the installed plugin or this project's onboarded artifacts are out of date.",
+  "description": "Injects the operator writing rule and session context before every reply; gates the points where work is authorized (workflow invocation, agent launch, skill invocation and the main session's own mutating calls) on a recorded intent for the current prompt, releasing the tool calls made inside an agent whose launch was already gated; on a fresh session start, reports when the installed plugin or this project's onboarded artifacts are out of date.",
   "hooks": {
     "SessionStart": [
       {
@@ -24,7 +24,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|Bash|Agent",
+        "matcher": "Edit|Write|Bash|Agent|Workflow|Skill",
         "hooks": [
           {
             "type": "command",
