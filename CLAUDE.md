@@ -14,6 +14,9 @@ The main session orchestrates and delegates to sub-agents to implement. It decid
 Miguel, assigns the work, reviews the outcome; it does not hand-write substantive changes
 itself.
 
+## Style
+@STYLE.md
+
 ## Lifecycle of any change
 
 understand, then decide, then spec/plan, then review, then implement, then verify. No
