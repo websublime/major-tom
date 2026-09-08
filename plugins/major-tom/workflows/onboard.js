@@ -5,20 +5,24 @@ export const meta = {
   phases: [
     { title: 'Check', detail: 'preconditions: git, existing config, required MCP' },
     { title: 'Prepare', detail: 'scan: stack, devops, topology, units, dependency graph' },
-    { title: 'Execute', detail: 'validate fail-closed, write config, bootstrap .knowledge, render templates, install specialists' },
+    { title: 'Execute', detail: 'validate fail-closed, write config, bootstrap .knowledge, quarantine consented residue, render templates, install specialists' },
     { title: 'Finalize', detail: 're-validate everything written, record the run' },
   ],
 }
 
 // Two-stage protocol (PRD 12.3, D21). Stage 1 (no args): Check + Prepare, returns detected
 // facts plus instructions; the main session interviews the user and relaunches with
-// args = { stage: 'execute', config }. The runtime accepts no mid-run user input and the
-// script has no filesystem access: agents do every read and write.
+// args = { stage: 'execute', config, quarantine }. The runtime accepts no mid-run user input
+// and the script has no filesystem access: agents do every read and write.
+//
+// That no-input constraint is also why the quarantine consent of D55 rides on the relaunch and
+// is not a question Execute asks: between the two stages is the only place in this design
+// where a human can be asked anything at all.
 
 const PRECONDITIONS = {
   type: 'object',
   additionalProperties: false,
-  required: ['isGitRepo', 'hasExistingConfig', 'existingConfig', 'codebaseMemoryMcpAvailable', 'pluginRoot', 'pluginAssetsPresent', 'projectTypeGuess', 'notes'],
+  required: ['isGitRepo', 'hasExistingConfig', 'existingConfig', 'codebaseMemoryMcpAvailable', 'pluginRoot', 'pluginAssetsPresent', 'projectTypeGuess', 'residuePlan', 'notes'],
   properties: {
     isGitRepo: { type: 'boolean' },
     hasExistingConfig: { type: 'boolean' },
@@ -27,6 +31,27 @@ const PRECONDITIONS = {
     pluginRoot: { type: 'string' },
     pluginAssetsPresent: { type: 'boolean' },
     projectTypeGuess: { enum: ['new', 'existing'] },
+    // residuePlan is the artifact map's answer, never the checker's own judgement: onboard-check
+    // derives it from migration.js --plan, exactly as it derives the asset list from --assets
+    // (D54). One entry per residue subject the plan names, each with the path, whether the
+    // plugin may quarantine it, and the script's reason; for an ineligible entry the reason is
+    // why the declared evidence did not prove the file ours, which is why the plugin leaves it
+    // alone (D55). The array is empty when the target has no config for --plan to resolve the
+    // persistence root from, and that is a fact rather than a failure: both residues exist only
+    // because a past onboard wrote them, so a first onboard cannot carry any.
+    residuePlan: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['path', 'eligible', 'reason'],
+        properties: {
+          path: { type: 'string' },
+          eligible: { type: 'boolean' },
+          reason: { type: 'string' },
+        },
+      },
+    },
     notes: { type: 'string' },
   },
 }
@@ -135,6 +160,36 @@ const WRITE_REPORT = {
   properties: {
     written: { type: 'array', items: { type: 'string' } },
     failures: { type: 'array', items: { type: 'string' } },
+    notes: { type: 'string' },
+  },
+}
+
+// The residue quarantine reports in four declared places, for the same reason the writer has
+// notes (D53): a step whose outcomes do not all have a place put them in the wrong one. The
+// script distinguishes three outcomes by itself, a rename performed, a subject left alone and
+// a rename the filesystem refused, and notes takes everything else.
+//
+// failed is not the writer's failures and halts nothing. This step is cleanup of residue a
+// PAST version of this plugin left behind; it is not part of onboarding this project, so a
+// leftover file the filesystem refuses to rename must never get veto power over an otherwise
+// correct onboard, which is what the writer's semantics would give it: any entry there stops
+// the run before the templates are rendered, the specialists are installed and the run record
+// is written. A failed rename is carried forward and reported instead. The file stays on disk,
+// so the Finalize phase's migration.js --verify . reports it as RETIRED, that line goes into
+// problems verbatim and mapVerified is false, exactly as for a subject the script skipped or a
+// quarantine the user declined. The map keeps reporting what is on disk and nothing softens it.
+//
+// The consequence is worth naming: a failed rename and a declined quarantine converge on the
+// same honest end state, the file still there and the problem reported. What tells them apart
+// is the run record, which is why Finalize is told which of the two happened.
+const QUARANTINE_REPORT = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['quarantined', 'skipped', 'failed', 'notes'],
+  properties: {
+    quarantined: { type: 'array', items: { type: 'string' } },
+    skipped: { type: 'array', items: { type: 'string' } },
+    failed: { type: 'array', items: { type: 'string' } },
     notes: { type: 'string' },
   },
 }
@@ -250,7 +305,8 @@ if (!input || input.stage !== 'execute') {
       `1. Interview the user by walking the config schema at ${pre.pluginRoot}/config.schema.json. Ask only the keys marked as interview-filled that the scan did not settle, and present detected values as defaults to confirm. Enums are the options; their descriptions are the help text. Present detected.specialistCandidates (name, source, reason, flagging inexact matches) for the user to confirm or deselect: only confirmed entries go into the config as specialists [{name, source}], and nothing is installed beyond that list (D24). No candidates means specialists: [].`,
       '2. Assemble the full config object: schemaVersion 1, onboard.completedAt as the current UTC ISO 8601 time (a placeholder: Finalize re-stamps it with the actual completion time), onboard.pluginVersion from the installed plugin manifest, plus every interviewed and confirmed value.',
       '3. If preconditions.existingConfig is present this is a re-onboard: show the user a diff of changed answers and get confirmation before proceeding.',
-      '4. Relaunch this workflow with args { stage: "execute", config: <the object> }. Pass args as a structured JSON object, never as a JSON-encoded string. Do not write any file yourself: the workflow writes everything.',
+      '4. If preconditions.residuePlan is not empty, get the user\'s decision on the quarantine now, because this is the only place it can be asked: the workflow runtime accepts no mid-run user input, so Execute can put no question to anyone (D55). Show every entry whose eligible is true, with its path and exactly what will happen to it: the file is renamed in place to <path>.retired. It is never deleted, an existing <path>.retired is never overwritten (that subject is skipped instead), and the plugin never touches the renamed file again, so whether it is ever removed is the user\'s call alone. Show every entry whose eligible is false with its reason, and say that those files are not touched at all: the plugin quarantines a file only where its own declared evidence proves the file is its own. Then get one explicit yes or no for the whole plan; do not ask path by path, do not proceed on silence, and do not argue the user into either answer. An empty residuePlan means there is nothing to ask.',
+      '5. Relaunch this workflow with args { stage: "execute", config: <the object>, quarantine: <true|false> }. quarantine carries the answer from step 4, and is false whenever residuePlan was empty or the user said no. Pass args as a structured JSON object, never as a JSON-encoded string. Do not write any file yourself: the workflow writes everything.',
     ].join('\n'),
   }
 }
@@ -265,6 +321,13 @@ if (!cfg) {
   }
 }
 const cfgJson = JSON.stringify(cfg, null, 2)
+// The plugin never deletes a file in a user's repository. Residue is quarantined by renaming it
+// in place, only where declared evidence proves the file is ours, and only where the user said
+// yes in this session (D55). That consent was collected between the two stages because the
+// runtime gives it nowhere else to be collected, so it arrives here as one boolean covering the
+// whole plan. Anything that is not an explicit true is a no: a missing, malformed or absent
+// answer must never be read as permission to touch someone's files.
+const quarantineAuthorised = input.quarantine === true
 
 phase('Execute')
 // Re-locate the plugin root instead of trusting anything the session passed in args:
@@ -327,6 +390,36 @@ if (write.failures.length > 0) {
   }
 }
 
+// The quarantine is a step of its own and not part of the writer, because it is not part of
+// onboarding this project at all: it cleans up residue a PAST version of this plugin left
+// behind (D55). Inside the writer it would inherit that agent's failures semantics, under which
+// any entry halts the run before the templates are rendered, the specialists are installed and
+// the run record is written, and a leftover file the filesystem refuses to rename would get
+// veto power over an otherwise correct onboard.
+//
+// Where it sits is fixed at both ends even so. It runs after the writer because --quarantine
+// resolves the persistence root from the config the writer wrote in its step 1, and before
+// Finalize because the artifact map reports what is on disk and knows nothing about anyone's
+// consent, so the renames have to precede that verification. It runs before the render and
+// install pair rather than inside it: renaming residue is disjoint from rendering, but
+// sequencing it keeps the order deterministic and keeps one writer at a time touching the
+// target. When the user did not consent there is no agent call at all.
+let quarantine = null
+if (quarantineAuthorised) {
+  quarantine = await agent(
+    [
+      'You are the residue quarantine step of the Major Tom onboard Execute phase, in the target repository (current working directory). You run one command and report what it printed, line for line. You rename nothing yourself.',
+      `Run: node ${pre2.pluginRoot}/migration.js --quarantine .`,
+      'It is the only mode of the artifact map that writes, and all it writes is a rename: every residue subject whose declared evidence proves this plugin wrote it is renamed in place to <path>.retired. Nothing is deleted and no existing destination is overwritten, because the plugin never deletes a file in a user repository (D55). The user was shown this exact plan between the two stages of this workflow and said yes; that consent covers this run and no other.',
+      'The script prints one line per subject: QUARANTINED <from> -> <to> for a rename it performed, SKIPPED <path>  -- <reason> for a subject it did not touch, and, on stderr, FAILED <path>  -- <error> for a rename the filesystem refused. Put every QUARANTINED line in quarantined, every SKIPPED line in skipped and every FAILED line in failed, one entry per line and in the script\'s own words. Everything else you have to say goes in notes. Report every line it printed: do not summarise, do not merge, do not reword and do not judge.',
+      'A skip is the mechanism working and not a fault: a destination that already exists, or evidence that did not prove the file is ours, is precisely the case the script exists to refuse, and it still exits 0.',
+      'A failed rename does not stop this onboard and is not yours to work around. Report it and stop there: do not retry it, do not change permissions, do not move the file some other way, and delete nothing. The file stays where it is, and the Finalize phase, which reports what is actually on disk, is what says so.',
+      'Change nothing else in the repository.',
+    ].join('\n'),
+    { label: 'quarantine residue', phase: 'Execute', schema: QUARANTINE_REPORT }
+  )
+}
+
 const [render, install] = await parallel([
   () =>
     agent(
@@ -357,6 +450,69 @@ const [render, install] = await parallel([
     ),
 ])
 
+// What Finalize has to be told about the quarantine, and why it is told at all. The artifact
+// map reports what is on disk and knows nothing about consent, nor about a rename the
+// filesystem refused, so residue that is still there comes back out of migration.js --verify as
+// RETIRED, lands in problems and sets mapVerified false. That is intended and nothing here
+// softens it. What the map cannot say, and the run record must, is why each file is still
+// there: declined, skipped, never eligible and failed to rename are four different facts that
+// all reduce to the same RETIRED line, and a record that repeats the line without the reason
+// leaves a reader with a defect of unknown origin (D55). A subject that was renamed is the one
+// case that is not a problem at all: --verify reports the .retired form as quarantined, a state.
+//
+// pre2.residuePlan is the plan as it stood when Execute started, before anything in this stage
+// ran, so it is the only place that still knows what was offered and what was never eligible.
+const residuePlan = Array.isArray(pre2.residuePlan) ? pre2.residuePlan : []
+const eligibleResidue = residuePlan.filter((entry) => entry && entry.eligible)
+const ineligibleResidue = residuePlan.filter((entry) => entry && !entry.eligible)
+
+// The quarantine outcome gets a place in the return whatever happened, so the main session
+// never infers it from an absent key: an agent that did not complete is a fact about this run
+// and must be reported as one, not degraded into silence. It does not abort the onboard, for
+// the same reason a failed rename does not: this step is cleanup of a past version's residue,
+// not part of onboarding this project.
+const quarantineOutcome = quarantineAuthorised
+  ? quarantine || {
+      quarantined: [],
+      skipped: [],
+      failed: [],
+      notes: 'the quarantine step did not complete, so what it did is unknown; migration.js --verify in Finalize is what reports the residue actually on disk',
+    }
+  : {
+      quarantined: [],
+      skipped: [],
+      failed: [],
+      notes:
+        eligibleResidue.length > 0
+          ? 'the user was offered the quarantine on this run and declined it, so nothing was renamed and nothing was deleted'
+          : 'no residue in this repository was eligible for quarantine, so there was nothing to offer and nothing to run',
+    }
+
+const residueLines = []
+if (quarantineAuthorised && !quarantine) {
+  residueLines.push(
+    'The user authorised the residue quarantine of D55 on this run and the step that performs it did not complete, so what it managed to do is unknown. Do not guess it and do not run the quarantine yourself. Step 5 reports what is actually on disk; the run record states that the quarantine was authorised, that its step did not complete, and that any residue step 5 reports is present for that reason, so nobody later reads it as a defect of unknown origin.'
+  )
+} else if (quarantineAuthorised) {
+  residueLines.push(
+    'The user authorised the residue quarantine of D55 on this run and it ran. This is what the script reported, in its own words:',
+    JSON.stringify(quarantine, null, 2),
+    'State it in the run record with the three outcomes kept apart rather than as a count. A renamed subject now sits at its .retired path, and step 5 reports that form as quarantined, which is a state and not a problem. A skipped subject and a rename that failed are both still on disk under the original name, so step 5 reports them as RETIRED and those lines go into problems verbatim; the record says which of them was skipped, with the reason the script gave, and which was a rename the filesystem refused, with the error it gave. A failed rename did not stop this onboard and is not a defect of unknown origin: it is a fact about this repository and the record states it as one.'
+  )
+} else if (eligibleResidue.length > 0) {
+  residueLines.push(
+    'The user was offered the residue quarantine of D55 on this run and declined it. Nothing was renamed and nothing was deleted, which is the plugin doing what it was told. These subjects are therefore still on disk:',
+    JSON.stringify(eligibleResidue.map((entry) => entry.path), null, 2),
+    'Step 5 reports them as RETIRED, those lines go into problems verbatim and mapVerified is false: the artifact map reports what is on disk and knows nothing about consent, and you neither weaken, filter nor reinterpret it. What the run record must add, beside those problems, is why they are there: the user was asked during this onboard and said no, and re-running /major-tom:onboard offers the quarantine again. Without that sentence a declined choice reads exactly like an unexplained defect.'
+  )
+}
+if (ineligibleResidue.length > 0) {
+  residueLines.push(
+    'These residue subjects were not eligible for the quarantine, each with the reason the artifact map gave. They were never offered to the user and nothing in this run touched them, because the plugin quarantines a file only where declared evidence proves the file is ours. If step 5 reports them, record that this is why they are still present:',
+    JSON.stringify(ineligibleResidue, null, 2)
+  )
+}
+
 phase('Finalize')
 const finalize = await agent(
   [
@@ -370,6 +526,9 @@ const finalize = await agent(
       : 'The installer agent did not complete, so its outcome is unknown. Reconcile from disk: for each entry in the specialists list already in .claude/major-tom.json, check whether .claude/agents/<name>.md exists; keep the entries that do, drop the ones that do not, and record the reconciliation in problems.',
     `2. Re-read .claude/major-tom.json and re-validate it against the schema at ${schemaPath} (same ajv setup as validation: draft-07, strict, strictRequired disabled, temporary install, nothing added to the target repo). This step stays with you and is not covered by step 3: schema validation is draft-07 conformance over the whole document, which needs ajv and a temporary install, and the artifact map ships with zero dependencies and deliberately does not re-implement it. The map checks that the config is there and is ours; only ajv checks that it is valid.`,
     `3. Write the run record: a markdown file in ${cfg.persistence.root}/runs/ named onboard-<UTC timestamp>.md summarizing this onboard (config keys written, files rendered, specialists installed, problems). Use the current UTC time. The record is an OKF v0.2 concept (D28): YAML frontmatter with type: run, a title, and generated: {by: major-tom-onboard, at: <the same UTC time>}.`,
+    residueLines.length > 0
+      ? residueLines.join('\n')
+      : 'This repository carried no residue from an older plugin version when this run started, so there is nothing about a quarantine to record.',
     `4. Append the run record's one-line entry under the runs area in ${cfg.persistence.root}/index.md (the bundle index maintenance rule).`,
     `5. Verify everything this onboard wrote by running, from the target repo root: node ${pre2.pluginRoot}/migration.js --verify .`,
     'That script is the artifact map (D54), the plugin\'s single declaration of everything it writes into a target project. It resolves the persistence root from the config you just wrote and checks every declared artifact, which is why this step is one command and not a list of assertions: a list written here is exactly what the map replaced, and the two lists it replaced had already drifted from each other. It runs last because it verifies the run record too, and the run record does not exist until step 3 has written it.',
@@ -381,12 +540,32 @@ const finalize = await agent(
   { label: 'finalize + run record', schema: FINALIZE_REPORT }
 )
 
+// Four situations, and the main session has to tell them apart out loud, because three of them
+// end with a file still sitting in the user's repository and only one of those three is a
+// defect the plugin could have prevented (D55).
+const quarantineInstructions =
+  (!quarantineAuthorised
+    ? eligibleResidue.length > 0
+      ? 'Report the quarantine outcome first (D55): the user declined it on this run, so nothing was renamed and nothing was deleted. Any RETIRED line in the artifact map problems for those files is the user\'s own choice on this run and not a defect, the map simply reports what is on disk; say so plainly instead of listing it as a fault, and say that re-running /major-tom:onboard offers the quarantine again. '
+      : ''
+    : !quarantine
+      ? 'Report the quarantine outcome first (D55): the user authorised it and the step that performs it did not complete, so what it did is unknown and nothing here guessed. Whatever the artifact map problems say about that residue is what is actually on disk. Say that the onboard itself finished regardless, because this step is cleanup of an older version\'s leftovers and not part of onboarding this project, and that re-running /major-tom:onboard offers the quarantine again. '
+      : quarantineOutcome.failed.length > 0
+        ? 'Report the quarantine outcome first (D55): name every residue file renamed in place to <path>.retired, every subject the script skipped with the reason it gave, and every rename that failed with the error it gave. A failed rename left that file exactly where it was and did not stop the onboard, which finished: the file shows up as a RETIRED line in the artifact map problems because the map reports what is on disk, so name it for what it is instead of leaving it as an unexplained fault, and say that re-running /major-tom:onboard tries the quarantine again. Nothing was deleted. '
+        : 'Report the quarantine outcome first (D55): name every residue file renamed in place to <path>.retired, and every subject the script skipped with the reason it gave. Nothing was deleted, the renamed files are the user\'s to keep or remove, and the plugin will not touch them again. A skipped subject is still on disk and still shows up as a RETIRED line in the artifact map problems, which is the map reporting what it finds there. ') +
+  (ineligibleResidue.length > 0
+    ? 'Say too that some residue was never eligible for the quarantine, because the plugin\'s declared evidence did not prove those files are its own; they were not offered and nothing touched them, so a RETIRED line naming one of them is present for that reason. '
+    : '')
+
 return {
   stage: 'complete',
   validation,
   written: write,
+  quarantine: quarantineOutcome,
   render: render || { written: [], failures: ['render agent did not complete'], notes: '' },
   specialists: install || { installed: [], skipped: [], notes: 'installer agent did not complete' },
   finalize: finalize || { revalidated: false, mapVerified: false, runRecordPath: '', problems: ['finalize agent did not complete'] },
-  instructions: 'Report the outcome to the user: files written, templates rendered, specialists installed, the dashboard launcher written to .claude/server/, the run record path, whether the config revalidated and whether the target verified against the artifact map (D54), and any problems. Mention that re-running /major-tom:onboard updates the configuration and the generated files, and that /major-tom:dashboard opens the dashboard in the browser: the page computes its data from the repository every time it is loaded, and carries a refresh control, so nothing has to be re-run to see current data. Snapshot window and retention are still open (PRD OQ-13).',
+  instructions:
+    quarantineInstructions +
+    'Report the outcome to the user: files written, templates rendered, specialists installed, the dashboard launcher written to .claude/server/, the run record path, whether the config revalidated and whether the target verified against the artifact map (D54), and any problems. Mention that re-running /major-tom:onboard updates the configuration and the generated files, and that /major-tom:dashboard opens the dashboard in the browser: the page computes its data from the repository every time it is loaded, and carries a refresh control, so nothing has to be re-run to see current data. Snapshot window and retention are still open (PRD OQ-13).',
 }
