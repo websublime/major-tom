@@ -58,6 +58,8 @@ claude plugin validate plugins/major-tom
 grep -rn $'\u2014\\|\u2013' <edited files>   # em/en dash check, must return nothing
 ```
 
-Plus, when the touched surface has one: the schema fixture suite (ajv strict,
-strictRequired off) and the dashboard DOM-stub suite; both are recreated from the PRD
-descriptions when no longer on disk.
+Plus, when the touched surface has one, its suite in `tests/`, run as
+`node tests/<file>.test.js`. There are five of them; the inventory and what each covers live
+in PRD section 15, so this file does not restate a list that would drift. One suite is not on
+disk, the ajv schema fixture suite (strict, strictRequired off), and it is recreated from the
+PRD description whenever `config.schema.json` changes.
