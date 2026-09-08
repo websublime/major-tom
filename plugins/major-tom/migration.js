@@ -23,14 +23,19 @@
 // from each other without anything noticing.
 //
 // Usage:
-//   node migration.js --verify [repo]   what the target has against what the map declares
-//   node migration.js --assets          what must exist under the plugin root
-//   node migration.js --check           the map does not lie about the plugin itself
-//   node migration.js --plan [repo]     which transitions apply, reported, never performed
+//   node migration.js --verify [repo]      what the target has against what the map declares
+//   node migration.js --assets             what must exist under the plugin root
+//   node migration.js --check              the map does not lie about the plugin itself
+//   node migration.js --plan [repo]        which transitions apply, reported, never performed
+//   node migration.js --quarantine [repo]  move proven residue out of the way, in place
 //
-// --plan writes nothing and deletes nothing. Whether the plugin may delete a file in
-// someone else's repository is not decided (OQ-16); it would be the first destructive act
-// this plugin ever took, so --plan reports and stops.
+// One of those five writes, and what it writes is a rename. D55 settled OQ-16 and settled
+// it against deletion: this plugin never removes a file from a repository that is not its
+// own. Residue is renamed in place to <path>.retired, which leaves it exactly where the
+// user's git already sees it, tracked if it was tracked and ignored if it was ignored, so
+// the change lands in their diff rather than behind their back. Nothing moves without
+// evidence that we wrote it, nothing is ever overwritten, and nothing ever cleans the
+// quarantine: a .retired file belongs to the user from the instant it exists.
 //
 // Two things this file deliberately does not cover. It is a map of the target project, so
 // hooks/version-check.js writing its cache under CLAUDE_PLUGIN_DATA is out of scope: that
@@ -66,6 +71,14 @@ const SETTINGS_KEYS = [
   ['alwaysThinkingEnabled', true],
 ]
 const SPECIALIST_BUILTIN_TOOLS = ['Read', 'Glob', 'Grep']
+
+// The quarantine suffix (D55). One constant, because two modes have to agree on it or the
+// remedy creates a defect: --quarantine renames onto it, and --verify has to recognise what
+// --quarantine left behind, both to report it and to keep it out of the UNEXPECTED sweep of
+// a directory the plugin owns whole. A suffix rather than a new location on purpose: moving
+// the file elsewhere would change whether git tracks it, and choosing that for someone is
+// not the plugin's to choose.
+const RETIRED_SUFFIX = '.retired'
 
 // ---------------------------------------------------------------------------
 // The entry shape.
@@ -495,8 +508,8 @@ const MAP = [
 //
 //   residue  Something an older version wrote that this version does not. --verify
 //            sees a file it never declared, and in an owned directory it does report
-//            it, but the map alone cannot say it was once ours. The remedy is
-//            deletion, and no mechanism performs it (OQ-16).
+//            it, but the map alone cannot say it was once ours. The remedy is a
+//            quarantine, performed by --quarantine and by nothing else (D55).
 //   value    A value inside a file we own is wrong under the current design and the
 //            right value is derivable. The file is still ours, so --verify must not
 //            call it unrecognised; re-running the onboard rewrites it.
@@ -504,12 +517,24 @@ const MAP = [
 //            the right value is not derivable from anything on disk. It needs the
 //            interview, which means a human.
 //
-// since   A config whose onboard.pluginVersion is BELOW this needs the transition.
-// detect  Whether it actually applies to this repository. The version alone
-//         over-reports: a project onboarded at 0.19.0 that never installed a
-//         specialist has no specialist frontmatter to correct. Detection is a
-//         computation over the target and cannot be a literal, so it lives here
-//         beside the declaration rather than somewhere it could drift from it.
+// since     A config whose onboard.pluginVersion is BELOW this needs the transition.
+// detect    Whether it actually applies to this repository. The version alone
+//           over-reports: a project onboarded at 0.19.0 that never installed a
+//           specialist has no specialist frontmatter to correct. Detection is a
+//           computation over the target and cannot be a literal, so it lives here
+//           beside the declaration rather than somewhere it could drift from it.
+// evidence  Residue only, and every residue must carry it: --check refuses one that does
+//           not. It is read exactly as an entry's evidence is, an array of predicates all
+//           of which must hold, evaluated by the one checkEvidence below and by no second
+//           evaluator, because a second evaluator would be a second definition of what
+//           "ours" means. It exists because a residue is the only thing anything here
+//           writes to: --quarantine renames it, the path has not been written by this
+//           plugin for several versions, and a stranger's file can be sitting there under
+//           the same name. Detection says a path is occupied; evidence says by whom, and
+//           only the second one may authorise a move. When it fails, the honest act is to
+//           report and stop, which is what both --plan and --quarantine do.
+// remedy    quarantine | rewrite | interview. What closes the transition.
+// remedyBy  The mechanism that performs the remedy, named concretely enough to run.
 // ---------------------------------------------------------------------------
 
 const TRANSITIONS = [
@@ -521,8 +546,31 @@ const TRANSITIONS = [
     subject: { path: '<persistence.root>/dashboard.html' },
     describe:
       'The dashboard was a snapshot embedded in a file written at onboard time. It is a served application now and no dashboard artifact is written anywhere in the target project, so a copy left in the persistence root is stale data in a place that should hold only knowledge.',
-    remedy: 'delete',
-    remedyBy: 'undecided (OQ-16): no mechanism deletes a file in a user repository',
+    // Both predicates are traits of the file this path actually held: the dashboard template
+    // retired in 88edb9a, written into the target by `render.js inject`, which replaced the
+    // island content and left every other byte of the template alone. They are read off that
+    // commit, never off the dashboard the plugin ships today, which is a different file.
+    //
+    // The title separates the artifact from an unrelated dashboard.html. That is a common
+    // enough filename for a project to keep one of its own in a knowledge root, and a
+    // stranger's page is precisely what must never be moved.
+    //
+    // The island separates it from the dashboard this plugin ships today, which is the file
+    // a user is most likely to have copied to this path by hand and which carries the very
+    // same title. Today's page fetches its data from the server and has no island at all;
+    // the retired one could not exist without one, because inject refused any source that
+    // lacked it. The tag is matched with the same shape inject used to find it, on the id
+    // attribute rather than on a whole literal tag, so an injected copy is recognised
+    // whatever attribute order its source carried.
+    evidence: [
+      { type: 'pattern', source: '<title>Major Tom dashboard</title>', flags: '' },
+      { type: 'pattern', source: '<script[^>]*id="major-tom-data"[^>]*>', flags: '' },
+    ],
+    remedy: 'quarantine',
+    remedyBy:
+      'node migration.js --quarantine, which renames the file found above in place, adding the ' +
+      RETIRED_SUFFIX +
+      ' suffix, and never deletes it (D55); from that instant the file is the user\'s and nothing here touches it again',
     detect(ctx) {
       const target = ctx.resolve('<persistence.root>/dashboard.html')
       return exists(path.join(ctx.repo, target)) ? [target] : []
@@ -536,8 +584,30 @@ const TRANSITIONS = [
     subject: { path: '.claude/server/dashboard-server.js' },
     describe:
       'A copy of the dashboard server used to be written into the target project, where it aged silently every time the plugin was updated. It was replaced by launcher.js, which resolves the installed plugin at run time; the old copy still runs and still serves the version it was copied at.',
-    remedy: 'delete',
-    remedyBy: 'undecided (OQ-16): no mechanism deletes a file in a user repository',
+    // Both predicates are traits of the file this path actually held: the plugin's
+    // templates/dashboard-server.js as it stood before a8a6b1f, copied into the target
+    // verbatim with no substitution of any kind, so every byte of that commit is a byte of
+    // the artifact.
+    //
+    // The header line is the file's own identity line. It names the plugin, names D31 and
+    // states the zero-dependency constraint in one sentence that no other file carries; it
+    // is anchored to the start of a line so a document merely quoting it does not match.
+    //
+    // The listen banner separates it from the server this plugin ships today, which is the
+    // file a user is most likely to have copied into .claude/server/ by hand. Today's
+    // app/server.js prints the address it actually bound and the repository it reads,
+    // `(reading ${repoRoot})`; the retired copy printed a hardcoded localhost and the single
+    // dashboard file it was serving, `(serving ${target})`. One line, and the two files
+    // cannot both match it.
+    evidence: [
+      { type: 'pattern', source: '^// Static server for the Major Tom dashboard \\(D31\\)\\. Node, no dependencies\\.$', flags: 'm' },
+      { type: 'pattern', source: 'major-tom dashboard on http://localhost:\\$\\{port\\} \\(serving \\$\\{target\\}\\)', flags: '' },
+    ],
+    remedy: 'quarantine',
+    remedyBy:
+      'node migration.js --quarantine, which renames the file found above in place, adding the ' +
+      RETIRED_SUFFIX +
+      ' suffix, and never deletes it (D55); from that instant the file is the user\'s and nothing here touches it again',
     detect(ctx) {
       const target = '.claude/server/dashboard-server.js'
       return exists(path.join(ctx.repo, target)) ? [target] : []
@@ -877,6 +947,17 @@ function substitute(value, context) {
   return out
 }
 
+// The one place a list of predicates becomes a list of reasons. Map entries and residue
+// transitions both come through here, so "the evidence holds" means exactly the same thing
+// for a file --verify calls ours and for a file --quarantine is about to rename. Empty means
+// every predicate held; a residue with no predicates at all cannot reach this function,
+// because --check refuses to let one exist.
+function evidenceFailures(predicates, fullPath, context) {
+  return (predicates || [])
+    .map((predicate) => checkEvidence(predicate, fullPath, context))
+    .filter((failure) => failure !== null)
+}
+
 // ---------------------------------------------------------------------------
 // Entry resolution: from a declaration to the concrete paths in one repository.
 // ---------------------------------------------------------------------------
@@ -922,8 +1003,19 @@ function verify(repo) {
   }
   const ctx = { repo, config, resolve }
 
-  const counts = { ok: 0, absent: 0, missing: 0, unrecognised: 0, unexpected: 0, retired: 0 }
+  const counts = { ok: 0, absent: 0, missing: 0, unrecognised: 0, unexpected: 0, retired: 0, quarantined: 0 }
   const declared = new Set()
+
+  // Every declared residue path and the quarantined form of it, resolved once and before
+  // any loop runs. The quarantined form has to be known by the time the owned-directory
+  // sweep starts: .claude/server/ owns its contents, so a dashboard-server.js.retired left
+  // there would be reported UNEXPECTED on every run for the rest of the project's life, and
+  // a remedy that installs a permanent new problem is not a remedy.
+  const residuePaths = TRANSITIONS.filter((t) => t.species === 'residue').map((t) => ({
+    transition: t,
+    path: ctx.resolve(t.subject.path),
+  }))
+  const quarantinedPaths = new Set(residuePaths.map((r) => r.path + RETIRED_SUFFIX))
 
   for (const entry of MAP) {
     const instances = resolveEntry(entry, ctx)
@@ -959,9 +1051,7 @@ function verify(repo) {
         }
         continue
       }
-      const failures = entry.evidence
-        .map((predicate) => checkEvidence(predicate, full, instance.context))
-        .filter((f) => f !== null)
+      const failures = evidenceFailures(entry.evidence, full, instance.context)
       if (failures.length > 0) {
         counts.unrecognised += 1
         report('UNRECOGNISED', instance.path, entry, failures.join('; '))
@@ -981,19 +1071,34 @@ function verify(repo) {
     for (const name of fs.readdirSync(dir).sort()) {
       const rel = ctx.resolve(entry.paths[0]).replace(/\/$/, '') + '/' + name
       if (declared.has(rel)) continue
+      // The quarantine this tool itself performed is not a stranger file. Reporting it here
+      // would punish the user for taking the remedy, and it is reported once below with what
+      // it actually is.
+      if (quarantinedPaths.has(rel)) continue
       counts.unexpected += 1
-      console.log('UNEXPECTED    ' + rel + '  -- the plugin owns ' + entry.paths[0] + ' whole and the map does not declare this')
+      console.log(pad('UNEXPECTED') + rel + '  -- the plugin owns ' + entry.paths[0] + ' whole and the map does not declare this')
     }
   }
 
   // Retired paths are checked whatever version wrote this project: a residue is residue
   // regardless of what the config claims, and the config can be wrong or hand-edited.
-  for (const transition of TRANSITIONS) {
-    if (transition.species !== 'residue') continue
-    const target = ctx.resolve(transition.subject.path)
-    if (!exists(path.join(repo, target))) continue
-    counts.retired += 1
-    console.log('RETIRED       ' + target + '  -- written by a plugin before ' + transition.since + ', retired by ' + transition.decision + '; run --plan for what it means')
+  //
+  // The two states are reported independently, never as alternatives, because both can be
+  // true at once: that is exactly the repository where --quarantine already ran, found the
+  // destination taken and refused to overwrite it. Residue still present stays a problem
+  // whatever else sits beside it and whether or not the user declined the quarantine (D55
+  // point 5); the map reports the state of the repository, and reporting that the user
+  // declined is the onboard's job, not the map's.
+  for (const { transition, path: target } of residuePaths) {
+    if (exists(path.join(repo, target))) {
+      counts.retired += 1
+      console.log(pad('RETIRED') + target + '  -- written by a plugin before ' + transition.since + ', retired by ' + transition.decision + '; run --plan for what it means')
+    }
+    const retired = target + RETIRED_SUFFIX
+    if (exists(path.join(repo, retired))) {
+      counts.quarantined += 1
+      console.log(pad('quarantined') + retired + '  -- residue moved aside by --quarantine (D55). Yours from that instant: nothing here reads it, rewrites it or removes it')
+    }
   }
 
   console.log(
@@ -1009,14 +1114,26 @@ function verify(repo) {
       counts.unexpected +
       ' unexpected, ' +
       counts.retired +
-      ' retired'
+      ' retired, ' +
+      counts.quarantined +
+      ' quarantined'
   )
   const problems = counts.missing + counts.unrecognised + counts.unexpected + counts.retired
   return problems === 0 ? 0 : 1
 }
 
 // Statuses that name a problem are uppercase and statuses that do not are lowercase, so a
-// reader and a grep both find the problems without reading the summary line.
+// reader and a grep both find the problems without reading the summary line. The rule has no
+// exceptions: `grep '^[A-Z]'` over --verify's output means exactly "the problems" and nothing
+// else, which is why `quarantined` is lowercase here beside `ok` and `absent`.
+//
+// The same word is uppercase in --quarantine's output, and that is not an inconsistency to be
+// tidied away in either direction. The two outputs are not the same kind of sentence. --verify
+// reports a state it observed in a repository, and this state is not a problem. --quarantine
+// reports an action it just performed on somebody's file, and every line of that output is an
+// action, which is why all of them are uppercase there and none of them is a status. An action
+// performed is not a status observed; whoever "fixes" one of these to match the other will
+// break the grep contract on one side or lose the emphasis on the other.
 function report(status, target, entry, detail) {
   const suffix = detail ? '  -- ' + detail : ''
   console.log(pad(status) + target + '  [' + entry.id + ', ' + entry.kind + ', ' + entry.tracked + ']' + suffix)
@@ -1057,6 +1174,28 @@ function assets() {
 // documentation cannot catch, and it is the reason this gate is worth having.
 // ---------------------------------------------------------------------------
 
+// The declaration-time checks on one predicate, as opposed to the run-time evaluation in
+// checkEvidence. Entries and residue transitions share them because they share the
+// evaluator: a predicate that cannot be trusted inside an entry that only reports certainly
+// cannot be trusted inside the one transition that gets acted on.
+function predicateProblems(ownerId, predicate) {
+  const problems = []
+  if (predicate.type === 'byte-identical' && !exists(path.join(PLUGIN_ROOT, predicate.source))) {
+    problems.push(ownerId + ': byte-identical evidence names a plugin file that is not there, ' + predicate.source)
+  }
+  if (predicate.type === 'none' && !predicate.why) {
+    problems.push(ownerId + ': evidence none must say why no proof is available')
+  }
+  if (predicate.type === 'pattern') {
+    try {
+      new RegExp(predicate.source, predicate.flags || '')
+    } catch (err) {
+      problems.push(ownerId + ': evidence pattern does not compile, ' + err.message)
+    }
+  }
+  return problems
+}
+
 function check() {
   const problems = []
 
@@ -1094,20 +1233,8 @@ function check() {
       if (starred.length > 1) problems.push(entry.id + ': more than one starred path segment, which expandGlob does not support')
       if (starred.length > 0 && entry.instance !== 'set') problems.push(entry.id + ': starred path on a non-set entry')
     }
-    for (const predicate of entry.evidence) {
-      if (predicate.type === 'byte-identical' && !exists(path.join(PLUGIN_ROOT, predicate.source))) {
-        problems.push(entry.id + ': byte-identical evidence names a plugin file that is not there, ' + predicate.source)
-      }
-      if (predicate.type === 'none' && !predicate.why) {
-        problems.push(entry.id + ': evidence none must say why no proof is available')
-      }
-      if (predicate.type === 'pattern') {
-        try {
-          new RegExp(predicate.source, predicate.flags || '')
-        } catch (err) {
-          problems.push(entry.id + ': evidence pattern does not compile, ' + err.message)
-        }
-      }
+    if (Array.isArray(entry.evidence)) {
+      for (const predicate of entry.evidence) problems.push(...predicateProblems(entry.id, predicate))
     }
   }
 
@@ -1128,6 +1255,30 @@ function check() {
     }
     if (transition.species !== 'residue' && transition.subject.path) {
       problems.push(transition.id + ': only a residue names a path; a value or a gap names the entry it lives in')
+    }
+    if (transition.species === 'residue') {
+      // The invariant D55 rests on. A residue is the only thing --quarantine acts on, and it
+      // acts by writing; a residue with no evidence would let the one writing mode move a
+      // file on nothing but a path match, which is the exact act D55 point 2 forbids. The
+      // gate lives here so that adding a residue in some future version without also
+      // declaring what proves it is ours fails the pre-commit check rather than reaching a
+      // user's repository.
+      if (!Array.isArray(transition.evidence) || transition.evidence.length === 0) {
+        problems.push(transition.id + ': a residue must declare non-empty evidence that the file is ours; --quarantine never moves a path without it')
+      } else {
+        for (const predicate of transition.evidence) problems.push(...predicateProblems(transition.id, predicate))
+        // `none` is an honest answer for a map entry, which only reports what it found. It
+        // is not an answer here: an artifact nothing can prove is ours is precisely the one
+        // that must never be renamed.
+        if (transition.evidence.some((predicate) => predicate.type === 'none')) {
+          problems.push(transition.id + ': evidence none proves nothing, and a residue is the one thing that gets moved on its evidence')
+        }
+      }
+      if (['quarantine'].indexOf(transition.remedy) === -1) {
+        problems.push(transition.id + ': a residue is remedied by quarantine and by nothing else (D55), not by ' + JSON.stringify(transition.remedy))
+      }
+    } else if (transition.evidence) {
+      problems.push(transition.id + ': only a residue carries evidence; a value or a gap lives inside a file the map already proves through its entry')
     }
   }
 
@@ -1220,7 +1371,25 @@ function plan(repo) {
     }
     applies += 1
     console.log('APPLIES  ' + transition.species + '  ' + transition.id + '  (' + transition.decision + ', from ' + transition.since + ')')
-    for (const detail of found) console.log('         found: ' + detail)
+    // A residue's `found` entries are paths, and a path is not yet a claim of ownership. The
+    // remedy line below states what the remedy is in general; only the evidence says whether
+    // this repository's file will actually get it, so it is answered per path here rather
+    // than left implied. A report that named a remedy for a file nothing will touch would be
+    // worse than no report: the user would wait for something that is never going to happen.
+    for (const detail of found) {
+      if (transition.species !== 'residue') {
+        console.log('         found: ' + detail)
+        continue
+      }
+      const failures = evidenceFailures(transition.evidence, path.join(ctx.repo, detail), null)
+      if (failures.length === 0) {
+        console.log('         found: ' + detail + '  -- the evidence holds, so --quarantine will move this one')
+      } else {
+        console.log(
+          '         found: ' + detail + '  -- the evidence does NOT hold (' + failures.join('; ') + '), so nothing will touch it: it is reported and left exactly where it is'
+        )
+      }
+    }
     console.log('         what: ' + transition.describe)
     console.log('         remedy: ' + transition.remedy + '; ' + transition.remedyBy)
   }
@@ -1232,11 +1401,113 @@ function plan(repo) {
 }
 
 // ---------------------------------------------------------------------------
+// --quarantine. The only mode that writes, and all it writes is a rename (D55).
+//
+// Why a rename and not a deletion. OQ-16 asked whether this plugin may delete a file it once
+// wrote in someone else's repository, and the answer is no, permanently. The plugin cannot
+// know what a user did with that file since it was written, and a deletion is the one act
+// that leaves them nothing to look at afterwards. A rename in place costs the same, keeps
+// the bytes, and is visible in the same diff the user was going to read anyway.
+//
+// Why in place and not into a folder of our own. A quarantine directory would be a new
+// artifact the map would then have to declare, own and eventually explain, and moving the
+// file into it would silently change whether git tracks it: a tracked knowledge file would
+// vanish from the index, an ignored mechanism file could reappear in it. Suffixing the name
+// where it already sits changes neither.
+//
+// Three answers and no fourth. The evidence holds and the destination is free, so the file
+// moves. The evidence does not hold, so nothing is touched and the reason is printed: a path
+// match is not proof, and acting on one would make this mode capable of moving a stranger's
+// file. The destination exists, so nothing is touched either, because overwriting is
+// destroying by another name and there is no argument for it that a deletion would not also
+// pass. None of the three is a failure of this command, so the exit status stays 0; only an
+// I/O error the filesystem reports is a failure, because then the mode did not do what it
+// said it did.
+//
+// What this mode never does. It never removes a .retired file, never inspects one, never
+// re-runs a quarantine that already happened and never cleans up after itself (D55 point 4).
+// From the instant that file exists it is the user's, and a tool that tidied it away would
+// be a deletion wearing a delay.
+//
+// Every label printed here is uppercase, and that does not contradict --verify's rule that
+// uppercase means a problem. See the note above report(): --verify prints states it observed
+// and only some of them are problems, so the case carries information there. Every line here
+// is an action this command just took on somebody's file, which is the whole reason to print
+// it at all, so there is nothing for the case to distinguish and nothing to lower.
+// ---------------------------------------------------------------------------
+
+function quarantine(repo) {
+  const config = readJson(path.join(repo, '.claude', 'major-tom.json'))
+  if (config === null) {
+    console.error('quarantine: ' + repo + ' carries no readable .claude/major-tom.json, so it is not an onboarded project and nothing here may touch it')
+    return 1
+  }
+  let resolve
+  try {
+    resolve = makeResolver(config)
+  } catch (err) {
+    console.error('quarantine: ' + err.message)
+    return 1
+  }
+  const ctx = { repo, config, resolve }
+
+  let moved = 0
+  let skipped = 0
+  let failed = 0
+
+  for (const transition of TRANSITIONS) {
+    if (transition.species !== 'residue') continue
+    // Detection is over the repository and never over the recorded version, exactly as in
+    // --plan: a residue is residue whatever the config claims, and a config can be
+    // hand-edited or restamped by a later onboard without the file ever going away.
+    for (const target of transition.detect(ctx)) {
+      const from = path.join(repo, target)
+      const to = from + RETIRED_SUFFIX
+      const relTo = target + RETIRED_SUFFIX
+
+      const failures = evidenceFailures(transition.evidence, from, null)
+      if (failures.length > 0) {
+        skipped += 1
+        console.log(pad('SKIPPED') + target + '  -- the evidence that this is ours does not hold (' + failures.join('; ') + '), so it stays exactly where it is')
+        continue
+      }
+      if (exists(to)) {
+        skipped += 1
+        console.log(pad('SKIPPED') + target + '  -- ' + relTo + ' already exists; nothing is ever overwritten')
+        continue
+      }
+      try {
+        fs.renameSync(from, to)
+      } catch (err) {
+        failed += 1
+        console.error(pad('FAILED') + target + '  -- ' + err.message)
+        continue
+      }
+      moved += 1
+      console.log(pad('QUARANTINED') + target + ' -> ' + relTo)
+    }
+  }
+
+  console.log(
+    'quarantine: ' +
+      moved +
+      ' quarantined, ' +
+      skipped +
+      ' skipped, ' +
+      failed +
+      ' failed. Nothing was deleted and nothing was overwritten: a ' +
+      RETIRED_SUFFIX +
+      ' file is yours from the instant it exists, and no mode here ever reads, rewrites or removes one (D55).'
+  )
+  return failed === 0 ? 0 : 1
+}
+
+// ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
 
 function usage() {
-  console.error('usage: node migration.js --verify [repo] | --assets | --check | --plan [repo]')
+  console.error('usage: node migration.js --verify [repo] | --assets | --check | --plan [repo] | --quarantine [repo]')
   return 1
 }
 
@@ -1245,6 +1516,7 @@ function main(argv) {
   const target = argv[1] ? path.resolve(argv[1]) : process.cwd()
   if (mode === '--verify') return verify(target)
   if (mode === '--plan') return plan(target)
+  if (mode === '--quarantine') return quarantine(target)
   if (mode === '--assets') return assets()
   if (mode === '--check') return check()
   return usage()
