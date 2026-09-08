@@ -42,13 +42,17 @@ function runPreconditions(phaseTitle) {
   )
 }
 
+// The required-asset list is not written here and is not written in onboard-check either:
+// both derive it from the artifact map (D54), which is the plugin's own declaration of what
+// it needs and what it writes. It used to be hand-written in both places and the two copies
+// had already drifted apart once.
 function blockedOnAssets(pre) {
   return {
     stage: 'blocked',
     at: 'check',
-    reason: 'plugin assets missing (config.schema.json, templates, or app scripts not under the plugin root)',
+    reason: 'plugin assets missing: the plugin root does not carry everything the artifact map requires',
     preconditions: pre,
-    instructions: `Tell the user the installed major-tom plugin at ${pre.pluginRoot} is incomplete: config.schema.json, the templates dir (context.md.tpl, claude.md.tpl, render.js, launch-merge.js, settings-merge.js, gitignore-merge.js) and the app dir (app/snapshot.js, app/server.js, app/dashboard.html, app/launcher.js, app/vendor/js-yaml.cjs.js) must exist there. Reinstall or update the plugin. For a dev checkout the two generated trees are rebuilt from the plugin repo with node scripts/sync-templates.js (which produces plugins/*/templates/ only) and node scripts/build-dashboard.js (which produces app/dashboard.html only); every other file of the app dir is authored in place, so if one of those is missing the checkout itself is incomplete and neither script will produce it. Then relaunch /major-tom:onboard.`,
+    instructions: `Tell the user the installed major-tom plugin at ${pre.pluginRoot} is incomplete. Get the authoritative list by running: node ${pre.pluginRoot}/migration.js --assets ; it prints one plugin-root-relative path per line, and every one of them must exist under ${pre.pluginRoot}. Name the ones that do not. Ask the user to reinstall or update the plugin. For a dev checkout two of those paths are generated trees, rebuilt from the plugin repo with node scripts/sync-templates.js (which produces plugins/*/templates/ only) and node scripts/build-dashboard.js (which produces app/dashboard.html only); every other listed file is authored in place, so if one of those is missing the checkout itself is incomplete and neither script will produce it. If migration.js itself is the missing file, nothing can produce the list and the plugin install is broken outright. Then relaunch /major-tom:onboard.`,
   }
 }
 
@@ -168,12 +172,18 @@ const INSTALL_REPORT = {
   },
 }
 
+// revalidated and mapVerified are two different claims and are reported apart (D54): the
+// first says the config still validates against the schema, which needs ajv and a temporary
+// install, and the second says the target carries what the artifact map declares, which a
+// script the plugin ships answers on its own. Collapsing them into one boolean would let a
+// passing half hide a failing half.
 const FINALIZE_REPORT = {
   type: 'object',
   additionalProperties: false,
-  required: ['revalidated', 'runRecordPath', 'problems'],
+  required: ['revalidated', 'mapVerified', 'runRecordPath', 'problems'],
   properties: {
     revalidated: { type: 'boolean' },
+    mapVerified: { type: 'boolean' },
     runRecordPath: { type: 'string' },
     problems: { type: 'array', items: { type: 'string' } },
   },
@@ -358,11 +368,15 @@ const finalize = await agent(
           JSON.stringify(install.installed, null, 2),
         ].join('\n')
       : 'The installer agent did not complete, so its outcome is unknown. Reconcile from disk: for each entry in the specialists list already in .claude/major-tom.json, check whether .claude/agents/<name>.md exists; keep the entries that do, drop the ones that do not, and record the reconciliation in problems.',
-    `2. Re-read .claude/major-tom.json and re-validate it against the schema at ${schemaPath} (same ajv setup as validation: draft-07, strict, strictRequired disabled, temporary install, nothing added to the target repo).`,
-    `3. Verify ${cfg.persistence.root}/ exists with memories, docs, runs, monitors, logs and the bundle index.md at its root; that CLAUDE.md and AGENTS.md exist at the repo root with major-tom managed block markers; that .claude/server/launcher.js exists (D44: the launcher is the only thing written there, and no dashboard artifact is produced anywhere, so do not look for one); that .claude/launch.json parses and contains the major-tom-dashboard configuration (D32); and that the session defaults landed (D37): the settings file the merge targeted, .claude/settings.local.json when that file exists, else .claude/settings.json, exists, parses, and carries env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB "1", env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS "1", and alwaysThinkingEnabled true; and that .gitignore exists at the repo root and carries the major-tom managed block (markers # major-tom:begin and # major-tom:end) with all three entries, .claude/worktrees/, .claude/session/ and .claude/server/ (D38).`,
-    `4. Write the run record: a markdown file in ${cfg.persistence.root}/runs/ named onboard-<UTC timestamp>.md summarizing this onboard (config keys written, files rendered, specialists installed, problems). Use the current UTC time. The record is an OKF v0.2 concept (D28): YAML frontmatter with type: run, a title, and generated: {by: major-tom-onboard, at: <the same UTC time>}.`,
-    `5. Append the run record's one-line entry under the runs area in ${cfg.persistence.root}/index.md (the bundle index maintenance rule).`,
-    'Report revalidated, the run record path, and every problem found.',
+    `2. Re-read .claude/major-tom.json and re-validate it against the schema at ${schemaPath} (same ajv setup as validation: draft-07, strict, strictRequired disabled, temporary install, nothing added to the target repo). This step stays with you and is not covered by step 3: schema validation is draft-07 conformance over the whole document, which needs ajv and a temporary install, and the artifact map ships with zero dependencies and deliberately does not re-implement it. The map checks that the config is there and is ours; only ajv checks that it is valid.`,
+    `3. Write the run record: a markdown file in ${cfg.persistence.root}/runs/ named onboard-<UTC timestamp>.md summarizing this onboard (config keys written, files rendered, specialists installed, problems). Use the current UTC time. The record is an OKF v0.2 concept (D28): YAML frontmatter with type: run, a title, and generated: {by: major-tom-onboard, at: <the same UTC time>}.`,
+    `4. Append the run record's one-line entry under the runs area in ${cfg.persistence.root}/index.md (the bundle index maintenance rule).`,
+    `5. Verify everything this onboard wrote by running, from the target repo root: node ${pre2.pluginRoot}/migration.js --verify .`,
+    'That script is the artifact map (D54), the plugin\'s single declaration of everything it writes into a target project. It resolves the persistence root from the config you just wrote and checks every declared artifact, which is why this step is one command and not a list of assertions: a list written here is exactly what the map replaced, and the two lists it replaced had already drifted from each other. It runs last because it verifies the run record too, and the run record does not exist until step 3 has written it.',
+    'It reports one line per artifact: ok; absent (declared optional or conditional, with the condition stated); MISSING; UNRECOGNISED (present at the declared path but not provably ours); UNEXPECTED (a file inside a directory the plugin owns whole that the map does not declare); RETIRED (an artifact an older plugin version wrote and this one no longer does).',
+    'Do not re-assert in prose anything the map covers, and do not judge its output. Copy every MISSING, UNRECOGNISED, UNEXPECTED and RETIRED line into problems verbatim, and set mapVerified true only when the script exits 0. An absent line is not a problem and never goes into problems. If migration.js is not there or does not run, set mapVerified false and say so in problems; never substitute file-existence checks of your own for it.',
+    'Nothing else of this phase moved into the map, and the split is deliberate: steps 1, 3 and 4 are writes rather than assertions, and step 2 is the one assertion the map cannot make. Every file-existence and managed-content assertion this phase used to state in prose is now in the map and is made by step 5.',
+    'Report revalidated, mapVerified, the run record path, and every problem found.',
   ].join('\n'),
   { label: 'finalize + run record', schema: FINALIZE_REPORT }
 )
@@ -373,6 +387,6 @@ return {
   written: write,
   render: render || { written: [], failures: ['render agent did not complete'], notes: '' },
   specialists: install || { installed: [], skipped: [], notes: 'installer agent did not complete' },
-  finalize: finalize || { revalidated: false, runRecordPath: '', problems: ['finalize agent did not complete'] },
-  instructions: 'Report the outcome to the user: files written, templates rendered, specialists installed, the dashboard launcher written to .claude/server/, the run record path, and any problems. Mention that re-running /major-tom:onboard updates the configuration and the generated files, and that /major-tom:dashboard opens the dashboard in the browser: the page computes its data from the repository every time it is loaded, and carries a refresh control, so nothing has to be re-run to see current data. Snapshot window and retention are still open (PRD OQ-13).',
+  finalize: finalize || { revalidated: false, mapVerified: false, runRecordPath: '', problems: ['finalize agent did not complete'] },
+  instructions: 'Report the outcome to the user: files written, templates rendered, specialists installed, the dashboard launcher written to .claude/server/, the run record path, whether the config revalidated and whether the target verified against the artifact map (D54), and any problems. Mention that re-running /major-tom:onboard updates the configuration and the generated files, and that /major-tom:dashboard opens the dashboard in the browser: the page computes its data from the repository every time it is loaded, and carries a refresh control, so nothing has to be re-run to see current data. Snapshot window and retention are still open (PRD OQ-13).',
 }

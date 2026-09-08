@@ -26,12 +26,23 @@ else; this path is authoritative (the host substitutes it at load time).
    return its parsed content as `existingConfig`; otherwise `existingConfig` is null.
 3. `codebaseMemoryMcpAvailable`: is the `codebase-memory-mcp` MCP server configured and
    reachable in this environment? Check the configured MCP servers; do not guess.
-4. `pluginAssetsPresent`: do `config.schema.json`, `templates/context.md.tpl`,
-   `templates/claude.md.tpl`, `templates/render.js`, `templates/launch-merge.js`,
-   `templates/settings-merge.js`, `templates/gitignore-merge.js`, `app/snapshot.js`,
-   `app/server.js`, `app/dashboard.html`, `app/launcher.js`, and
-   `app/vendor/js-yaml.cjs.js` all exist under the plugin root reported above? All twelve
-   must exist for true.
+4. `pluginAssetsPresent`: does the plugin root carry everything an onboard needs? Do not
+   answer from a list written here. Get the list from the plugin itself, which is the only
+   thing that knows it (the artifact map, D54):
+
+   ```
+   node ${CLAUDE_PLUGIN_ROOT}/migration.js --assets
+   ```
+
+   It prints one plugin-root-relative path per line and nothing else. Check that every
+   printed path exists under the plugin root; `pluginAssetsPresent` is true when all of them
+   do, false as soon as one does not, and the ones that do not go into `notes` by name. If
+   the command itself does not run, the plugin root does not carry `migration.js` either:
+   report false and say that in `notes`.
+
+   This check has no count and names no file on purpose. It carried a hand-written list
+   until D54, `workflows/onboard.js` carried a second copy of the same list, and the two had
+   already drifted apart, this file claiming a count that did not match what it listed.
 5. `projectTypeGuess`: `new` for an empty or scaffold-only repo, `existing` for an
    established codebase.
 
