@@ -53,6 +53,7 @@ phase skipped silently.
 ```
 node scripts/build-dashboard.js --check
 node scripts/sync-templates.js --check
+node plugins/major-tom/migration.js --check
 claude plugin validate plugins/major-tom
 grep -rn $'\u2014\\|\u2013' <edited files>   # em/en dash check, must return nothing
 ```
