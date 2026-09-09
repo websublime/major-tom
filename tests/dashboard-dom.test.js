@@ -556,6 +556,20 @@ function railCount(env, view) {
   return match ? Number(match[1]) : 0
 }
 
+// The lifecycle phase grid of the overview, one entry per card, as the facts a card states:
+// the phase name, the elapsed time beside it, and the status it is drawn in. The status is a
+// class because the grid draws it rather than spelling it, so reading it is a selector and it
+// lives here rather than inside a test. `on` is the card the run currently sits on.
+function phaseCards(env) {
+  const out = []
+  const re = /<div class="phase( on)?"><div class="phase-top"><span class="sq (\w+)"><\/span>[\s\S]*?<span class="count push">([^<]*)<\/span><\/div><div class="phase-name[^"]*">([^<]*)<\/div>/g
+  let match
+  while ((match = re.exec(env.main.innerHTML)) !== null) {
+    out.push({ name: match[4], elapsed: match[3], status: match[2], on: Boolean(match[1]) })
+  }
+  return out
+}
+
 function countOf(html, needle) {
   let total = 0
   let at = html.indexOf(needle)
@@ -886,7 +900,7 @@ test('load: a resolved fetch replaces the loading state with the view', async ()
 
   lacks(env.main.innerHTML, 'Computing the snapshot on the server',
     'the loading panel must be gone once the snapshot landed')
-  has(env.main.innerHTML, 'feat(dashboard): fetch the snapshot over http',
+  has(env.main.innerHTML, 'fetch the snapshot over http',
     'the overview must show the data that arrived')
   has(env.main.innerHTML, 'computed ', 'the pill must state the time of the computation')
   has(env.main.innerHTML, '(5 min ago)', 'the pill must state generatedAt as a relative time')
@@ -963,7 +977,7 @@ test('load: retry after a failure recovers and renders the view', async () => {
 
   lacks(env.main.innerHTML, '>no data<', 'the error state must be gone once the retry landed')
   lacks(env.main.innerHTML, 'the repository is broken', 'the old message must not survive the recovery')
-  has(env.main.innerHTML, 'feat(dashboard): fetch the snapshot over http', 'the view must render the recovered data')
+  has(env.main.innerHTML, 'fetch the snapshot over http', 'the view must render the recovered data')
 })
 
 // ---------------------------------------------------------------------------
@@ -981,23 +995,34 @@ test('views: overview renders the lifecycle, the roadmap, the counts, the activi
   has(html, 'Live data', 'the roadmap brief must render the milestones')
   has(html, '>concepts</span>', 'the knowledge panel must render its total tile')
   has(html, 'Serve the snapshot from the dashboard server', 'the activity strip must render the merged stream')
-  has(html, 'feat(dashboard): fetch the snapshot over http', 'the git panel must render the commit window')
+  has(html, 'fetch the snapshot over http', 'the git panel must render the commit window')
   has(html, 'The dashboard reads a live snapshot over HTTP', 'the decisions panel must render the decisions')
   has(html, '2 closed &#183; 1 open', 'the decisions panel must count what it was given')
 })
 
-test('views: overview switches between the grid and the console layout', async () => {
+test('views: the phase grid states the elapsed time and the status of every phase', async () => {
   const env = await bootLoaded()
-  has(env.main.innerHTML, '2/3 done', 'the grid layout states how many phases are done')
+  const phases = snapshotFixture().lastRun.phases
 
-  click(env, 'layout', 'B')
-  const html = env.main.innerHTML
-  // The console layout states two things the grid never renders: the elapsed time of each
-  // phase and its status in full.
-  has(html, '>6m</span>', 'the console layout states the elapsed time of each phase')
-  has(html, ';letter-spacing:.08em;text-transform:uppercase">active</span>',
-    'the console layout states the status of each phase')
-  lacks(html, '2/3 done', 'the grid header must be gone in the console layout')
+  const cards = phaseCards(env)
+  assert.equal(cards.length, phases.length, 'the grid must render one card per phase of the run')
+  assert.deepEqual(cards.map((card) => card.name), phases.map((p) => p.name),
+    'the cards must be the phases of the run, in order')
+
+  // The elapsed time of each phase is on screen, per phase and not as a run total.
+  assert.deepEqual(cards.map((card) => card.elapsed), phases.map((p) => p.elapsed),
+    'every phase must state its own elapsed time')
+
+  // The status of each phase is on screen too, drawn rather than spelled. Done and active
+  // carry their own name, and the phase the run sits on is the one card marked on.
+  assert.deepEqual(cards.map((card) => card.status), phases.map((p) => p.status),
+    'every phase must be drawn in the status the snapshot gave it')
+  assert.deepEqual(cards.filter((card) => card.on).map((card) => card.name), ['implement'],
+    'exactly the active phase is the card the run is marked on')
+
+  // The head states where the run stands, which is the phase it sits on while one is active.
+  has(env.main.innerHTML, 'phase 3/3 &#183; implement &#183; 12m',
+    'the lifecycle head must state the position of the run and how long it has taken')
 })
 
 test('views: roadmap renders every milestone with its tasks and its progress', async () => {
@@ -1012,7 +1037,7 @@ test('views: roadmap renders every milestone with its tasks and its progress', a
   has(html, 'Serve the snapshot', 'a milestone must render its tasks')
   has(html, 'Fetch it in the client', 'a milestone must render every task')
   has(html, 'Fetch bodies on demand', 'the second milestone must render its task too')
-  has(html, '1/2 tasks', 'a milestone must state how many of its tasks are done')
+  has(html, '<span class="num">1/2</span>', 'a milestone must state how many of its tasks are done')
   has(html, '1 active', 'the head must count the active milestones')
 })
 
@@ -1031,7 +1056,7 @@ test('views: timeline renders the merged stream, the window and the omission rec
   has(html, 'feature workflow completed', 'a run event must be on screen')
   has(html, '>truncated<', 'a summary cut at the cap must be flagged')
   has(html, 'session abcdef12', 'events must be grouped under their session')
-  has(html, 'fix(server): refuse a path-shaped id', 'the commits must be merged into the same stream')
+  has(html, 'refuse a path-shaped id', 'the commits must be merged into the same stream')
 })
 
 test('views: git renders the commit window with its authors and its diff stats', async () => {
@@ -1042,7 +1067,7 @@ test('views: git renders the commit window with its authors and its diff stats',
   has(html, '<h1 class="sans">git</h1>', 'the header must name the view')
   has(html, '5 of 5 commits', 'the bar must state how much of the window is visible')
   has(html, '1a2b3c4', 'a commit must be identified by its short sha')
-  has(html, 'fix(server): refuse a path-shaped id', 'every commit subject must be on screen')
+  has(html, 'refuse a path-shaped id', 'every commit subject must be on screen')
   has(html, 'Other Author', 'the author column must come from the data')
   has(html, '+120', 'the diff stats must come from the data')
   has(html, 'id="git-q"', 'the filter input must be rendered')
@@ -1052,9 +1077,35 @@ test('views: git escapes a commit subject that carries markup', async () => {
   const env = await bootLoaded()
   click(env, 'view', 'git')
 
-  has(env.main.innerHTML, 'test(client): cover a &lt;script&gt; subject',
+  has(env.main.innerHTML, 'cover a &lt;script&gt; subject',
     'a subject is data from the repository and must be escaped')
   lacks(env.main.innerHTML, '<script>', 'no snapshot string may reach the page as markup')
+})
+
+test('views: git drops a conventional prefix from the subject and leaves any other word alone', async () => {
+  const snapshot = snapshotFixture()
+
+  // A subject whose leading word is a conventional keyword but whose shape is not a prefix.
+  snapshot.git.push({
+    hash: 'f1e2a3b4c5d60055',
+    date: ago(4 * DAY),
+    author: 'Fixture Author',
+    subject: 'fix the build',
+    add: 1,
+    del: 1,
+  })
+
+  const env = await bootLoaded({ snapshot: snapshot })
+  click(env, 'view', 'git')
+  const html = env.main.innerHTML
+
+  // The kind column states the prefix beside the subject, so the subject cell drops it.
+  has(html, '>refuse a path-shaped id<', 'a parsing prefix must be gone from the subject cell')
+  lacks(html, 'fix(server)', 'the prefix must not reach the page at all')
+  lacks(html, 'feat(dashboard)', 'no scoped prefix may survive anywhere on the page')
+
+  // Nothing parses here, so the sentence keeps every character, the leading word included.
+  has(html, '>fix the build<', 'a subject that is not conventional must survive whole')
 })
 
 test('views: git filters by kind and by the query the user types', async () => {
@@ -1063,15 +1114,31 @@ test('views: git filters by kind and by the query the user types', async () => {
 
   click(env, 'filter', 'fix')
   has(env.main.innerHTML, '1 of 5 commits', 'the kind segment must narrow the window')
-  has(env.main.innerHTML, 'fix(server): refuse a path-shaped id', 'the surviving commit must be the fix')
-  lacks(env.main.innerHTML, 'feat(dashboard): fetch the snapshot over http', 'the other kinds must be gone')
+  has(env.main.innerHTML, 'refuse a path-shaped id', 'the surviving commit must be the fix')
+  lacks(env.main.innerHTML, 'fetch the snapshot over http', 'the other kinds must be gone')
 
   click(env, 'filter', 'all')
   typeInFilter(env, 'Other Author')
   has(env.main.innerHTML, '1 of 5 commits', 'the query must narrow the window')
-  has(env.main.innerHTML, 'docs(prd): D43 drops the degraded path', 'the query must match the author too')
+  has(env.main.innerHTML, 'D43 drops the degraded path', 'the query must match the author too')
   assert.equal(env.gitInput().value, 'Other Author', 'the query must survive the re-render')
   assert.equal(env.gitInput().focused, 1, 'the caret must be put back after the re-render')
+})
+
+test('views: the git query searches the subject the repository wrote, prefix and scope included', async () => {
+  const env = await bootLoaded()
+  click(env, 'view', 'git')
+
+  // `release` lives only in the scope of `chore(release): manifests at 0.19.0`, a prefix the
+  // subject cell strips. The query runs over the full subject, so the word still finds the
+  // commit even though the page never prints it.
+  typeInFilter(env, 'release')
+  const html = env.main.innerHTML
+
+  has(html, '1 of 5 commits', 'a word that lives only in the prefix must still narrow the window')
+  has(html, '>manifests at 0.19.0<', 'the matched commit must render its stripped subject')
+  lacks(html.slice(html.indexOf('<section class="panel"')), 'release',
+    'the matched word must stay out of the table, the filter input alone repeats it')
 })
 
 test('views: knowledge renders the tree, the frontmatter and the selected file', async () => {
@@ -1196,7 +1263,7 @@ test('refresh: the pill states the new computation and the new data is on screen
 
   has(env.main.innerHTML, '(1 min ago)', 'the pill must state the time of the new computation')
   lacks(env.main.innerHTML, '(5 min ago)', 'the pill must not still state the old one')
-  has(env.main.innerHTML, 'feat(client): a commit that landed after the page loaded',
+  has(env.main.innerHTML, 'a commit that landed after the page loaded',
     'the recomputed data must be on screen')
   assert.equal(railCount(env, 'git'), next.git.length, 'the rail must count the recomputed data')
 })
@@ -1213,7 +1280,7 @@ test('refresh: a failure over a loaded page states itself above the view it coul
   has(html, 'Showing the last snapshot that loaded.', 'the banner must say what is on screen')
   has(html, 'stale, last computed ', 'the pill must state that what is on screen is stale')
   // Blanking a good view because a later request failed would destroy what the user still has.
-  has(html, 'feat(dashboard): fetch the snapshot over http', 'the loaded view must survive the failed refresh')
+  has(html, 'fetch the snapshot over http', 'the loaded view must survive the failed refresh')
   lacks(html, '>no data<', 'the full error state belongs to a page that never loaded')
 
   click(env, 'refresh')
@@ -1357,7 +1424,7 @@ test('window: a refused window renders the server message at the control and kee
   // The view and its data are untouched, and so is the value that has to be corrected.
   has(html, '<h1 class="sans">git</h1>', 'the view must be the one the reader was on')
   has(html, '5 of 5 commits', 'the data must still be on screen')
-  has(html, 'fix(server): refuse a path-shaped id', 'every commit must still be there')
+  has(html, 'refuse a path-shaped id', 'every commit must still be there')
   assert.deepEqual(windowFields(env), { days: '900', limit: '500' },
     'the refused value must stay in its field so it can be corrected in place')
 })
@@ -1385,7 +1452,7 @@ test('window: a corrected value after a refusal renders normally again', async (
   lacks(html, '>window refused<', 'the refusal must be gone once a window was accepted')
   lacks(html, 'received 0', 'the old message must not survive the correction')
   assert.deepEqual(windowFields(env), { days: '90', limit: '500' }, 'the control must state the new window')
-  has(html, 'feat(dashboard): fetch the snapshot over http', 'the view must render the data of the new window')
+  has(html, 'fetch the snapshot over http', 'the view must render the data of the new window')
 
   // And the refused window never became the one in force: the request the refresh issues is the
   // one that was accepted.
@@ -1677,12 +1744,23 @@ test('body: re-rendering the knowledge view does not re-request the body it alre
 // The knowledge tree
 // ---------------------------------------------------------------------------
 
-// The group headings the tree rendered, in the order it rendered them.
+// The group headings the tree rendered, in the order it rendered them. A heading is a row and
+// not a control, so it carries no data-act and reading it is a selector.
 function treeHeadings(env) {
   const out = []
-  const re = /&#9656;<\/span><span>([^<]+)<\/span>/g
+  const re = /<div class="treebtn dir"><span class="c-grow">([^<]+)<\/span>/g
   let match
   while ((match = re.exec(env.main.innerHTML)) !== null) out.push(match[1])
+  return out
+}
+
+// The knowledge count rows of the overview, in the order they were rendered. Each row is a
+// label and the number counted under it, so this is the partition as the page states it.
+function countRows(env) {
+  const out = []
+  const re = /<span class="c-grow fg-dim">([^<]*)<\/span><span class="c num"[^>]*>(\d+)<\/span>/g
+  let match
+  while ((match = re.exec(env.main.innerHTML)) !== null) out.push({ label: match[1], n: Number(match[2]) })
   return out
 }
 
@@ -1755,13 +1833,8 @@ test('tree: an empty canonical area produces no heading, and a second unexpected
 test('tree: the overview counts are the same partition, so the areas add up to the total', async () => {
   const env = await bootLoaded()
   const snapshot = snapshotFixture()
-  const html = env.main.innerHTML
 
-  const tiles = []
-  const re = /<span class="sans" style="font-size:24px;font-weight:600;letter-spacing:-\.02em">(\d+)<\/span><span style="color:var\(--dim\);font-size:11px">([^<]*)<\/span>/g
-  let match
-  while ((match = re.exec(html)) !== null) tiles.push({ n: Number(match[1]), label: match[2] })
-
+  const tiles = countRows(env)
   const labels = tiles.map((tile) => tile.label)
   assert.deepEqual(labels, ['memories', 'docs', 'runs', 'monitors', 'logs', 'notes', '/ (bundle root)', 'concepts'],
     'the five canonical tiles are always present, then whatever else the bundle holds, then the total')

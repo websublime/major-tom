@@ -26,7 +26,18 @@ const path = require('node:path')
 
 const REPO_ROOT = path.resolve(__dirname, '..')
 const SCRIPT = path.join(REPO_ROOT, 'plugins', 'major-tom', 'app', 'snapshot.js')
-const VENDORED_PARSER = path.join(REPO_ROOT, 'plugins', 'major-tom', 'app', 'vendor', 'js-yaml.cjs.js')
+const VENDOR_DIR = path.join(REPO_ROOT, 'plugins', 'major-tom', 'app', 'vendor')
+
+// Every third-party file shipped inside the plugin, with the size and the SHA-256 that
+// plugins/major-tom/app/vendor/README.md records for it. This list is the pin, so a vendored file
+// that changes byte for byte fails the suite here instead of travelling silently.
+const VENDORED = [
+  { file: 'js-yaml.cjs.js', size: 122488, sha256: 'f1499c20ab232a283f6f9f85aeecc99dceab175e8dd4005bd3d764848f3e5965' },
+  { file: 'fonts/ibm-plex-mono-latin-400.woff2', size: 10052, sha256: 'c36f509c0a8f9f85f29cb44bc8701d8a9e0b14c499e77a884f789ead7093a7ac' },
+  { file: 'fonts/ibm-plex-mono-latin-500.woff2', size: 10060, sha256: 'a76f53ca6612e7b3828eec2311098675b7f9849ae4169a8bcef6302aec02a6c0' },
+  { file: 'fonts/ibm-plex-mono-latin-600.woff2', size: 10120, sha256: 'ad4580d8cb4b5f627c2d18457656732f7f7b070f7837fbc380e08054157e6f6c' },
+  { file: 'fonts/ibm-plex-sans-latin-variable.woff2', size: 40240, sha256: '056e4e2459f57a0033c8c9c844ff19d6e42ac8602027803d4345823bcc939818' },
+]
 
 // The persistence root every fixture uses; the config schema fixes it to .knowledge.
 const KNOWLEDGE_ROOT = '.knowledge'
@@ -317,16 +328,19 @@ function decisionById(snapshot, id) {
 }
 
 // ---------------------------------------------------------------------------
-// The vendored parser
+// The vendored files
 // ---------------------------------------------------------------------------
 
-test('vendor: the js-yaml bundle has the recorded size and SHA-256', () => {
-  const bytes = fs.readFileSync(VENDORED_PARSER)
-  assert.equal(bytes.length, 122488)
-  assert.equal(
-    crypto.createHash('sha256').update(bytes).digest('hex'),
-    'f1499c20ab232a283f6f9f85aeecc99dceab175e8dd4005bd3d764848f3e5965'
-  )
+test('vendor: every vendored file has the recorded size and SHA-256', () => {
+  for (const entry of VENDORED) {
+    const bytes = fs.readFileSync(path.join(VENDOR_DIR, ...entry.file.split('/')))
+    assert.equal(bytes.length, entry.size, `${entry.file} is not the recorded size`)
+    assert.equal(
+      crypto.createHash('sha256').update(bytes).digest('hex'),
+      entry.sha256,
+      `${entry.file} is not the recorded bytes`
+    )
+  }
 })
 
 // ---------------------------------------------------------------------------
