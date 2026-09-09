@@ -13,448 +13,336 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <style>
 :root{
-  --bg:#101214; --panel:#1a1d21; --panel2:#22262b; --raise:#2a2f35; --tile:#1f2328;
-  --line:#282c32; --line2:#3a4048; --text:#edeff1; --dim:#98a0a8; --dimmer:#69717a;
-  --accent:#ef8272; --accent-soft:#332624; --accent-line:#5b3a34;
-  --ok:#6fcf9d; --ok-soft:#1e2c26; --warn:#e6bd6c; --stop:#e0757f;
-  --shadow:0 1px 0 rgba(255,255,255,.03), 0 12px 28px -14px rgba(0,0,0,.7);
+  --bg:#0a0a0b; --panel:#101011; --head:#141416; --row:#0d0d0e; --hover:#17181a;
+  --line:#1f2022; --line2:#2c2e31; --text:#e7e8e9; --dim:#9b9da0; --dimmer:#6b6d71;
+  --done:#7ea88f; --active:#c2a05e; --idle:#3a3c3f; --neg:#b1727a;
 }
 :root[data-theme="light"]{
-  --bg:#ececeb; --panel:#fbfbfa; --panel2:#f1f2f2; --raise:#e4e5e6; --tile:#f5f6f6;
-  --line:#e0e1e2; --line2:#c3c6c8; --text:#14171a; --dim:#5b6167; --dimmer:#8a9096;
-  --accent:#d9604c; --accent-soft:#fbeae6; --accent-line:#f0c4bb;
-  --ok:#2f8a62; --ok-soft:#e8f2ec; --warn:#8e6c22; --stop:#b04d58;
-  --shadow:0 1px 0 rgba(255,255,255,.6), 0 10px 24px -16px rgba(0,0,0,.28);
+  --bg:#f6f6f5; --panel:#ffffff; --head:#f0f0ef; --row:#fbfbfa; --hover:#f2f2f1;
+  --line:#e3e3e2; --line2:#cfd0cf; --text:#131415; --dim:#5c5e61; --dimmer:#8b8d90;
+  --done:#3d7a5c; --active:#8a6a1e; --idle:#c6c7c8; --neg:#a1505a;
 }
 *{box-sizing:border-box;}
-html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:"IBM Plex Mono",ui-monospace,monospace;-webkit-font-smoothing:antialiased;}
-a{color:var(--accent);text-decoration:none;}
-a:hover{color:var(--text);}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:13px;-webkit-font-smoothing:antialiased;}
+a{color:var(--text);text-decoration:none;border-bottom:1px solid var(--line2);}
+a:hover{color:var(--text);border-bottom-color:var(--text);}
 input::placeholder{color:var(--dimmer);}
-::selection{background:var(--accent-soft);}
-::-webkit-scrollbar{width:10px;height:10px;}
-::-webkit-scrollbar-thumb{background:var(--raise);border-radius:10px;border:3px solid transparent;background-clip:content-box;}
-::-webkit-scrollbar-track{background:transparent;}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+::selection{background:var(--line2);}
+::-webkit-scrollbar{width:11px;height:11px;}
+::-webkit-scrollbar-thumb{background:var(--line2);}
+::-webkit-scrollbar-track{background:var(--bg);}
 </style>
 </helmet>
 
-<div style="display:flex;gap:12px;height:100vh;width:100%;padding:12px;overflow:hidden;background:var(--bg);font-size:13px;line-height:1.45">
+<div style="display:flex;height:100vh;width:100%;overflow:hidden;background:var(--bg);line-height:1.45">
 
-  <nav style="flex:0 0 auto;display:flex;flex-direction:column;gap:6px;padding:14px 10px;border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);overflow:hidden;transition:width .18s ease;width:{{ railWidth }}">
-    <div style="display:flex;align-items:center;gap:11px;padding:2px 4px 16px 4px">
-      <div style="flex:0 0 auto;width:34px;height:34px;border-radius:12px;background:var(--accent-soft);border:1px solid var(--accent-line);display:grid;place-items:center;color:var(--accent);font-size:12px;font-weight:600">MT</div>
-      <div style="display:flex;flex-direction:column;white-space:nowrap;opacity:{{ labelOpacity }}">
-        <span style="font-family:'IBM Plex Sans',sans-serif;font-size:14px;font-weight:600;letter-spacing:-.01em">Major Tom</span>
-        <span style="font-size:10.5px;color:var(--dimmer)">v0.11.0</span>
-      </div>
+  <nav style="flex:0 0 auto;display:flex;flex-direction:column;border-right:1px solid var(--line);background:var(--panel);overflow:hidden;transition:width .14s ease;width:{{ railWidth }}">
+    <div style="display:flex;align-items:center;gap:10px;height:52px;padding:0 14px;border-bottom:1px solid var(--line);flex:0 0 auto">
+      <span style="flex:0 0 auto;width:22px;height:22px;border:1px solid var(--line2);display:grid;place-items:center;font-size:10px;font-weight:600;color:var(--text)">MT</span>
+      <span style="white-space:nowrap;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);opacity:{{ labelOpacity }}">major tom</span>
     </div>
 
-    <sc-for list="{{ navItems }}" as="item" hint-placeholder-count="5">
-      <button type="button" onClick="{{ item.go }}" title="{{ item.label }}" style="display:flex;align-items:center;gap:11px;width:100%;padding:8px;border:1px solid {{ item.border }};border-radius:14px;background:{{ item.bg }};color:{{ item.fg }};font-family:inherit;font-size:12.5px;cursor:pointer;text-align:left;white-space:nowrap;transition:background .12s ease" style-hover="background:var(--panel2);color:var(--text)">
-        <span style="flex:0 0 auto;width:22px;height:22px;border-radius:8px;display:grid;place-items:center;font-size:12.5px">{{ item.glyph }}</span>
-        <span style="opacity:{{ labelOpacity }}">{{ item.label }}</span>
-        <span style="margin-left:auto;padding:0 7px;border-radius:999px;background:var(--panel2);color:var(--dimmer);font-size:10.5px;opacity:{{ labelOpacity }}">{{ item.count }}</span>
-      </button>
-    </sc-for>
+    <div style="display:flex;flex-direction:column;padding:8px 0">
+      <sc-for list="{{ navItems }}" as="item" hint-placeholder-count="6">
+        <button type="button" sc-camel-on-click="{{ item.go }}" title="{{ item.label }}" style="display:flex;align-items:center;gap:12px;width:100%;height:34px;padding:0 14px;border:0;border-left:2px solid {{ item.bar }};background:{{ item.bg }};color:{{ item.fg }};font-family:inherit;font-size:12.5px;cursor:pointer;text-align:left;white-space:nowrap" style-hover="background:var(--hover);color:var(--text)">
+          <span style="flex:0 0 auto;width:14px;text-align:center;font-size:12px;color:{{ item.glyphColor }}">{{ item.glyph }}</span>
+          <span style="opacity:{{ labelOpacity }}">{{ item.label }}</span>
+          <span style="margin-left:auto;color:var(--dimmer);font-size:11px;opacity:{{ labelOpacity }}">{{ item.count }}</span>
+        </button>
+      </sc-for>
+    </div>
 
-    <div style="margin-top:auto;display:flex;flex-direction:column;gap:6px">
-      <button type="button" onClick="{{ toggleTheme }}" title="Theme" style="display:flex;align-items:center;gap:11px;padding:8px;border:1px solid transparent;border-radius:14px;background:transparent;color:var(--dim);font-family:inherit;font-size:12.5px;cursor:pointer;white-space:nowrap" style-hover="background:var(--panel2);color:var(--text)">
-        <span style="flex:0 0 auto;width:22px;text-align:center">{{ themeGlyph }}</span>
+    <div style="margin-top:auto;display:flex;flex-direction:column;border-top:1px solid var(--line)">
+      <button type="button" sc-camel-on-click="{{ toggleTheme }}" title="Theme" style="display:flex;align-items:center;gap:12px;height:34px;padding:0 14px;border:0;border-left:2px solid transparent;background:transparent;color:var(--dim);font-family:inherit;font-size:12.5px;cursor:pointer;white-space:nowrap" style-hover="background:var(--hover);color:var(--text)">
+        <span style="flex:0 0 auto;width:14px;text-align:center">{{ themeGlyph }}</span>
         <span style="opacity:{{ labelOpacity }}">{{ themeLabel }}</span>
       </button>
-      <button type="button" onClick="{{ toggleRail }}" title="Collapse" style="display:flex;align-items:center;gap:11px;padding:8px;border:1px solid transparent;border-radius:14px;background:transparent;color:var(--dim);font-family:inherit;font-size:12.5px;cursor:pointer;white-space:nowrap" style-hover="background:var(--panel2);color:var(--text)">
-        <span style="flex:0 0 auto;width:22px;text-align:center">{{ railGlyph }}</span>
+      <button type="button" sc-camel-on-click="{{ toggleRail }}" title="Collapse" style="display:flex;align-items:center;gap:12px;height:34px;padding:0 14px;border:0;border-left:2px solid transparent;background:transparent;color:var(--dim);font-family:inherit;font-size:12.5px;cursor:pointer;white-space:nowrap" style-hover="background:var(--hover);color:var(--text)">
+        <span style="flex:0 0 auto;width:14px;text-align:center">{{ railGlyph }}</span>
         <span style="opacity:{{ labelOpacity }}">collapse</span>
       </button>
     </div>
   </nav>
 
-  <main style="flex:1 1 auto;display:flex;flex-direction:column;gap:14px;min-width:0;overflow:auto;padding-right:2px">
+  <main style="flex:1 1 auto;display:flex;flex-direction:column;min-width:0;overflow:hidden">
 
-    <header style="flex:0 0 auto;display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;padding:6px 4px 0 4px">
-      <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-        <h1 style="margin:0;font-family:'IBM Plex Sans',sans-serif;font-size:29px;font-weight:600;letter-spacing:-.02em;text-transform:capitalize">{{ viewTitle }}</h1>
-        <span style="color:var(--dim);font-size:12px">{{ viewSubtitle }}</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap">
-        <span style="display:flex;align-items:center;gap:8px;padding:7px 13px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--dim);font-size:11.5px;white-space:nowrap;box-shadow:var(--shadow)"><span style="width:6px;height:6px;border-radius:50%;background:var(--ok);animation:pulse 2.6s infinite"></span>snapshot {{ generatedAt }}</span>
-        <span style="padding:7px 13px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--dim);font-size:11.5px;white-space:nowrap;box-shadow:var(--shadow)">unblock &#183; mono-repo</span>
-        <span style="padding:7px 13px;border:1px solid var(--accent-line);border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:11.5px;white-space:nowrap">team &#183; 3 + coordinator</span>
+    <header style="flex:0 0 auto;display:flex;align-items:center;gap:16px;height:52px;padding:0 20px;border-bottom:1px solid var(--line);background:var(--panel)">
+      <span style="font-family:'IBM Plex Sans',sans-serif;font-size:15px;font-weight:600;letter-spacing:-.01em;text-transform:capitalize;white-space:nowrap">{{ viewTitle }}</span>
+      <span style="color:var(--line2)">/</span>
+      <span style="color:var(--dim);font-size:12px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ viewSubtitle }}</span>
+      <div style="display:flex;align-items:center;gap:0;margin-left:auto;height:100%">
+        <span style="display:flex;align-items:center;gap:8px;height:100%;padding:0 14px;border-left:1px solid var(--line);color:var(--dim);font-size:11.5px;white-space:nowrap"><span style="width:5px;height:5px;background:var(--done)"></span>{{ project }}</span>
+        <span style="display:flex;align-items:center;height:100%;padding:0 14px;border-left:1px solid var(--line);color:var(--dim);font-size:11.5px;white-space:nowrap">{{ workingModel }}</span>
+        <span style="display:flex;align-items:center;height:100%;padding:0 14px;border-left:1px solid var(--line);color:var(--dim);font-size:11.5px;white-space:nowrap">snapshot {{ generatedAt }}</span>
       </div>
     </header>
 
-    <!-- ============ OVERVIEW ============ -->
-    <sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
-      <div style="display:flex;flex-direction:column;gap:14px">
+    <div style="flex:1 1 auto;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:20px">
 
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:0 4px">
-          <div style="display:flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:999px;background:var(--panel)">
-            <button type="button" onClick="{{ setLayoutA }}" style="padding:6px 15px;border:0;border-radius:999px;background:{{ layoutABg }};color:{{ layoutAFg }};font-family:inherit;font-size:11.5px;cursor:pointer">grid</button>
-            <button type="button" onClick="{{ setLayoutB }}" style="padding:6px 15px;border:0;border-radius:999px;background:{{ layoutBBg }};color:{{ layoutBFg }};font-family:inherit;font-size:11.5px;cursor:pointer">console</button>
-          </div>
-          <span style="margin-left:auto;color:var(--dim);font-size:11.5px">last run <span style="color:var(--text)">{{ lastRun.id }}</span> &#183; {{ lastRun.duration }}</span>
-        </div>
+      <!-- ============ OVERVIEW ============ -->
+      <sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:20px">
 
-        <!-- ---- layout A ---- -->
-        <sc-if value="{{ isLayoutA }}" hint-placeholder-val="{{ true }}">
-          <div style="display:flex;flex-direction:column;gap:14px">
+          <section style="border:1px solid var(--line);background:var(--panel)">
+            <div style="display:flex;align-items:center;gap:14px;height:34px;padding:0 14px;border-bottom:1px solid var(--line);background:var(--head)">
+              <span style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)">lifecycle</span>
+              <span style="color:var(--dimmer);font-size:11.5px">{{ lastRun.id }}</span>
+              <span style="margin-left:auto;color:var(--dim);font-size:11.5px">phase {{ lastRun.phaseIndex }}/9 · {{ lastRun.phaseName }} · {{ lastRun.duration }}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+              <sc-for list="{{ phases }}" as="p" hint-placeholder-count="9">
+                <div style="padding:12px 14px;border-left:1px solid var(--line);border-top:1px solid var(--line);margin-top:-1px;background:{{ p.cellBg }};display:flex;flex-direction:column;gap:9px;min-width:0">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="width:5px;height:5px;background:{{ p.color }}"></span>
+                    <span style="color:var(--dimmer);font-size:10.5px">{{ p.num }}</span>
+                    <span style="margin-left:auto;color:var(--dimmer);font-size:10.5px">{{ p.elapsed }}</span>
+                  </div>
+                  <div style="color:{{ p.labelColor }};font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</div>
+                  <div style="height:2px;background:var(--idle)"><div style="height:2px;background:{{ p.color }};width:{{ p.pct }}%"></div></div>
+                  <div style="color:var(--dimmer);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.artifact }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </section>
 
-            <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px 16px 18px 16px">
-              <div style="display:flex;align-items:center;gap:12px;padding:0 2px 14px 2px;flex-wrap:wrap">
-                <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">lifecycle</span>
-                <span style="color:var(--dimmer);font-size:11.5px">{{ lastRun.id }}</span>
-                <span style="margin-left:auto;padding:4px 11px;border-radius:999px;background:var(--panel2);color:var(--text);font-size:11.5px">phase {{ lastRun.phaseIndex }}/9 &#183; {{ lastRun.phaseName }}</span>
+          <div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:20px;align-items:start">
+
+            <section style="border:1px solid var(--line);background:var(--panel)">
+              <div style="display:flex;align-items:center;height:34px;padding:0 14px;border-bottom:1px solid var(--line);background:var(--head)">
+                <span style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)">roadmap</span>
+                <a href="#roadmap" sc-camel-on-click="{{ goRoadmap }}" style="margin-left:auto;font-size:11.5px;color:var(--dim)">open</a>
               </div>
-              <div style="display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:8px">
-                <sc-for list="{{ phases }}" as="p" hint-placeholder-count="9">
-                  <div style="padding:12px;border:1px solid {{ p.tileLine }};border-radius:14px;background:{{ p.tileBg }};display:flex;flex-direction:column;gap:8px;min-width:0">
-                    <div style="display:flex;align-items:center;gap:7px">
-                      <span style="width:7px;height:7px;border-radius:50%;background:{{ p.color }}"></span>
-                      <span style="color:var(--dimmer);font-size:10.5px">{{ p.num }}</span>
-                    </div>
-                    <div style="font-family:'IBM Plex Sans',sans-serif;color:{{ p.labelColor }};font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</div>
-                    <div style="height:3px;border-radius:999px;background:var(--raise)"><div style="height:3px;border-radius:999px;background:{{ p.color }};width:{{ p.pct }}%"></div></div>
-                    <div style="color:var(--dimmer);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.artifact }}</div>
+              <div style="display:flex;flex-direction:column">
+                <sc-for list="{{ milestones }}" as="m" hint-placeholder-count="5">
+                  <div style="display:flex;align-items:center;gap:14px;height:34px;padding:0 14px;border-bottom:1px solid var(--line)" style-hover="background:var(--hover)">
+                    <span style="flex:0 0 5px;height:5px;background:{{ m.color }}"></span>
+                    <span style="flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.title }}</span>
+                    <span style="flex:0 0 56px;text-align:right;color:var(--dimmer);font-size:11px">{{ m.doneTasks }}/{{ m.totalTasks }}</span>
+                    <span style="flex:0 0 92px;height:2px;background:var(--idle)"><span style="display:block;height:2px;background:{{ m.color }};width:{{ m.pct }}%"></span></span>
+                    <span style="flex:0 0 34px;text-align:right;color:var(--dim);font-size:11.5px">{{ m.pct }}%</span>
                   </div>
                 </sc-for>
               </div>
             </section>
 
-            <div style="display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px;align-items:start">
-
-              <section style="grid-column:span 7;border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
-                <div style="display:flex;align-items:center;gap:12px;padding:0 2px 12px 2px">
-                  <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">roadmap</span>
-                  <a href="#roadmap" onClick="{{ goRoadmap }}" style="margin-left:auto;font-size:11.5px">open &#8594;</a>
-                </div>
-                <div style="display:flex;flex-direction:column;gap:8px">
-                  <sc-for list="{{ milestonesBrief }}" as="m" hint-placeholder-count="5">
-                    <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:var(--tile)">
-                      <span style="width:7px;height:7px;flex:0 0 auto;border-radius:50%;background:{{ m.color }}"></span>
-                      <span style="flex:1 1 auto;min-width:0;font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.title }}</span>
-                      <span style="flex:0 0 auto;color:var(--dimmer);font-size:11px">{{ m.doneTasks }}/{{ m.totalTasks }}</span>
-                      <span style="flex:0 0 96px;height:4px;border-radius:999px;background:var(--raise)"><span style="display:block;height:4px;border-radius:999px;background:{{ m.color }};width:{{ m.pct }}%"></span></span>
-                      <span style="flex:0 0 36px;text-align:right;color:var(--text);font-size:11.5px">{{ m.pct }}%</span>
-                    </div>
-                  </sc-for>
-                </div>
-              </section>
-
-              <section style="grid-column:span 5;border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
-                <div style="display:flex;align-items:center;gap:12px;padding:0 2px 12px 2px">
-                  <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">.knowledge</span>
-                  <span style="margin-left:auto;color:var(--dimmer);font-size:11px">okf 0.2 bundle</span>
-                </div>
-                <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
-                  <sc-for list="{{ counts }}" as="c" hint-placeholder-count="6">
-                    <div style="padding:12px;border-radius:14px;background:var(--tile);display:flex;flex-direction:column;gap:2px">
-                      <span style="font-family:'IBM Plex Sans',sans-serif;font-size:24px;font-weight:600;letter-spacing:-.02em;color:{{ c.color }}">{{ c.n }}</span>
-                      <span style="color:var(--dim);font-size:11px">{{ c.label }}</span>
-                    </div>
-                  </sc-for>
-                </div>
-              </section>
-
-              <section style="grid-column:span 7;border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
-                <div style="display:flex;align-items:center;gap:12px;padding:0 2px 12px 2px">
-                  <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">git history</span>
-                  <a href="#git" onClick="{{ goGit }}" style="margin-left:auto;font-size:11.5px">full log &#8594;</a>
-                </div>
-                <div style="display:flex;flex-direction:column;gap:2px">
-                  <sc-for list="{{ commitsBrief }}" as="c" hint-placeholder-count="7">
-                    <div style="display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:12px" style-hover="background:var(--panel2)">
-                      <span style="flex:0 0 auto;padding:1px 8px;border-radius:999px;background:var(--panel2);color:var(--accent);font-size:11px">{{ c.sha }}</span>
-                      <span style="flex:0 0 58px;color:{{ c.kindColor }};font-size:11px">{{ c.kind }}</span>
-                      <span style="flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.subject }}</span>
-                      <span style="flex:0 0 auto;color:var(--dimmer);font-size:11px">{{ c.when }}</span>
-                    </div>
-                  </sc-for>
-                </div>
-              </section>
-
-              <section style="grid-column:span 5;border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
-                <div style="display:flex;align-items:center;gap:12px;padding:0 2px 12px 2px">
-                  <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">decisions</span>
-                  <span style="margin-left:auto;color:var(--dimmer);font-size:11px">32 closed &#183; 8 open</span>
-                </div>
-                <div style="display:flex;flex-direction:column;gap:2px">
-                  <sc-for list="{{ decisions }}" as="d" hint-placeholder-count="7">
-                    <div style="display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:12px" style-hover="background:var(--panel2)">
-                      <span style="flex:0 0 auto;padding:1px 8px;border-radius:999px;background:{{ d.chipBg }};border:1px solid {{ d.chipLine }};color:{{ d.color }};font-size:10.5px">{{ d.id }}</span>
-                      <span style="flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ d.textColor }}">{{ d.text }}</span>
-                      <span style="flex:0 0 auto;color:var(--dimmer);font-size:11px">{{ d.date }}</span>
-                    </div>
-                  </sc-for>
-                </div>
-              </section>
-
-            </div>
-          </div>
-        </sc-if>
-
-        <!-- ---- layout B ---- -->
-        <sc-if value="{{ isLayoutB }}" hint-placeholder-val="{{ true }}">
-          <div style="display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:14px;align-items:start">
-
-            <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
-              <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
-                <div style="display:flex;align-items:center;gap:11px;padding:0 2px 14px 2px;flex-wrap:wrap">
-                  <span style="width:26px;height:26px;border-radius:10px;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent);display:grid;place-items:center;font-size:11px">&#9656;</span>
-                  <span style="font-family:'IBM Plex Sans',sans-serif;font-size:14px;font-weight:600">{{ lastRun.id }}</span>
-                  <span style="color:var(--dim);font-size:11.5px">{{ lastRun.workflow }}</span>
-                  <span style="margin-left:auto;padding:4px 11px;border-radius:999px;background:var(--panel2);color:var(--dim);font-size:11.5px">{{ lastRun.duration }} &#183; {{ lastRun.mode }}</span>
-                </div>
-                <div style="display:flex;flex-direction:column;gap:3px">
-                  <sc-for list="{{ phases }}" as="p" hint-placeholder-count="9">
-                    <div style="display:flex;align-items:center;gap:13px;padding:9px 12px;border-radius:13px;background:{{ p.rowBg }}">
-                      <span style="flex:0 0 16px;color:var(--dimmer);font-size:11px">{{ p.num }}</span>
-                      <span style="flex:0 0 7px;height:7px;border-radius:50%;background:{{ p.color }}"></span>
-                      <span style="flex:0 0 118px;font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;color:{{ p.labelColor }};font-weight:500">{{ p.name }}</span>
-                      <span style="flex:1 1 auto;min-width:0;color:var(--dim);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.artifact }}</span>
-                      <span style="flex:0 0 auto;padding:1px 9px;border-radius:999px;background:{{ p.chipBg }};color:{{ p.color }};font-size:10.5px;letter-spacing:.08em;text-transform:uppercase">{{ p.status }}</span>
-                      <span style="flex:0 0 50px;text-align:right;color:var(--dimmer);font-size:11px">{{ p.elapsed }}</span>
-                    </div>
-                  </sc-for>
-                </div>
-              </section>
-
-              <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
-                <div style="display:flex;align-items:center;gap:12px;padding:0 2px 12px 2px">
-                  <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">git history</span>
-                  <a href="#git" onClick="{{ goGit }}" style="margin-left:auto;font-size:11.5px">full log &#8594;</a>
-                </div>
-                <div style="display:flex;flex-direction:column;gap:2px">
-                  <sc-for list="{{ commitsBrief }}" as="c" hint-placeholder-count="7">
-                    <div style="display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:12px" style-hover="background:var(--panel2)">
-                      <span style="flex:0 0 auto;padding:1px 8px;border-radius:999px;background:var(--panel2);color:var(--accent);font-size:11px">{{ c.sha }}</span>
-                      <span style="flex:0 0 58px;color:{{ c.kindColor }};font-size:11px">{{ c.kind }}</span>
-                      <span style="flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.subject }}</span>
-                      <span style="flex:0 0 auto;color:var(--dimmer);font-size:11px">{{ c.when }}</span>
-                    </div>
-                  </sc-for>
-                </div>
-              </section>
-            </div>
-
-            <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
-              <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:14px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+            <section style="border:1px solid var(--line);background:var(--panel)">
+              <div style="display:flex;align-items:center;height:34px;padding:0 14px;border-bottom:1px solid var(--line);background:var(--head)">
+                <span style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)">.knowledge</span>
+                <span style="margin-left:auto;color:var(--dimmer);font-size:11px">okf 0.2</span>
+              </div>
+              <div style="display:flex;flex-direction:column">
                 <sc-for list="{{ counts }}" as="c" hint-placeholder-count="6">
-                  <div style="padding:11px;border-radius:13px;background:var(--tile);display:flex;flex-direction:column;gap:1px">
-                    <span style="font-family:'IBM Plex Sans',sans-serif;font-size:20px;font-weight:600;color:{{ c.color }}">{{ c.n }}</span>
-                    <span style="color:var(--dim);font-size:10.5px">{{ c.label }}</span>
+                  <div style="display:flex;align-items:center;gap:14px;height:34px;padding:0 14px;border-bottom:1px solid var(--line)" style-hover="background:var(--hover)">
+                    <span style="flex:1 1 auto;min-width:0;color:var(--dim);font-size:12px">{{ c.label }}</span>
+                    <span style="flex:0 0 auto;font-variant-numeric:tabular-nums;color:{{ c.color }};font-size:13px;font-weight:500">{{ c.n }}</span>
                   </div>
                 </sc-for>
-              </section>
+              </div>
+            </section>
 
-              <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
-                <div style="display:flex;align-items:center;gap:12px;padding:0 2px 12px 2px">
-                  <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">roadmap</span>
-                  <a href="#roadmap" onClick="{{ goRoadmap }}" style="margin-left:auto;font-size:11.5px">open &#8594;</a>
-                </div>
-                <div style="display:flex;flex-direction:column;gap:8px">
-                  <sc-for list="{{ milestonesBrief }}" as="m" hint-placeholder-count="5">
-                    <div style="padding:11px 12px;border-radius:13px;background:var(--tile);display:flex;flex-direction:column;gap:7px">
-                      <div style="display:flex;gap:10px;align-items:baseline">
-                        <span style="flex:1 1 auto;min-width:0;font-family:'IBM Plex Sans',sans-serif;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.title }}</span>
-                        <span style="color:var(--dim);font-size:11.5px">{{ m.pct }}%</span>
-                      </div>
-                      <div style="height:3px;border-radius:999px;background:var(--raise)"><div style="height:3px;border-radius:999px;background:{{ m.color }};width:{{ m.pct }}%"></div></div>
-                    </div>
-                  </sc-for>
-                </div>
-              </section>
+            <section style="border:1px solid var(--line);background:var(--panel)">
+              <div style="display:flex;align-items:center;height:34px;padding:0 14px;border-bottom:1px solid var(--line);background:var(--head)">
+                <span style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)">git history</span>
+                <a href="#git" sc-camel-on-click="{{ goGit }}" style="margin-left:auto;font-size:11.5px;color:var(--dim)">full log</a>
+              </div>
+              <div style="display:flex;flex-direction:column">
+                <sc-for list="{{ commitsBrief }}" as="c" hint-placeholder-count="7">
+                  <div style="display:flex;align-items:center;gap:14px;height:32px;padding:0 14px;border-bottom:1px solid var(--line)" style-hover="background:var(--hover)">
+                    <span style="flex:0 0 62px;color:var(--dim);font-size:11.5px">{{ c.sha }}</span>
+                    <span style="flex:0 0 58px;color:var(--dimmer);font-size:11px">{{ c.kind }}</span>
+                    <span style="flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.subject }}</span>
+                    <span style="flex:0 0 74px;text-align:right;color:var(--dimmer);font-size:11px">{{ c.when }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
 
-              <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
-                <div style="display:flex;align-items:center;padding:0 2px 12px 2px">
-                  <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">decisions</span>
-                </div>
-                <div style="display:flex;flex-direction:column;gap:2px">
-                  <sc-for list="{{ decisions }}" as="d" hint-placeholder-count="7">
-                    <div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:12px" style-hover="background:var(--panel2)">
-                      <span style="flex:0 0 auto;padding:1px 8px;border-radius:999px;background:{{ d.chipBg }};border:1px solid {{ d.chipLine }};color:{{ d.color }};font-size:10.5px">{{ d.id }}</span>
-                      <span style="flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ d.textColor }}">{{ d.text }}</span>
-                    </div>
-                  </sc-for>
-                </div>
-              </section>
-            </div>
+            <section style="border:1px solid var(--line);background:var(--panel)">
+              <div style="display:flex;align-items:center;height:34px;padding:0 14px;border-bottom:1px solid var(--line);background:var(--head)">
+                <span style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)">decisions</span>
+                <span style="margin-left:auto;color:var(--dimmer);font-size:11px">{{ decisionsSummary }}</span>
+              </div>
+              <div style="display:flex;flex-direction:column">
+                <sc-for list="{{ decisions }}" as="d" hint-placeholder-count="7">
+                  <div style="display:flex;align-items:center;gap:12px;height:32px;padding:0 14px;border-bottom:1px solid var(--line)" style-hover="background:var(--hover)">
+                    <span style="flex:0 0 44px;color:{{ d.color }};font-size:11px">{{ d.id }}</span>
+                    <span style="flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ d.textColor }};font-size:12.5px">{{ d.text }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
+
           </div>
-        </sc-if>
+        </div>
+      </sc-if>
 
-      </div>
-    </sc-if>
-
-    <!-- ============ ROADMAP ============ -->
-    <sc-if value="{{ isRoadmap }}" hint-placeholder-val="{{ false }}">
-      <div style="display:flex;flex-direction:column;gap:14px">
-        <section style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:16px 18px;border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow)">
-          <div style="display:flex;flex-direction:column;gap:1px">
-            <span style="color:var(--dim);font-size:11px;letter-spacing:.14em;text-transform:uppercase">overall</span>
-            <span style="font-family:'IBM Plex Sans',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.02em">{{ roadmapPct }}%</span>
-          </div>
-          <div style="flex:1 1 240px;height:7px;border-radius:999px;background:var(--raise)"><div style="height:7px;border-radius:999px;background:var(--accent);width:{{ roadmapPct }}%"></div></div>
-          <div style="display:flex;gap:8px">
-            <span style="padding:5px 12px;border-radius:999px;background:var(--ok-soft);color:var(--ok);font-size:11.5px">{{ roadmapDone }} done</span>
-            <span style="padding:5px 12px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:11.5px">{{ roadmapActive }} active</span>
-            <span style="padding:5px 12px;border-radius:999px;background:var(--panel2);color:var(--dim);font-size:11.5px">{{ roadmapPlanned }} planned</span>
-          </div>
-        </section>
-
-        <sc-for list="{{ milestones }}" as="m" hint-placeholder-count="5">
-          <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
-            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:0 2px 12px 2px">
-              <span style="width:8px;height:8px;border-radius:50%;background:{{ m.color }}"></span>
-              <span style="font-family:'IBM Plex Sans',sans-serif;font-size:15px;font-weight:600">{{ m.title }}</span>
-              <span style="color:var(--dimmer);font-size:11.5px">{{ m.version }}</span>
-              <span style="padding:2px 10px;border-radius:999px;background:{{ m.chipBg }};color:{{ m.color }};font-size:10.5px;letter-spacing:.08em;text-transform:uppercase">{{ m.status }}</span>
-              <span style="margin-left:auto;display:flex;align-items:center;gap:12px;color:var(--dim);font-size:11.5px">
-                <span>{{ m.doneTasks }}/{{ m.totalTasks }} tasks</span>
-                <span style="width:120px;height:4px;border-radius:999px;background:var(--raise);display:inline-block"><span style="display:block;height:4px;border-radius:999px;background:{{ m.color }};width:{{ m.pct }}%"></span></span>
-                <span style="width:36px;text-align:right;color:var(--text)">{{ m.pct }}%</span>
-              </span>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:3px">
-              <sc-for list="{{ m.tasks }}" as="t" hint-placeholder-count="4">
-                <div style="display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:13px;background:var(--tile)">
-                  <span style="flex:0 0 14px;color:{{ t.color }};font-size:12px">{{ t.mark }}</span>
-                  <span style="flex:0 0 auto;padding:1px 8px;border-radius:999px;background:var(--panel2);color:var(--dim);font-size:10.5px">{{ t.ref }}</span>
-                  <span style="flex:1 1 auto;min-width:0;color:{{ t.textColor }};text-wrap:pretty">{{ t.title }}</span>
-                  <span style="flex:0 0 auto;color:var(--dimmer);font-size:11px">{{ t.owner }}</span>
-                </div>
-              </sc-for>
+      <!-- ============ ROADMAP ============ -->
+      <sc-if value="{{ isRoadmap }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:20px">
+          <section style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:14px 16px;border:1px solid var(--line);background:var(--panel)">
+            <span style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)">overall</span>
+            <span style="font-family:'IBM Plex Sans',sans-serif;font-size:18px;font-weight:600;font-variant-numeric:tabular-nums">{{ roadmapPct }}%</span>
+            <div style="flex:1 1 200px;height:3px;background:var(--idle)"><div style="height:3px;background:var(--text);width:{{ roadmapPct }}%"></div></div>
+            <div style="display:flex;gap:18px;color:var(--dim);font-size:11.5px">
+              <span><span style="color:var(--done)">■</span> {{ roadmapDone }} done</span>
+              <span><span style="color:var(--active)">■</span> {{ roadmapActive }} active</span>
+              <span><span style="color:var(--idle)">■</span> {{ roadmapPlanned }} planned</span>
             </div>
           </section>
-        </sc-for>
-      </div>
-    </sc-if>
 
-    <!-- ============ GIT ============ -->
-    <sc-if value="{{ isGit }}" hint-placeholder-val="{{ false }}">
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:0 4px">
-          <div style="display:flex;align-items:center;gap:9px;padding:8px 14px;border:1px solid var(--line);border-radius:999px;background:var(--panel);flex:0 0 300px;box-shadow:var(--shadow)">
-            <span style="color:var(--dimmer)">&#9906;</span>
-            <input type="text" placeholder="filter subject, sha, author" value="{{ query }}" onInput="{{ onQuery }}" style="flex:1 1 auto;min-width:0;border:0;outline:none;background:transparent;color:var(--text);font-family:inherit;font-size:12.5px" />
-          </div>
-          <div style="display:flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:999px;background:var(--panel)">
-            <sc-for list="{{ kindFilters }}" as="f" hint-placeholder-count="7">
-              <button type="button" onClick="{{ f.go }}" style="padding:6px 13px;border:0;border-radius:999px;background:{{ f.bg }};color:{{ f.fg }};font-family:inherit;font-size:11.5px;cursor:pointer">{{ f.label }}</button>
-            </sc-for>
-          </div>
-          <span style="margin-left:auto;color:var(--dim);font-size:11.5px">{{ visibleCount }} of 50 commits &#183; window from D31</span>
-        </div>
-
-        <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:14px 14px 8px 14px">
-          <div style="display:flex;gap:12px;padding:0 12px 10px 12px;color:var(--dim);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase">
-            <span style="flex:0 0 78px">sha</span>
-            <span style="flex:0 0 58px">kind</span>
-            <span style="flex:1 1 auto">subject</span>
-            <span style="flex:0 0 130px">author</span>
-            <span style="flex:0 0 84px">files</span>
-            <span style="flex:0 0 104px">when</span>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:2px">
-            <sc-for list="{{ visibleCommits }}" as="c" hint-placeholder-count="14">
-              <div style="display:flex;gap:12px;padding:9px 12px;border-radius:13px;align-items:center" style-hover="background:var(--panel2)">
-                <span style="flex:0 0 78px"><span style="padding:1px 8px;border-radius:999px;background:var(--panel2);color:var(--accent);font-size:11px">{{ c.sha }}</span></span>
-                <span style="flex:0 0 58px;color:{{ c.kindColor }};font-size:11px">{{ c.kind }}</span>
-                <span style="flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.subject }}</span>
-                <span style="flex:0 0 130px;color:var(--dim);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.author }}</span>
-                <span style="flex:0 0 84px;font-size:11px"><span style="color:var(--ok)">+{{ c.add }}</span> <span style="color:var(--stop)">&#8722;{{ c.del }}</span></span>
-                <span style="flex:0 0 104px;color:var(--dimmer);font-size:11px">{{ c.when }}</span>
+          <section style="border:1px solid var(--line);background:var(--panel)">
+            <div style="display:flex;gap:14px;height:30px;align-items:center;padding:0 14px;border-bottom:1px solid var(--line);background:var(--head);color:var(--dim);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase">
+              <span style="flex:0 0 18px"></span>
+              <span style="flex:0 0 52px">ref</span>
+              <span style="flex:1 1 auto">task</span>
+              <span style="flex:0 0 130px">owner</span>
+              <span style="flex:0 0 70px;text-align:right">status</span>
+            </div>
+            <sc-for list="{{ milestones }}" as="m" hint-placeholder-count="5">
+              <div>
+                <div style="display:flex;align-items:center;gap:14px;height:36px;padding:0 14px;border-bottom:1px solid var(--line);background:var(--head)">
+                  <span style="flex:0 0 5px;height:5px;background:{{ m.color }}"></span>
+                  <span style="flex:0 0 auto;font-weight:500">{{ m.title }}</span>
+                  <span style="flex:0 0 auto;color:var(--dimmer);font-size:11px">{{ m.version }}</span>
+                  <span style="margin-left:auto;display:flex;align-items:center;gap:14px;color:var(--dim);font-size:11.5px">
+                    <span>{{ m.doneTasks }}/{{ m.totalTasks }}</span>
+                    <span style="width:92px;height:2px;background:var(--idle);display:inline-block"><span style="display:block;height:2px;background:{{ m.color }};width:{{ m.pct }}%"></span></span>
+                    <span style="width:34px;text-align:right;color:var(--text)">{{ m.pct }}%</span>
+                  </span>
+                </div>
+                <sc-for list="{{ m.tasks }}" as="t" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;gap:14px;min-height:32px;padding:6px 14px;border-bottom:1px solid var(--line)" style-hover="background:var(--hover)">
+                    <span style="flex:0 0 18px;color:{{ t.color }};font-size:11px">{{ t.mark }}</span>
+                    <span style="flex:0 0 52px;color:var(--dimmer);font-size:11px">{{ t.ref }}</span>
+                    <span style="flex:1 1 auto;min-width:0;color:{{ t.textColor }};font-size:12.5px;text-wrap:pretty">{{ t.title }}</span>
+                    <span style="flex:0 0 130px;color:var(--dim);font-size:11px">{{ t.owner }}</span>
+                    <span style="flex:0 0 70px;text-align:right;color:{{ t.color }};font-size:10.5px;letter-spacing:.1em;text-transform:uppercase">{{ t.status }}</span>
+                  </div>
+                </sc-for>
               </div>
             </sc-for>
-          </div>
-        </section>
-      </div>
-    </sc-if>
+          </section>
+        </div>
+      </sc-if>
 
-    <!-- ============ KNOWLEDGE ============ -->
-    <sc-if value="{{ isKnowledge }}" hint-placeholder-val="{{ false }}">
-      <div style="display:grid;grid-template-columns:minmax(240px,300px) minmax(0,1fr);gap:14px;align-items:start">
-        <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:14px">
-          <div style="display:flex;align-items:center;gap:10px;padding:2px 8px 12px 8px">
-            <span style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)">.knowledge</span>
-            <span style="margin-left:auto;padding:1px 8px;border-radius:999px;background:var(--panel2);color:var(--dimmer);font-size:10.5px">okf 0.2</span>
+      <!-- ============ GIT ============ -->
+      <sc-if value="{{ isGit }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:stretch;gap:14px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:9px;height:30px;padding:0 12px;border:1px solid var(--line);background:var(--panel);flex:0 0 300px">
+              <span style="color:var(--dimmer);font-size:12px">filter</span>
+              <input type="text" placeholder="subject, sha, author" value="{{ query }}" sc-camel-on-input="{{ onQuery }}" style="flex:1 1 auto;min-width:0;border:0;outline:none;background:transparent;color:var(--text);font-family:inherit;font-size:12.5px">
+            </div>
+            <div style="display:flex;border:1px solid var(--line);background:var(--panel)">
+              <sc-for list="{{ kindFilters }}" as="f" hint-placeholder-count="7">
+                <button type="button" sc-camel-on-click="{{ f.go }}" style="height:28px;padding:0 12px;border:0;border-left:1px solid {{ f.sep }};background:{{ f.bg }};color:{{ f.fg }};font-family:inherit;font-size:11.5px;cursor:pointer" style-hover="color:var(--text)">{{ f.label }}</button>
+              </sc-for>
+            </div>
+            <span style="margin-left:auto;align-self:center;color:var(--dim);font-size:11.5px">{{ visibleCount }} of {{ totalCommits }} commits</span>
           </div>
-          <div style="display:flex;flex-direction:column;gap:2px">
+
+          <section style="border:1px solid var(--line);background:var(--panel)">
+            <div style="display:flex;gap:14px;align-items:center;height:30px;padding:0 14px;border-bottom:1px solid var(--line);background:var(--head);color:var(--dim);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase">
+              <span style="flex:0 0 64px">sha</span>
+              <span style="flex:0 0 58px">kind</span>
+              <span style="flex:1 1 auto">subject</span>
+              <span style="flex:0 0 130px">author</span>
+              <span style="flex:0 0 88px;text-align:right">churn</span>
+              <span style="flex:0 0 88px;text-align:right">when</span>
+            </div>
+            <sc-for list="{{ visibleCommits }}" as="c" hint-placeholder-count="14">
+              <div style="display:flex;gap:14px;align-items:center;height:32px;padding:0 14px;border-bottom:1px solid var(--line)" style-hover="background:var(--hover)">
+                <span style="flex:0 0 64px;color:var(--dim);font-size:11.5px">{{ c.sha }}</span>
+                <span style="flex:0 0 58px;color:{{ c.kindColor }};font-size:11px">{{ c.kind }}</span>
+                <span style="flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px">{{ c.subject }}</span>
+                <span style="flex:0 0 130px;color:var(--dim);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.author }}</span>
+                <span style="flex:0 0 88px;text-align:right;font-size:11px;font-variant-numeric:tabular-nums"><span style="color:var(--done)">+{{ c.add }}</span> <span style="color:var(--neg)">−{{ c.del }}</span></span>
+                <span style="flex:0 0 88px;text-align:right;color:var(--dimmer);font-size:11px">{{ c.when }}</span>
+              </div>
+            </sc-for>
+          </section>
+        </div>
+      </sc-if>
+
+      <!-- ============ KNOWLEDGE ============ -->
+      <sc-if value="{{ isKnowledge }}" hint-placeholder-val="{{ false }}">
+        <div style="display:grid;grid-template-columns:minmax(230px,280px) minmax(0,1fr);gap:20px;align-items:start">
+          <section style="border:1px solid var(--line);background:var(--panel)">
+            <div style="display:flex;align-items:center;height:30px;padding:0 14px;border-bottom:1px solid var(--line);background:var(--head)">
+              <span style="font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)">bundle</span>
+              <span style="margin-left:auto;color:var(--dimmer);font-size:11px">{{ fileCount }} files</span>
+            </div>
             <sc-for list="{{ tree }}" as="n" hint-placeholder-count="12">
-              <button type="button" onClick="{{ n.go }}" style="display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px;padding-left:{{ n.indent }};border:0;border-radius:12px;background:{{ n.bg }};color:{{ n.fg }};font-family:inherit;font-size:12.5px;cursor:{{ n.cursor }};text-align:left" style-hover="background:var(--panel2)">
-                <span style="flex:0 0 auto;color:var(--dimmer)">{{ n.glyph }}</span>
+              <button type="button" sc-camel-on-click="{{ n.go }}" style="display:flex;align-items:center;gap:10px;width:100%;height:30px;padding:0 14px;padding-left:{{ n.indent }};border:0;border-bottom:1px solid var(--line);border-left:2px solid {{ n.bar }};background:{{ n.bg }};color:{{ n.fg }};font-family:inherit;font-size:12.5px;cursor:{{ n.cursor }};text-align:left" style-hover="background:var(--hover)">
                 <span style="flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ n.name }}</span>
                 <span style="flex:0 0 auto;color:var(--dimmer);font-size:10.5px">{{ n.meta }}</span>
               </button>
             </sc-for>
-          </div>
-        </section>
-
-        <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px;min-width:0">
-          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:0 2px 12px 2px">
-            <span style="font-family:'IBM Plex Sans',sans-serif;font-size:14.5px;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ activeFile.path }}</span>
-            <span style="flex:0 0 auto;padding:1px 9px;border-radius:999px;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent);font-size:10.5px">{{ activeFile.type }}</span>
-            <span style="margin-left:auto;color:var(--dimmer);font-size:11px;white-space:nowrap">{{ activeFile.size }} &#183; {{ activeFile.updated }}</span>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px;padding-bottom:14px">
-            <sc-for list="{{ activeFile.frontmatter }}" as="f" hint-placeholder-count="4">
-              <div style="display:flex;gap:10px;padding:8px 12px;border-radius:12px;background:var(--tile)">
-                <span style="flex:0 0 auto;color:var(--dim);font-size:11.5px">{{ f.k }}</span>
-                <span style="flex:1 1 auto;min-width:0;color:var(--text);font-size:12px;word-break:break-word;text-align:right">{{ f.v }}</span>
-              </div>
-            </sc-for>
-          </div>
-          <pre style="margin:0;padding:16px 18px;border-radius:16px;background:var(--tile);color:var(--text);font-family:inherit;font-size:12.5px;line-height:1.75;white-space:pre-wrap;word-break:break-word">{{ activeFile.body }}</pre>
-        </section>
-      </div>
-    </sc-if>
-
-    <!-- ============ CONFIG ============ -->
-    <sc-if value="{{ isConfig }}" hint-placeholder-val="{{ false }}">
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:0 4px">
-          <div style="display:flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:999px;background:var(--panel)">
-            <button type="button" onClick="{{ setTable }}" style="padding:6px 15px;border:0;border-radius:999px;background:{{ tableBg }};color:{{ tableFg }};font-family:inherit;font-size:11.5px;cursor:pointer">table</button>
-            <button type="button" onClick="{{ setRaw }}" style="padding:6px 15px;border:0;border-radius:999px;background:{{ rawBg }};color:{{ rawFg }};font-family:inherit;font-size:11.5px;cursor:pointer">raw json</button>
-          </div>
-          <span style="color:var(--dim);font-size:11.5px">.claude/major-tom.json &#183; schemaVersion 1</span>
-          <span style="margin-left:auto;display:flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;background:var(--ok-soft);color:var(--ok);font-size:11.5px"><span style="width:6px;height:6px;border-radius:50%;background:var(--ok)"></span>valid against config.schema.json</span>
-        </div>
-
-        <sc-if value="{{ isTable }}" hint-placeholder-val="{{ true }}">
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px;align-items:start">
-            <sc-for list="{{ configSections }}" as="s" hint-placeholder-count="8">
-              <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
-                <div style="display:flex;align-items:center;gap:10px;padding:0 2px 12px 2px">
-                  <span style="font-family:'IBM Plex Sans',sans-serif;font-size:14px;font-weight:600;color:var(--text)">{{ s.key }}</span>
-                  <span style="margin-left:auto;color:var(--dimmer);font-size:10.5px">{{ s.note }}</span>
-                </div>
-                <div style="display:flex;flex-direction:column;gap:2px">
-                  <sc-for list="{{ s.rows }}" as="r" hint-placeholder-count="4">
-                    <div style="display:flex;gap:12px;padding:8px 12px;border-radius:12px;background:var(--tile)">
-                      <span style="flex:0 0 160px;color:var(--dim);font-size:11.5px;word-break:break-word">{{ r.k }}</span>
-                      <span style="flex:1 1 auto;min-width:0;color:{{ r.color }};word-break:break-word">{{ r.v }}</span>
-                    </div>
-                  </sc-for>
-                </div>
-              </section>
-            </sc-for>
-          </div>
-        </sc-if>
-
-        <sc-if value="{{ isRaw }}" hint-placeholder-val="{{ false }}">
-          <section style="border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px">
-            <div style="padding:0 2px 12px 2px;color:var(--dim);font-size:11px;letter-spacing:.16em;text-transform:uppercase">raw</div>
-            <pre style="margin:0;padding:16px 18px;border-radius:16px;background:var(--tile);font-family:inherit;font-size:12.5px;line-height:1.7;color:var(--text);white-space:pre;overflow:auto">{{ configRaw }}</pre>
           </section>
-        </sc-if>
-      </div>
-    </sc-if>
 
+          <section style="border:1px solid var(--line);background:var(--panel);min-width:0">
+            <div style="display:flex;align-items:center;gap:14px;height:34px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--head)">
+              <span style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500">{{ activeFile.path }}</span>
+              <span style="flex:0 0 auto;color:var(--dim);font-size:11px;letter-spacing:.1em;text-transform:uppercase">{{ activeFile.type }}</span>
+              <span style="margin-left:auto;color:var(--dimmer);font-size:11px;white-space:nowrap">{{ activeFile.size }} · {{ activeFile.updated }}</span>
+            </div>
+            <div style="display:flex;flex-direction:column">
+              <sc-for list="{{ activeFile.frontmatter }}" as="f" hint-placeholder-count="4">
+                <div style="display:flex;gap:16px;min-height:28px;align-items:center;padding:4px 16px;border-bottom:1px solid var(--line);background:var(--row)">
+                  <span style="flex:0 0 150px;color:var(--dim);font-size:11.5px">{{ f.k }}</span>
+                  <span style="flex:1 1 auto;min-width:0;font-size:12px;word-break:break-word">{{ f.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <pre style="margin:0;padding:18px 16px;color:var(--text);font-family:inherit;font-size:12.5px;line-height:1.75;white-space:pre-wrap;word-break:break-word">{{ activeFile.body }}</pre>
+          </section>
+        </div>
+      </sc-if>
+
+      <!-- ============ CONFIG ============ -->
+      <sc-if value="{{ isConfig }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <div style="display:flex;border:1px solid var(--line);background:var(--panel)">
+              <button type="button" sc-camel-on-click="{{ setTable }}" style="height:28px;padding:0 14px;border:0;background:{{ tableBg }};color:{{ tableFg }};font-family:inherit;font-size:11.5px;cursor:pointer">table</button>
+              <button type="button" sc-camel-on-click="{{ setRaw }}" style="height:28px;padding:0 14px;border:0;border-left:1px solid var(--line);background:{{ rawBg }};color:{{ rawFg }};font-family:inherit;font-size:11.5px;cursor:pointer">raw json</button>
+            </div>
+            <span style="color:var(--dim);font-size:11.5px">.claude/major-tom.json · schemaVersion 1</span>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:8px;color:var(--dim);font-size:11.5px"><span style="width:5px;height:5px;background:var(--done)"></span>validated at onboard</span>
+          </div>
+
+          <sc-if value="{{ isTable }}" hint-placeholder-val="{{ true }}">
+            <section style="border:1px solid var(--line);background:var(--panel)">
+              <div style="display:flex;gap:16px;align-items:center;height:30px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--head);color:var(--dim);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase">
+                <span style="flex:0 0 260px">key</span>
+                <span style="flex:1 1 auto">value</span>
+                <span style="flex:0 0 60px;text-align:right">ref</span>
+              </div>
+              <sc-for list="{{ configRows }}" as="r" hint-placeholder-count="24">
+                <div style="display:flex;gap:16px;align-items:baseline;min-height:{{ r.minHeight }};padding:6px 16px;border-bottom:1px solid var(--line);background:{{ r.bg }}" style-hover="background:var(--hover)">
+                  <span style="flex:0 0 260px;padding-left:{{ r.indent }};color:{{ r.keyColor }};font-size:{{ r.keySize }};font-weight:{{ r.keyWeight }};letter-spacing:{{ r.keyTracking }};word-break:break-word">{{ r.k }}</span>
+                  <span style="flex:1 1 auto;min-width:0;color:{{ r.valueColor }};font-size:12.5px;word-break:break-word;text-wrap:pretty">{{ r.v }}</span>
+                  <span style="flex:0 0 60px;text-align:right;color:var(--dimmer);font-size:10.5px">{{ r.note }}</span>
+                </div>
+              </sc-for>
+            </section>
+          </sc-if>
+
+          <sc-if value="{{ isRaw }}" hint-placeholder-val="{{ false }}">
+            <section style="border:1px solid var(--line);background:var(--panel)">
+              <div style="display:flex;align-items:center;height:30px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--head);color:var(--dim);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase">raw</div>
+              <pre style="margin:0;padding:16px;font-family:inherit;font-size:12.5px;line-height:1.7;color:var(--text);white-space:pre;overflow:auto">{{ configRaw }}</pre>
+            </section>
+          </sc-if>
+        </div>
+      </sc-if>
+
+    </div>
   </main>
 </div>
 
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;defaultTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark'|'light'&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;options&quot;:[&quot;#ef8272&quot;,&quot;#e0a05c&quot;,&quot;#6fcf9d&quot;,&quot;#9fd0e3&quot;],&quot;default&quot;:&quot;#ef8272&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;defaultTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark'|'light'&quot;},&quot;showChurn&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
 const PHASES = [
   ["think", "intent record", "done", "0.4s"],
   ["understand", "scan + context notes", "done", "12.1s"],
@@ -468,52 +356,37 @@ const PHASES = [
 ];
 
 const MILESTONES = [
-  {
-    title: "Onboard workflow", version: "0.5.0 - 0.9.1", status: "done", pct: 100,
-    tasks: [
-      ["D20", "Native workflow entry point /major-tom:onboard", "done", "architect"],
-      ["D21", "Two-stage protocol, session runs the interview", "done", "architect"],
-      ["D23", "Path resolution via onboard-check agent", "done", "architect"],
-      ["D29", "Canonical templates/render.js, no improvised renderer", "done", "technical"]
-    ]
-  },
-  {
-    title: "Configuration file", version: "0.2.0 - 0.7.0", status: "done", pct: 100,
-    tasks: [
-      ["D1", "Config at .claude/major-tom.json", "done", "owner"],
-      ["D3", "config.schema.json at plugin root, strict validation", "done", "architect"],
-      ["D25", "specialists key, Finalize records real outcome", "done", "project-manager"],
-      ["45", "Fixture suite, 45 cases passing", "done", "qa"]
-    ]
-  },
-  {
-    title: "Dashboard", version: "0.10.0 - 0.11.0", status: "active", pct: 62,
-    tasks: [
-      ["D31", "Static dashboard.html over the data island", "done", "designer"],
-      ["D32", "Desktop launch.json managed entry, vanilla permanent", "done", "owner"],
-      ["OQ-13", "Snapshot window and retention numbers", "active", "project-manager"],
-      ["OQ-13", "Live-data endpoint as the server evolution", "todo", "architect"],
-      ["OQ-13", "Design iteration inside the single file", "active", "designer"]
-    ]
-  },
-  {
-    title: "Skills and gates", version: "unversioned", status: "planned", pct: 8,
-    tasks: [
-      ["OQ-3", "Skill catalog decomposition, one per phase or other", "active", "project-manager"],
-      ["OQ-4", "Phase ownership and human-in-the-loop gates", "todo", "project-manager"],
-      ["OQ-11", "INV-1 guard mechanics and consent scope", "todo", "architect"],
-      ["OQ-1", "Designer agent scope and iteration loop", "todo", "owner"]
-    ]
-  },
-  {
-    title: "Distribution", version: "0.9.0+", status: "planned", pct: 25,
-    tasks: [
-      ["D30", "Version lineage continues, manifests at 0.9.0", "done", "owner"],
-      ["OQ-8", "Copilot CLI parity matrix and degradation story", "todo", "architect"],
-      ["FR-7", "Dual publish from one marketplace", "todo", "vcs-operator"],
-      ["OQ-7", "gitignore split for runs and logs", "active", "architect"]
-    ]
-  }
+  { title: "Onboard workflow", version: "0.5.0 - 0.9.1", status: "done", pct: 100, tasks: [
+    ["D20", "Native workflow entry point /major-tom:onboard", "done", "architect"],
+    ["D21", "Two-stage protocol, session runs the interview", "done", "architect"],
+    ["D23", "Path resolution via onboard-check agent", "done", "architect"],
+    ["D29", "Canonical templates/render.js, no improvised renderer", "done", "technical"]
+  ]},
+  { title: "Configuration file", version: "0.2.0 - 0.7.0", status: "done", pct: 100, tasks: [
+    ["D1", "Config at .claude/major-tom.json", "done", "owner"],
+    ["D3", "config.schema.json at plugin root, strict validation", "done", "architect"],
+    ["D25", "specialists key, Finalize records real outcome", "done", "project-manager"],
+    ["45", "Fixture suite, 45 cases passing", "done", "qa"]
+  ]},
+  { title: "Dashboard", version: "0.10.0 - 0.11.0", status: "active", pct: 62, tasks: [
+    ["D31", "Static dashboard.html over the data island", "done", "designer"],
+    ["D32", "Desktop launch.json managed entry, vanilla permanent", "done", "owner"],
+    ["OQ-13", "Snapshot window and retention numbers", "active", "project-manager"],
+    ["OQ-13", "Live-data endpoint as the server evolution", "todo", "architect"],
+    ["OQ-13", "Design iteration inside the single file", "active", "designer"]
+  ]},
+  { title: "Skills and gates", version: "unversioned", status: "planned", pct: 8, tasks: [
+    ["OQ-3", "Skill catalog decomposition, one per phase or other", "active", "project-manager"],
+    ["OQ-4", "Phase ownership and human-in-the-loop gates", "todo", "project-manager"],
+    ["OQ-11", "INV-1 guard mechanics and consent scope", "todo", "architect"],
+    ["OQ-1", "Designer agent scope and iteration loop", "todo", "owner"]
+  ]},
+  { title: "Distribution", version: "0.9.0+", status: "planned", pct: 25, tasks: [
+    ["D30", "Version lineage continues, manifests at 0.9.0", "done", "owner"],
+    ["OQ-8", "Copilot CLI parity matrix and degradation story", "todo", "architect"],
+    ["FR-7", "Dual publish from one marketplace", "todo", "vcs-operator"],
+    ["OQ-7", "gitignore split for runs and logs", "active", "architect"]
+  ]}
 ];
 
 const COMMITS = [
@@ -559,6 +432,7 @@ const CONFIG = {
   project: { name: "unblock", description: "Data-integrity tooling, from-scratch rewrite", type: "existing", topology: "mono-repo" },
   execution: { workingModel: "team", team: { coordinator: "coordinator", members: ["architect", "code-reviewer", "qa"] } },
   persistence: { root: ".knowledge" },
+  snapshot: { days: 30, limit: 500 },
   stack: { languages: ["typescript", "javascript"], frameworks: ["node", "express"], databases: ["postgres"], messaging: [] },
   devops: { ci: "github-actions", containers: "docker-compose", cloud: "vercel" },
   org: { namespace: "@websublime", internalLibraries: [{ name: "@websublime/core", registry: "npm", purpose: "shared primitives" }], preferredLibraries: [{ use: "vitest", never: "jest", reason: "esm first" }] },
@@ -568,34 +442,34 @@ const CONFIG = {
   workspace: { name: "unblock", layout: "domain", units: [{ name: "api", path: "services/api", dependsOn: ["design-system"] }, { name: "design-system", repo: "git@github.com:websublime/design-system.git" }], run: { compose: "docker-compose.yml" } }
 };
 
+const NOTES = { persistence: "D2", workspace: "D6", execution: "9.2", mcp: "D13", specialists: "D25", schemaVersion: "P2", snapshot: "OQ-13" };
+
 const DECISIONS = [
-  ["D32", "Desktop launch.json managed entry, vanilla permanent", "2026-08-05", "closed"],
-  ["D31", "Dashboard v1 over the data island, on-demand server", "2026-08-05", "closed"],
-  ["D29", "Canonical templates/render.js", "2026-08-05", "closed"],
-  ["OQ-13", "Snapshot window and retention numbers", "open", "open"],
-  ["OQ-3", "Skill catalog decomposition", "open", "open"],
-  ["OQ-4", "Phase ownership and gates", "open", "open"],
-  ["OQ-1", "Designer role scope", "open", "open"]
+  ["D32", "Desktop launch.json managed entry, vanilla permanent", "closed"],
+  ["D31", "Dashboard v1 over the data island, on-demand server", "closed"],
+  ["D29", "Canonical templates/render.js", "closed"],
+  ["OQ-13", "Snapshot window and retention numbers", "open"],
+  ["OQ-3", "Skill catalog decomposition", "open"],
+  ["OQ-4", "Phase ownership and gates", "open"],
+  ["OQ-1", "Designer role scope", "open"]
 ];
 
-const KIND_COLOR = { feat: "var(--accent)", fix: "var(--stop)", docs: "var(--dim)", test: "var(--ok)", chore: "var(--dimmer)", refactor: "var(--warn)" };
+const KIND_COLOR = { feat: "var(--text)", fix: "var(--neg)", docs: "var(--dim)", test: "var(--done)", chore: "var(--dimmer)", refactor: "var(--active)" };
 
 const SUBTITLES = {
-  overview: "Lifecycle state, roadmap and knowledge at a glance",
-  roadmap: "Milestones, tasks and open questions",
-  git: "50-commit window from the track phase",
+  overview: "lifecycle state, roadmap and knowledge at a glance",
+  roadmap: "milestones, tasks and open questions",
+  git: "commit window written by the track phase",
   knowledge: ".knowledge as an OKF 0.2 bundle",
-  config: "Single source of truth for every plugin surface"
+  config: "single source of truth for every plugin surface"
 };
 
 class Component extends DCLogic {
-  state = { view: "overview", layout: "A", rail: true, theme: null, filter: "all", query: "", file: 0, configMode: "table" };
+  state = { view: "overview", rail: true, theme: null, filter: "all", query: "", file: 0, configMode: "table" };
 
   componentDidMount() {
-    const root = document.documentElement;
     const t = this.props.defaultTheme || "dark";
-    root.dataset.theme = t;
-    if (this.props.accent) root.style.setProperty("--accent", this.props.accent);
+    document.documentElement.dataset.theme = t;
     this.setState({ theme: t });
     const hash = (location.hash || "").replace("#", "");
     if (["overview", "roadmap", "git", "knowledge", "config"].includes(hash)) this.setState({ view: hash });
@@ -608,30 +482,23 @@ class Component extends DCLogic {
   renderVals() {
     const s = this.state;
     const activePhase = PHASES.findIndex(p => p[2] === "active");
+    const statusColor = (st) => st === "done" ? "var(--done)" : st === "active" ? "var(--active)" : "var(--idle)";
 
-    const phases = PHASES.map((p, i) => {
-      const st = p[2];
-      const color = st === "done" ? "var(--ok)" : st === "active" ? "var(--accent)" : "var(--line2)";
-      return {
-        num: String(i + 1).padStart(2, "0"), name: p[0], artifact: p[1], status: st, elapsed: p[3], color,
-        pct: st === "done" ? 100 : st === "active" ? 55 : 0,
-        labelColor: st === "pending" ? "var(--dimmer)" : "var(--text)",
-        tileBg: st === "active" ? "var(--accent-soft)" : "var(--tile)",
-        tileLine: st === "active" ? "var(--accent-line)" : "transparent",
-        rowBg: st === "active" ? "var(--accent-soft)" : "var(--tile)",
-        chipBg: st === "done" ? "var(--ok-soft)" : st === "active" ? "var(--panel)" : "var(--panel2)"
-      };
-    });
+    const phases = PHASES.map((p, i) => ({
+      num: String(i + 1).padStart(2, "0"), name: p[0], artifact: p[1], status: p[2], elapsed: p[3],
+      color: statusColor(p[2]),
+      pct: p[2] === "done" ? 100 : p[2] === "active" ? 55 : 0,
+      labelColor: p[2] === "pending" ? "var(--dimmer)" : "var(--text)",
+      cellBg: p[2] === "active" ? "var(--head)" : "transparent"
+    }));
 
-    const msColor = (st) => st === "done" ? "var(--ok)" : st === "active" ? "var(--accent)" : "var(--line2)";
     const milestones = MILESTONES.map(m => ({
-      title: m.title, version: m.version, status: m.status, pct: m.pct, color: msColor(m.status),
-      chipBg: m.status === "done" ? "var(--ok-soft)" : m.status === "active" ? "var(--accent-soft)" : "var(--panel2)",
+      title: m.title, version: m.version, status: m.status, pct: m.pct, color: statusColor(m.status),
       doneTasks: m.tasks.filter(t => t[2] === "done").length, totalTasks: m.tasks.length,
       tasks: m.tasks.map(t => ({
-        ref: t[0], title: t[1], owner: t[3],
+        ref: t[0], title: t[1], owner: t[3], status: t[2],
         mark: t[2] === "done" ? "\u2713" : t[2] === "active" ? "\u25B8" : "\u00B7",
-        color: t[2] === "done" ? "var(--ok)" : t[2] === "active" ? "var(--accent)" : "var(--dimmer)",
+        color: statusColor(t[2] === "todo" ? "planned" : t[2]),
         textColor: t[2] === "todo" ? "var(--dim)" : "var(--text)"
       }))
     }));
@@ -646,36 +513,42 @@ class Component extends DCLogic {
       (!q || (c.subject + " " + c.sha + " " + c.author).toLowerCase().includes(q))
     );
 
-    const kindFilters = ["all", "feat", "fix", "docs", "test", "chore", "refactor"].map(k => ({
+    const kindFilters = ["all", "feat", "fix", "docs", "test", "chore", "refactor"].map((k, i) => ({
       label: k, go: () => this.setState({ filter: k }),
-      bg: s.filter === k ? "var(--accent-soft)" : "transparent",
-      fg: s.filter === k ? "var(--accent)" : "var(--dim)"
+      sep: i === 0 ? "transparent" : "var(--line)",
+      bg: s.filter === k ? "var(--head)" : "transparent",
+      fg: s.filter === k ? "var(--text)" : "var(--dim)"
     }));
 
     const navItems = [
-      ["overview", "\u25C8", "6"], ["roadmap", "\u2317", "5"], ["git", "\u2387", "50"],
-      ["knowledge", "\u25A4", "13"], ["config", "{ }", "12"]
+      ["overview", "\u25A0", ""], ["roadmap", "\u2261", String(MILESTONES.length)],
+      ["git", "\u2387", String(COMMITS.length)], ["knowledge", "\u25A4", String(FILES.length)],
+      ["config", "{ }", String(Object.keys(CONFIG).length)]
     ].map(([id, glyph, count]) => ({
       label: id, glyph, count, go: this.go(id),
-      bg: s.view === id ? "var(--raise)" : "transparent",
-      border: s.view === id ? "var(--line2)" : "transparent",
-      fg: s.view === id ? "var(--text)" : "var(--dim)"
+      bg: s.view === id ? "var(--head)" : "transparent",
+      bar: s.view === id ? "var(--text)" : "transparent",
+      fg: s.view === id ? "var(--text)" : "var(--dim)",
+      glyphColor: s.view === id ? "var(--text)" : "var(--dimmer)"
     }));
 
     const tree = [{
-      name: "index.md", glyph: "\u2261", meta: "index", indent: "10px", cursor: "pointer",
+      name: "index.md", meta: "index", indent: "14px", cursor: "pointer",
       go: () => this.setState({ file: 0 }),
-      bg: s.file === 0 ? "var(--accent-soft)" : "var(--tile)", fg: s.file === 0 ? "var(--accent)" : "var(--text)"
+      bg: s.file === 0 ? "var(--head)" : "transparent",
+      bar: s.file === 0 ? "var(--text)" : "transparent",
+      fg: s.file === 0 ? "var(--text)" : "var(--dim)"
     }];
     [["memories", 2], ["docs", 3], ["runs", 2], ["monitors", 1], ["logs", 1]].forEach(([dir, count]) => {
-      tree.push({ name: dir + "/", glyph: "\u25B8", meta: String(count), indent: "10px", cursor: "default", go: () => {}, bg: "transparent", fg: "var(--dim)" });
+      tree.push({ name: dir + "/", meta: String(count), indent: "14px", cursor: "default", go: () => {}, bg: "var(--row)", bar: "transparent", fg: "var(--dimmer)" });
       FILES.forEach((f, i) => {
         if (i === 0 || f.path.split("/")[1] !== dir) return;
         tree.push({
-          name: f.name, glyph: "\u00B7", meta: f.type, indent: "28px", cursor: "pointer",
+          name: f.name, meta: f.type, indent: "28px", cursor: "pointer",
           go: () => this.setState({ file: i }),
-          bg: s.file === i ? "var(--accent-soft)" : "transparent",
-          fg: s.file === i ? "var(--accent)" : "var(--dim)"
+          bg: s.file === i ? "var(--head)" : "transparent",
+          bar: s.file === i ? "var(--text)" : "transparent",
+          fg: s.file === i ? "var(--text)" : "var(--dim)"
         });
       });
     });
@@ -687,25 +560,39 @@ class Component extends DCLogic {
     };
 
     const fmt = (v) => Array.isArray(v)
-      ? (v.length === 0 ? "[ ]" : v.map(x => typeof x === "object" ? Object.values(x).join(" / ") : x).join(", "))
-      : (typeof v === "object" && v !== null ? Object.entries(v).map(([k, x]) => k + ": " + fmt(x)).join(" \u00B7 ") : (v === "" ? "\u2014" : String(v)));
+      ? (v.length === 0 ? "\u2014" : v.map(x => typeof x === "object" ? Object.values(x).join(" / ") : x).join(", "))
+      : (typeof v === "object" && v !== null ? Object.entries(v).map(([k, x]) => k + ": " + fmt(x)).join(" \u00B7 ") : (v === "" || v === null ? "\u2014" : String(v)));
 
-    const configSections = Object.entries(CONFIG).filter(([, v]) => typeof v === "object" && !Array.isArray(v)).map(([key, obj]) => ({
-      key,
-      note: key === "persistence" ? "D2" : key === "workspace" ? "D6" : key === "execution" ? "9.2" : "",
-      rows: Object.entries(obj).map(([k, v]) => ({ k, v: fmt(v), color: v === "" || (Array.isArray(v) && !v.length) ? "var(--dimmer)" : "var(--text)" }))
-    })).concat([
-      { key: "mcp", note: "D13", rows: CONFIG.mcp.map((m, i) => ({ k: "[" + i + "]", v: m, color: "var(--text)" })) },
-      { key: "specialists", note: "D25", rows: CONFIG.specialists.map(m => ({ k: m.name, v: m.source, color: "var(--text)" })) },
-      { key: "schemaVersion", note: "P2", rows: [{ k: "schemaVersion", v: "1", color: "var(--text)" }] }
-    ]);
+    const groupRow = (key) => ({
+      k: key, v: "", note: NOTES[key] || "", bg: "var(--head)", minHeight: "30px", indent: "0px",
+      keyColor: "var(--text)", keySize: "10.5px", keyWeight: "600", keyTracking: ".14em", valueColor: "var(--dim)"
+    });
+    const leafRow = (k, v) => ({
+      k: k, v: fmt(v), note: "", bg: "transparent", minHeight: "28px", indent: "18px",
+      keyColor: "var(--dim)", keySize: "12px", keyWeight: "400", keyTracking: "0",
+      valueColor: (v === "" || v === null || (Array.isArray(v) && !v.length)) ? "var(--dimmer)" : "var(--text)"
+    });
+
+    const configRows = [];
+    Object.entries(CONFIG).forEach(([key, val]) => {
+      if (typeof val === "object" && !Array.isArray(val)) {
+        configRows.push(groupRow(key));
+        Object.entries(val).forEach(([k, v]) => configRows.push(leafRow(k, v)));
+      } else if (Array.isArray(val)) {
+        configRows.push(groupRow(key));
+        val.forEach((v, i) => configRows.push(leafRow("[" + i + "]", v)));
+      } else {
+        configRows.push(Object.assign(groupRow(key), { v: String(val), valueColor: "var(--text)" }));
+      }
+    });
 
     const done = MILESTONES.filter(m => m.status === "done").length;
     const active = MILESTONES.filter(m => m.status === "active").length;
+    const openDecisions = DECISIONS.filter(d => d[2] === "open").length;
 
     return {
       navItems,
-      railWidth: s.rail ? "206px" : "62px",
+      railWidth: s.rail ? "188px" : "48px",
       labelOpacity: s.rail ? 1 : 0,
       railGlyph: s.rail ? "\u00AB" : "\u00BB",
       toggleRail: () => this.setState({ rail: !s.rail }),
@@ -723,49 +610,44 @@ class Component extends DCLogic {
       isKnowledge: s.view === "knowledge", isConfig: s.view === "config",
       goGit: this.go("git"), goRoadmap: this.go("roadmap"),
       generatedAt: "18:42:11",
-
-      isLayoutA: s.layout === "A", isLayoutB: s.layout === "B",
-      setLayoutA: () => this.setState({ layout: "A" }), setLayoutB: () => this.setState({ layout: "B" }),
-      layoutABg: s.layout === "A" ? "var(--accent-soft)" : "transparent", layoutAFg: s.layout === "A" ? "var(--accent)" : "var(--dim)",
-      layoutBBg: s.layout === "B" ? "var(--accent-soft)" : "transparent", layoutBFg: s.layout === "B" ? "var(--accent)" : "var(--dim)",
+      project: CONFIG.project.name + " \u00B7 " + CONFIG.project.topology,
+      workingModel: "team \u00B7 " + (CONFIG.execution.team.members.length) + " + coordinator",
 
       phases,
       lastRun: {
-        id: "run-2026-08-05-track", workflow: "workflows/track", mode: "team",
-        duration: "1m 13s", phaseIndex: activePhase + 1, phaseName: PHASES[activePhase][0]
+        id: "run-2026-08-05-track", duration: "1m 13s",
+        phaseIndex: activePhase + 1, phaseName: PHASES[activePhase][0]
       },
 
-      milestones, milestonesBrief: milestones,
+      milestones,
       roadmapDone: done, roadmapActive: active, roadmapPlanned: MILESTONES.length - done - active,
-      roadmapTotal: MILESTONES.length,
       roadmapPct: Math.round(MILESTONES.reduce((a, m) => a + m.pct, 0) / MILESTONES.length),
 
       counts: [
         { label: "memories", n: 2, color: "var(--text)" }, { label: "docs", n: 3, color: "var(--text)" },
-        { label: "runs", n: 2, color: "var(--accent)" }, { label: "monitors", n: 1, color: "var(--ok)" },
+        { label: "runs", n: 2, color: "var(--text)" }, { label: "monitors", n: 1, color: "var(--done)" },
         { label: "logs", n: 1, color: "var(--dim)" }, { label: "concepts", n: 13, color: "var(--text)" }
       ],
 
       commitsBrief: commits.slice(0, 7),
-      visibleCommits, visibleCount: visibleCommits.length,
+      visibleCommits, visibleCount: visibleCommits.length, totalCommits: COMMITS.length,
       kindFilters, query: s.query, onQuery: (e) => this.setState({ query: e.target.value }),
 
-      tree, activeFile,
+      tree, activeFile, fileCount: FILES.length,
 
+      decisionsSummary: (DECISIONS.length - openDecisions) + " closed \u00B7 " + openDecisions + " open",
       decisions: DECISIONS.map(d => ({
-        id: d[0], text: d[1], date: d[2] === "open" ? "open" : d[2],
-        color: d[3] === "open" ? "var(--warn)" : "var(--ok)",
-        chipBg: d[3] === "open" ? "var(--panel2)" : "var(--ok-soft)",
-        chipLine: d[3] === "open" ? "var(--line2)" : "transparent",
-        textColor: d[3] === "open" ? "var(--text)" : "var(--dim)"
+        id: d[0], text: d[1],
+        color: d[2] === "open" ? "var(--active)" : "var(--done)",
+        textColor: d[2] === "open" ? "var(--text)" : "var(--dim)"
       })),
 
-      configSections,
+      configRows,
       configRaw: JSON.stringify(CONFIG, null, 2),
       isTable: s.configMode === "table", isRaw: s.configMode === "raw",
       setTable: () => this.setState({ configMode: "table" }), setRaw: () => this.setState({ configMode: "raw" }),
-      tableBg: s.configMode === "table" ? "var(--accent-soft)" : "transparent", tableFg: s.configMode === "table" ? "var(--accent)" : "var(--dim)",
-      rawBg: s.configMode === "raw" ? "var(--accent-soft)" : "transparent", rawFg: s.configMode === "raw" ? "var(--accent)" : "var(--dim)"
+      tableBg: s.configMode === "table" ? "var(--head)" : "transparent", tableFg: s.configMode === "table" ? "var(--text)" : "var(--dim)",
+      rawBg: s.configMode === "raw" ? "var(--head)" : "transparent", rawFg: s.configMode === "raw" ? "var(--text)" : "var(--dim)"
     };
   }
 }
