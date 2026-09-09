@@ -1,40 +1,67 @@
-// Git: full commit window with text filter and conventional-kind segments.
+// Git: the full commit window, narrowed by a text filter and by conventional kind.
 
 import { commits } from '../data.mjs'
 import { S } from '../state.mjs'
 import { esc } from '../ui.mjs'
 
+const GIT_KINDS = ['all', 'feat', 'fix', 'docs', 'test', 'chore', 'refactor']
+
+// The churn column is dropped whole when no commit in the window carries diff stats, so the
+// head and the rows state the same columns rather than a label over nothing.
+function gitCommitRow(c, hasStat) {
+  return '<div class="row">'
+    + '<span class="w-sha fg-dim small">' + esc(c.sha) + '</span>'
+    + '<span class="w-kind small" style="color:' + c.kindColor + '">' + esc(c.kind) + '</span>'
+    + '<span class="c-grow">' + esc(c.subject) + '</span>'
+    + '<span class="w-author ellip fg-dim small">' + esc(c.author) + '</span>'
+    + (hasStat
+      ? '<span class="w-churn c-right num small"><span class="fg-done">+' + esc(c.add || 0) + '</span> '
+        + '<span class="fg-neg">&#8722;' + esc(c.del || 0) + '</span></span>'
+      : '')
+    + '<span class="w-when c-right count">' + esc(c.when) + '</span>'
+    + '</div>'
+}
+
 export function vGit() {
   const q = S.query.trim().toLowerCase()
   const all = commits()
+  // The query runs over `fullSubject`, the line the repository wrote, while the cell shows the
+  // stripped one. A word that lives only in the prefix therefore still matches, so typing
+  // `release` finds `chore(release): manifests at 0.28.0`, whose cell prints the tail alone.
   const visible = all.filter(function (c) {
     return (S.filter === 'all' || c.kind === S.filter)
-      && (!q || (c.subject + ' ' + c.sha + ' ' + c.author).toLowerCase().indexOf(q) !== -1)
+      && (!q || (c.fullSubject + ' ' + c.sha + ' ' + c.author).toLowerCase().indexOf(q) !== -1)
   })
-  const kinds = ['all', 'feat', 'fix', 'docs', 'test', 'chore', 'refactor']
-  const bar = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:0 4px">'
-    + '<div class="pill" style="flex:0 0 300px;gap:9px"><span style="color:var(--dimmer)">&#9906;</span>'
-    + '<input id="git-q" type="text" placeholder="filter subject, sha, author" value="' + esc(S.query) + '" '
-    + 'style="flex:1 1 auto;min-width:0;border:0;outline:none;background:transparent;color:var(--text);font-family:inherit;font-size:12.5px"></div>'
-    + '<div class="seg">' + kinds.map(function (k) {
-      return '<button data-act="filter" data-v="' + k + '" class="' + (S.filter === k ? 'active' : '') + '">' + k + '</button>'
+
+  // Both returns below wrap the tools row and its table in one tight stack, so the row sits
+  // closer to the table than the gap the view leaves between blocks. dashboard.css owns both gaps.
+  //
+  // The input carries no listener of its own. main.mjs binds one after every render, which is
+  // what keeps it at exactly one listener per rendered element.
+  const tools = '<div class="stack tight"><div class="tools">'
+    + '<div class="filter"><span>filter</span>'
+    + '<input id="git-q" type="text" placeholder="subject, sha, author" value="' + esc(S.query) + '"></div>'
+    + '<div class="seg">' + GIT_KINDS.map(function (k) {
+      return '<button data-act="filter" data-v="' + k + '"'
+        + (S.filter === k ? ' class="active"' : '') + '>' + k + '</button>'
     }).join('') + '</div>'
-    + '<span style="margin-left:auto;color:var(--dim);font-size:11.5px">' + visible.length + ' of ' + all.length + ' commits</span></div>'
-  if (!all.length) return bar + '<section class="panel"><div class="empty">No commits in the snapshot.</div></section>'
+    + '<span class="push fg-dim small">' + visible.length + ' of ' + all.length + ' commits</span>'
+    + '</div>'
+
+  if (!all.length) {
+    return tools + '<section class="panel"><div class="empty">No commits in the snapshot.</div></section></div>'
+  }
+
   const hasStat = all.some(function (c) { return c.add != null })
-  return bar + '<section class="panel" style="padding:14px 14px 8px 14px">'
-    + '<div style="display:flex;gap:12px;padding:0 12px 10px 12px;color:var(--dim);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase">'
-    + '<span style="flex:0 0 78px">sha</span><span style="flex:0 0 58px">kind</span><span style="flex:1 1 auto">subject</span>'
-    + '<span style="flex:0 0 130px">author</span>' + (hasStat ? '<span style="flex:0 0 84px">files</span>' : '')
-    + '<span style="flex:0 0 84px">when</span></div>'
-    + '<div style="display:flex;flex-direction:column;gap:2px">'
-    + visible.map(function (c) {
-      return '<div class="row" style="gap:12px;padding:9px 12px">'
-        + '<span style="flex:0 0 78px"><span class="chip sha">' + esc(c.sha) + '</span></span>'
-        + '<span style="flex:0 0 58px;color:' + c.kindColor + ';font-size:11px">' + esc(c.kind) + '</span>'
-        + '<span class="ellip" style="flex:1 1 auto;min-width:0">' + esc(c.subject) + '</span>'
-        + '<span class="ellip" style="flex:0 0 130px;color:var(--dim);font-size:11.5px">' + esc(c.author) + '</span>'
-        + (hasStat ? '<span style="flex:0 0 84px;font-size:11px"><span style="color:var(--ok)">+' + (c.add || 0) + '</span> <span style="color:var(--stop)">&#8722;' + (c.del || 0) + '</span></span>' : '')
-        + '<span style="flex:0 0 84px;color:var(--dimmer);font-size:11px">' + esc(c.when) + '</span></div>'
-    }).join('') + '</div></section>'
+  return tools + '<section class="panel">'
+    + '<div class="thead">'
+    + '<span class="w-sha">sha</span>'
+    + '<span class="w-kind">kind</span>'
+    + '<span class="c-grow">subject</span>'
+    + '<span class="w-author">author</span>'
+    + (hasStat ? '<span class="w-churn c-right">churn</span>' : '')
+    + '<span class="w-when c-right">when</span>'
+    + '</div>'
+    + visible.map(function (c) { return gitCommitRow(c, hasStat) }).join('')
+    + '</section></div>'
 }

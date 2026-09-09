@@ -43,90 +43,238 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+/* The design system the chrome and the six views are built from. Square, dense, table first,
+   hairline ruled. Every repeated shape is a class here, so the modules concatenate class names
+   and keep inline styles for the values only data can supply, such as a bar width.
+
+   The @font-face rules are emitted by the build, which inlines the vendored woff2 faces. This
+   file only names the families and their fallbacks. */
+
 :root{
-  --bg:#101214; --panel:#1a1d21; --panel2:#22262b; --raise:#2a2f35; --tile:#1f2328;
-  --line:#282c32; --line2:#3a4048; --text:#edeff1; --dim:#98a0a8; --dimmer:#69717a;
-  --accent:#ef8272; --accent-soft:#332624; --accent-line:#5b3a34;
-  --ok:#6fcf9d; --ok-soft:#1e2c26; --warn:#e6bd6c; --stop:#e0757f;
-  --shadow:0 1px 0 rgba(255,255,255,.03), 0 12px 28px -14px rgba(0,0,0,.7);
+  --bg:#0a0a0b; --panel:#101011; --head:#141416; --row:#0d0d0e; --hover:#17181a;
+  --line:#1f2022; --line2:#2c2e31; --text:#e7e8e9; --dim:#9b9da0; --dimmer:#6b6d71;
+  --done:#7ea88f; --active:#c2a05e; --idle:#3a3c3f; --neg:#b1727a;
 }
 :root[data-theme="light"]{
-  --bg:#ececeb; --panel:#fbfbfa; --panel2:#f1f2f2; --raise:#e4e5e6; --tile:#f5f6f6;
-  --line:#e0e1e2; --line2:#c3c6c8; --text:#14171a; --dim:#5b6167; --dimmer:#8a9096;
-  --accent:#d9604c; --accent-soft:#fbeae6; --accent-line:#f0c4bb;
-  --ok:#2f8a62; --ok-soft:#e8f2ec; --warn:#8e6c22; --stop:#b04d58;
-  --shadow:0 1px 0 rgba(255,255,255,.6), 0 10px 24px -16px rgba(0,0,0,.28);
+  --bg:#f6f6f5; --panel:#ffffff; --head:#f0f0ef; --row:#fbfbfa; --hover:#f2f2f1;
+  --line:#e3e3e2; --line2:#cfd0cf; --text:#131415; --dim:#5c5e61; --dimmer:#8b8d90;
+  --done:#3d7a5c; --active:#8a6a1e; --idle:#c6c7c8; --neg:#a1505a;
 }
+
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
-  font-family:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
-  -webkit-font-smoothing:antialiased;font-size:13px;line-height:1.45}
-a{color:var(--accent);text-decoration:none}
-a:hover{color:var(--text)}
+  font-family:"IBM Plex Mono",ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:13px;line-height:1.45;-webkit-font-smoothing:antialiased}
+a{color:var(--text);text-decoration:none;border-bottom:1px solid var(--line2)}
+a:hover{color:var(--text);border-bottom-color:var(--text)}
 input::placeholder{color:var(--dimmer)}
-::selection{background:var(--accent-soft)}
-::-webkit-scrollbar{width:10px;height:10px}
-::-webkit-scrollbar-thumb{background:var(--raise);border-radius:10px;border:3px solid transparent;background-clip:content-box}
-::-webkit-scrollbar-track{background:transparent}
+button{font-family:inherit}
+::selection{background:var(--line2)}
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-thumb{background:var(--line2)}
+::-webkit-scrollbar-track{background:var(--bg)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.sans{font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
-.app{display:flex;gap:12px;height:100vh;width:100%;padding:12px;overflow:hidden}
-nav.rail{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;padding:14px 10px;
-  border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);
-  overflow:hidden;transition:width .18s ease;width:206px}
-.app.collapsed nav.rail{width:62px}
+
+.sans{font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+
+/* Utilities. The mockup reaches for these on nearly every row. */
+.push{margin-left:auto}
+.ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nowrap{white-space:nowrap}
+.msg{flex:1 1 320px;min-width:0;word-break:break-word}
+.num{font-variant-numeric:tabular-nums}
+.sep{border-top:1px solid var(--line)}
+
+/* ---- Shell: rail, header, scrolling body ---------------------------------- */
+
+.app{display:flex;height:100vh;width:100%;overflow:hidden;background:var(--bg)}
+
+nav.rail{flex:0 0 auto;display:flex;flex-direction:column;width:212px;overflow:hidden;
+  border-right:1px solid var(--line);background:var(--panel);transition:width .14s ease}
+.app.collapsed nav.rail{width:48px}
 .app.collapsed .rail-label{opacity:0}
 .rail-label{white-space:nowrap;transition:opacity .12s ease}
-.brand{display:flex;align-items:center;gap:11px;padding:2px 4px 16px 4px}
-.brand-badge{flex:0 0 auto;width:34px;height:34px;border-radius:12px;background:var(--accent-soft);
-  border:1px solid var(--accent-line);display:grid;place-items:center;color:var(--accent);font-size:12px;font-weight:600}
-.navbtn{display:flex;align-items:center;gap:11px;width:100%;padding:8px;border:1px solid transparent;
-  border-radius:14px;background:transparent;color:var(--dim);font-family:inherit;font-size:12.5px;
-  cursor:pointer;text-align:left;white-space:nowrap;transition:background .12s ease}
-.navbtn:hover{background:var(--panel2);color:var(--text)}
-.navbtn.active{background:var(--raise);border-color:var(--line2);color:var(--text)}
-.navbtn .glyph{flex:0 0 auto;width:22px;height:22px;border-radius:8px;display:grid;place-items:center;font-size:12.5px}
-.navbtn .count{margin-left:auto;padding:0 7px;border-radius:999px;background:var(--panel2);color:var(--dimmer);font-size:10.5px}
-main{flex:1 1 auto;display:flex;flex-direction:column;gap:14px;min-width:0;overflow:auto;padding-right:2px}
-header.top{flex:0 0 auto;display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;padding:6px 4px 0 4px}
-h1{margin:0;font-size:29px;font-weight:600;letter-spacing:-.02em;text-transform:capitalize}
-.pill{display:flex;align-items:center;gap:8px;padding:7px 13px;border:1px solid var(--line);border-radius:999px;
-  background:var(--panel);color:var(--dim);font-size:11.5px;white-space:nowrap;box-shadow:var(--shadow)}
-.pill.accent{border-color:var(--accent-line);background:var(--accent-soft);color:var(--accent);box-shadow:none}
-.pill-btn{margin:-4px -8px -4px 2px;padding:5px 12px;border:0;border-radius:999px;background:var(--raise);
-  color:var(--dim);font-family:inherit;font-size:11px;cursor:pointer;transition:background .12s ease}
-.pill-btn:hover:enabled{background:var(--accent-soft);color:var(--accent)}
-.pill-btn:disabled{cursor:default;color:var(--dimmer)}
-.win-in{width:46px;padding:1px 4px;border:0;border-bottom:1px solid var(--line2);border-radius:0;
+.brand{flex:0 0 auto;display:flex;align-items:center;gap:10px;height:52px;padding:0 14px;
+  border-bottom:1px solid var(--line)}
+.brand-badge{flex:0 0 auto;width:22px;height:22px;border:1px solid var(--line2);display:grid;
+  place-items:center;font-size:10px;font-weight:600;color:var(--text)}
+.brand-name{white-space:nowrap;font-size:12px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--dim)}
+.brand .count{margin-left:auto;padding-left:12px}
+.rail-nav{display:flex;flex-direction:column;padding:8px 0}
+.rail-foot{margin-top:auto;display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.navbtn{display:flex;align-items:center;gap:12px;width:100%;height:34px;padding:0 14px;
+  border:0;border-left:2px solid transparent;background:transparent;color:var(--dim);
+  font-size:12.5px;cursor:pointer;text-align:left;white-space:nowrap}
+.navbtn:hover{background:var(--hover);color:var(--text)}
+.navbtn.active{border-left-color:var(--text);background:var(--head);color:var(--text)}
+.navbtn .glyph{flex:0 0 auto;width:14px;text-align:center;font-size:12px;color:var(--dimmer)}
+.navbtn.active .glyph{color:var(--text)}
+.navbtn .count{margin-left:auto}
+
+main{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+header.top{flex:0 0 auto;display:flex;align-items:center;gap:16px;height:52px;padding:0 20px;
+  border-bottom:1px solid var(--line);background:var(--panel)}
+header.top h1{margin:0;font-size:15px;font-weight:600;letter-spacing:-.01em;
+  text-transform:capitalize;white-space:nowrap}
+.top-sep{color:var(--line2)}
+.top-sub{color:var(--dim);font-size:12px;min-width:0;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.top-cells{display:flex;align-items:center;height:100%;margin-left:auto}
+.cell{display:flex;align-items:center;gap:8px;height:100%;padding:0 14px;
+  border-left:1px solid var(--line);color:var(--dim);font-size:11.5px;white-space:nowrap}
+
+/* The scroll container every view is rendered into. Views emit sections; the gap spaces them. */
+.view{flex:1 1 auto;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:20px}
+
+/* A full width correction under the header, with room to wrap. */
+.strip{flex:0 0 auto;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:9px 20px;
+  border-bottom:1px solid var(--line);background:var(--row);font-size:11.5px}
+.strip-label{flex:0 0 auto;color:var(--neg);font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase}
+
+/* ---- Section --------------------------------------------------------------- */
+
+.panel{border:1px solid var(--line);background:var(--panel);min-width:0}
+.panel-head{display:flex;align-items:center;gap:14px;height:34px;padding:0 14px;
+  border-bottom:1px solid var(--line);background:var(--head)}
+.panel-head.short{height:30px}
+.eyebrow{flex:0 0 auto;font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--dim)}
+.panel-meta{margin-left:auto;color:var(--dim);font-size:11.5px;white-space:nowrap}
+.panel-note{color:var(--dimmer);font-size:11px}
+.pad{padding:14px}
+.prose{font-size:13px;line-height:1.7}
+.small{font-size:11.5px}
+.quote{background:var(--row);color:var(--neg);font-size:12.5px;line-height:1.7;
+  word-break:break-word}
+.banner{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 14px;
+  background:var(--row)}
+.empty{padding:20px 14px;color:var(--dimmer);font-size:12.5px}
+
+/* ---- Table ----------------------------------------------------------------- */
+
+.thead{display:flex;align-items:center;gap:14px;height:30px;padding:0 14px;
+  border-bottom:1px solid var(--line);background:var(--head);color:var(--dim);
+  font-size:10.5px;letter-spacing:.14em;text-transform:uppercase}
+.row{display:flex;align-items:center;gap:14px;height:32px;padding:0 14px;
+  border-bottom:1px solid var(--line)}
+.row:hover{background:var(--hover)}
+.row.tall{height:34px}
+.row.wrap{height:auto;min-height:32px;padding:6px 14px;align-items:baseline}
+.row.kv{height:auto;min-height:28px;gap:16px;padding:4px 16px;align-items:baseline;
+  background:var(--row)}
+.row.group{height:36px;background:var(--head)}
+.row.group:hover{background:var(--head)}
+
+/* Cell conventions. A cell is fixed, elastic or wrapping, and the w- classes are the mockup's
+   column widths. */
+.c{flex:0 0 auto}
+.c-grow{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c-wrap{flex:1 1 auto;min-width:0;word-break:break-word;text-wrap:pretty}
+.c-right{text-align:right}
+
+/* ---- Marks ----------------------------------------------------------------- */
+
+.sq{flex:0 0 auto;display:inline-block;width:5px;height:5px;background:var(--idle)}
+.sq.done{background:var(--done)}
+.sq.active{background:var(--active)}
+.sq.idle{background:var(--idle)}
+.sq.neg{background:var(--neg)}
+.sq.busy{animation:pulse 2.6s infinite}
+.bar{flex:0 0 auto;display:block;height:2px;background:var(--idle)}
+.bar>span{display:block;height:2px;background:var(--text)}
+.bar>span.done{background:var(--done)}
+.bar>span.active{background:var(--active)}
+.bar>span.idle{background:var(--idle)}
+.bar.wide,.bar.wide>span{height:3px}
+.count{color:var(--dimmer);font-size:11px;font-variant-numeric:tabular-nums}
+.status{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase}
+
+/* ---- Controls -------------------------------------------------------------- */
+
+.btn{padding:2px 8px;border:1px solid var(--line2);background:transparent;color:var(--text);
+  font-size:11.5px;cursor:pointer}
+.btn:hover:enabled{border-color:var(--text)}
+.btn:disabled{cursor:default;color:var(--dimmer);border-color:var(--line)}
+.seg{display:flex;border:1px solid var(--line);background:var(--panel)}
+.seg button{height:28px;padding:0 12px;border:0;border-left:1px solid var(--line);
+  background:transparent;color:var(--dim);font-size:11.5px;cursor:pointer}
+.seg button:first-child{border-left:0}
+.seg button:hover{color:var(--text)}
+.seg button.active{background:var(--head);color:var(--text)}
+.filter{flex:0 0 300px;display:flex;align-items:center;gap:9px;height:30px;padding:0 12px;
+  border:1px solid var(--line);background:var(--panel)}
+.filter>span{flex:0 0 auto;color:var(--dimmer);font-size:12px}
+.filter input{flex:1 1 auto;min-width:0;border:0;outline:none;background:transparent;
+  color:var(--text);font-family:inherit;font-size:12.5px}
+.win-in{width:40px;padding:1px 2px;border:0;border-bottom:1px solid var(--line2);
   background:transparent;color:var(--text);font-family:inherit;font-size:11.5px;text-align:right}
-.win-in:focus{outline:none;border-bottom-color:var(--accent)}
-.btn{padding:7px 16px;border:1px solid var(--line2);border-radius:999px;background:var(--raise);color:var(--text);
-  font-family:inherit;font-size:11.5px;cursor:pointer;transition:background .12s ease}
-.btn:hover:enabled{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent)}
-.btn:disabled{cursor:default;color:var(--dimmer)}
-.dot{width:6px;height:6px;border-radius:50%;background:var(--ok)}
-.dot.pulse{animation:pulse 2.6s infinite}
-.panel{border:1px solid var(--line);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);padding:16px}
-.panel-head{display:flex;align-items:center;gap:12px;padding:0 2px 12px 2px;flex-wrap:wrap}
-.eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
-.tile{border-radius:14px;background:var(--tile)}
-.chip{padding:1px 8px;border-radius:999px;background:var(--panel2);color:var(--dim);font-size:10.5px}
-.chip.sha{color:var(--accent);font-size:11px}
-.bar{height:3px;border-radius:999px;background:var(--raise)}
-.bar>span{display:block;height:3px;border-radius:999px}
-.row{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:12px}
-.row:hover{background:var(--panel2)}
-.seg{display:flex;gap:4px;padding:4px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
-.seg button{padding:6px 15px;border:0;border-radius:999px;background:transparent;color:var(--dim);
-  font-family:inherit;font-size:11.5px;cursor:pointer}
-.seg button.active{background:var(--accent-soft);color:var(--accent)}
-.empty{padding:22px 12px;color:var(--dimmer);font-style:italic;font-size:12.5px;text-align:center}
-.grid12{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px;align-items:start}
-.ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-pre.body{margin:0;padding:16px 18px;border-radius:16px;background:var(--tile);color:var(--text);
-  font-family:inherit;font-size:12.5px;line-height:1.75;white-space:pre-wrap;word-break:break-word}
-button{font-family:inherit}
-@media (max-width:900px){.grid12>section{grid-column:span 12 !important}}
+.win-in:focus{outline:none;border-bottom-color:var(--text)}
+.tools{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+
+/* ---- Composition ----------------------------------------------------------- */
+
+.grid2{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:20px;
+  align-items:start}
+.grid2 .span2{grid-column:1 / -1}
+.gridk{display:grid;grid-template-columns:minmax(230px,280px) minmax(0,1fr);gap:20px;
+  align-items:start}
+.stack{display:flex;flex-direction:column;gap:20px}
+.stack.tight{gap:14px}
+.phases{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.phase{display:flex;flex-direction:column;gap:9px;min-width:0;padding:12px 14px;
+  border-left:1px solid var(--line);border-top:1px solid var(--line);margin-top:-1px}
+.phase.on{background:var(--head)}
+.phase-top{display:flex;align-items:center;gap:8px}
+.phase-name{font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.treebtn{display:flex;align-items:center;gap:10px;width:100%;height:30px;padding:0 14px;
+  border:0;border-bottom:1px solid var(--line);border-left:2px solid transparent;
+  background:transparent;color:var(--dim);font-size:12.5px;cursor:pointer;text-align:left}
+.treebtn:hover{background:var(--hover)}
+.treebtn.file{padding-left:28px}
+.treebtn.active{border-left-color:var(--text);background:var(--head);color:var(--text)}
+.treebtn.dir{background:var(--row);color:var(--dimmer);cursor:default}
+.treebtn.dir:hover{background:var(--row)}
+pre.body{margin:0;padding:18px 16px;color:var(--text);font-family:inherit;font-size:12.5px;
+  line-height:1.75;white-space:pre-wrap;word-break:break-word}
+pre.body.raw{padding:16px;line-height:1.7;white-space:pre;overflow:auto}
+
+/* The header carries four cells beside the title, so below this width the subtitle goes.
+   The rail already names the view, and every other cell states something nothing else does. */
+@media (max-width:1500px){
+  .top-sub,.top-sep{display:none}
+}
+
+@media (max-width:900px){
+  .grid2,.gridk{grid-template-columns:minmax(0,1fr)}
+}
+
+/* Column widths. Utilities, so they sit after the components that also set flex. */
+.w-mark{flex:0 0 18px}
+.w-ref{flex:0 0 52px}
+.w-kind{flex:0 0 58px}
+.w-sha{flex:0 0 64px}
+.w-status{flex:0 0 70px}
+.w-when{flex:0 0 88px}
+.w-churn{flex:0 0 88px}
+.w-author{flex:0 0 130px}
+.w-owner{flex:0 0 130px}
+.w-fmkey{flex:0 0 150px}
+.w-key{flex:0 0 260px}
+.w-pct{flex:0 0 34px}
+.w-count{flex:0 0 56px}
+.w-bar{flex:0 0 92px}
+
+/* Text colour last, so a colour a component sets can be overridden by adding one of these. */
+.fg-text{color:var(--text)}
+.fg-dim{color:var(--dim)}
+.fg-dimmer{color:var(--dimmer)}
+.fg-done{color:var(--done)}
+.fg-active{color:var(--active)}
+.fg-idle{color:var(--idle)}
+.fg-neg{color:var(--neg)}
 </style>
 </head>
 <body>
@@ -292,8 +440,22 @@ const AREAS = ['memories', 'docs', 'runs', 'monitors', 'logs']
 // including a directory literally called "(bundle root)".
 const ROOT_GROUP_LABEL = '/ (bundle root)'
 
-const KIND_COLOR = { feat: 'var(--accent)', fix: 'var(--stop)', docs: 'var(--dim)', test: 'var(--ok)', chore: 'var(--dimmer)', refactor: 'var(--warn)' }
-const TIER_COLOR = { trivial: 'var(--dimmer)', task: 'var(--warn)', substantive: 'var(--accent)' }
+// The kind mapping the mockup states, and a tier mapping built to match it. A tier reads at the
+// weight of the commit kind it resembles, so a substantive intent takes the colour of a feat and
+// a trivial one the colour of a chore. A run is --done, which no tier uses, so the two streams
+// stay apart at a glance.
+//
+// Both are Maps because both are keyed by a word the repository wrote. A plain object answers
+// `constructor` and `toString` with an inherited member, and that member would then be written
+// into a style attribute as if it were a colour. A Map holds only what was put in it, so an
+// unknown key misses and falls back by construction rather than by luck.
+const KIND_COLOR = new Map([
+  ['feat', 'var(--text)'], ['fix', 'var(--neg)'], ['docs', 'var(--dim)'],
+  ['test', 'var(--done)'], ['chore', 'var(--dimmer)'], ['refactor', 'var(--active)']
+])
+const TIER_COLOR = new Map([
+  ['trivial', 'var(--dimmer)'], ['task', 'var(--active)'], ['substantive', 'var(--text)']
+])
 
 function rel(iso) {
   if (!iso) return ''
@@ -306,6 +468,16 @@ function rel(iso) {
   return Math.round(m / 1440) + ' d ago'
 }
 
+// The calendar day a timestamp falls on, which is how a dated record reads. Anything that
+// does not parse is shown as it was written.
+function day(iso) {
+  if (!iso) return ''
+  const t = Date.parse(iso)
+  if (isNaN(t)) return String(iso)
+  const d = new Date(t)
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+}
+
 function clock(iso) {
   const t = Date.parse(iso)
   if (isNaN(t)) return ''
@@ -313,12 +485,24 @@ function clock(iso) {
   return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')
 }
 
+// The commit subject without the conventional prefix, which the kind column states beside it.
+// The prefix is only removed when it parses as one, so a subject like 'fix the build' is
+// untouched. The snapshot keeps serving the full subject; this is presentation.
+function conventionalBody(subject) {
+  return String(subject).replace(/^(feat|fix|docs|test|chore|refactor)(\([^)]*\))?!?:\s*/, '')
+}
+
+// Every commit carries its subject twice. `subject` is the cell, stripped of a prefix the kind
+// column already states; `fullSubject` is the line the repository wrote, prefix and scope
+// included. The git filter searches `fullSubject`, so a word that only lives in the prefix, such
+// as the scope in `chore(release):`, still matches what the reader typed.
 function deriveCommits(raw) {
   return (Array.isArray(raw.git) ? raw.git : []).map(function (c) {
     const kind = c.kind || (String(c.subject || '').match(/^(feat|fix|docs|test|chore|refactor)/) || [])[1] || 'other'
     return {
-      sha: String(c.hash || '').slice(0, 7), kind: kind, kindColor: KIND_COLOR[kind] || 'var(--dim)',
-      subject: c.subject || '', author: c.author || '', add: c.add, del: c.del,
+      sha: String(c.hash || '').slice(0, 7), kind: kind, kindColor: KIND_COLOR.get(kind) || 'var(--dim)',
+      subject: conventionalBody(c.subject || ''), fullSubject: String(c.subject || ''),
+      author: c.author || '', add: c.add, del: c.del,
       when: rel(c.date), date: c.date || ''
     }
   })
@@ -439,7 +623,7 @@ function deriveTimeline(raw) {
     return {
       stream: 'event', kind: isRun ? 'run' : 'intent', tier: tier,
       type: isRun || e.type == null ? null : String(e.type),
-      color: isRun ? 'var(--ok)' : (TIER_COLOR[tier] || 'var(--dim)'),
+      color: isRun ? 'var(--done)' : (TIER_COLOR.get(tier) || 'var(--dim)'),
       text: e.summary == null ? '' : String(e.summary),
       truncated: e.summaryTruncated === true,
       promptId: e.promptId == null ? '' : String(e.promptId),
@@ -515,17 +699,17 @@ const VIEWS = ['overview', 'roadmap', 'timeline', 'git', 'knowledge', 'config']
 // the data actually on screen and not the data that was there when the page loaded.
 function subtitles() {
   return {
-    overview: 'Lifecycle state, roadmap and knowledge at a glance',
-    roadmap: 'Milestones, tasks and open questions',
+    overview: 'lifecycle state, roadmap and knowledge at a glance',
+    roadmap: 'overall progress, milestones and their tasks',
     timeline: timeline().events.length + '-event window merged with the commit stream',
     git: commits().length + '-commit window from the snapshot',
     knowledge: root() + ' as an OKF 0.2 bundle',
-    config: 'Single source of truth for every plugin surface'
+    config: 'single source of truth for every plugin surface'
   }
 }
 
 const S = {
-  view: 'overview', layout: 'A', rail: localStorage.getItem('mt-rail') !== '0',
+  view: 'overview', rail: localStorage.getItem('mt-rail') !== '0',
   theme: localStorage.getItem('mt-theme') || (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'),
   filter: 'all', query: '', file: 0, configMode: 'table',
 
@@ -576,7 +760,7 @@ const initialHash = (location.hash || '').replace(/^#\/?/, '')
 if (VIEWS.indexOf(initialHash) !== -1) S.view = initialHash
 
 /* == src/ui.mjs == */
-// Shared fragments: escaping, status colors, reusable row and card builders.
+// Shared fragments: escaping, the status mapping, and the rows more than one view builds.
 
 
 function esc(s) {
@@ -585,48 +769,63 @@ function esc(s) {
   })
 }
 
-function statusColor(st) {
-  return st === 'done' ? 'var(--ok)' : st === 'active' ? 'var(--accent)' : 'var(--line2)'
+// Every status word collapses to one of three states, and the word this returns is both the
+// token name and the class stem: `sq done`, `fg-active`, a bar fill of `idle`.
+function uiStatusKey(st) {
+  return st === 'done' ? 'done' : st === 'active' ? 'active' : 'idle'
 }
 
+// The overview's git brief renders one commit per row. The full log has its own row in
+// views/git.mjs.
 function commitRow(c) {
   return '<div class="row">'
-    + '<span class="chip sha">' + esc(c.sha) + '</span>'
-    + '<span style="flex:0 0 58px;color:' + c.kindColor + ';font-size:11px">' + esc(c.kind) + '</span>'
-    + '<span class="ellip" style="flex:1 1 auto;min-width:0">' + esc(c.subject) + '</span>'
-    + '<span style="flex:0 0 auto;color:var(--dimmer);font-size:11px">' + esc(c.when) + '</span>'
+    + '<span class="w-sha fg-dim small">' + esc(c.sha) + '</span>'
+    + '<span class="w-kind fg-dimmer small">' + esc(c.kind) + '</span>'
+    + '<span class="c-grow">' + esc(c.subject) + '</span>'
+    + '<span class="w-when c-right count">' + esc(c.when) + '</span>'
     + '</div>'
 }
 
+// `mark` is already an HTML entity, so a view writes it without escaping it.
 function milestoneVm(m) {
   const tasks = Array.isArray(m.tasks) ? m.tasks : []
   const done = tasks.filter(function (t) { return t.status === 'done' }).length
   return {
     title: m.title || '', version: m.version || '', status: m.status || 'planned',
     pct: m.pct != null ? m.pct : (tasks.length ? Math.round(done / tasks.length * 100) : 0),
-    color: statusColor(m.status), done: done, total: tasks.length, tasks: tasks
+    key: uiStatusKey(m.status), done: done, total: tasks.length,
+    tasks: tasks.map(function (t) {
+      const st = t.status || 'todo'
+      return {
+        ref: t.ref || '', title: t.title || '', owner: t.owner || '', status: st,
+        key: uiStatusKey(st),
+        mark: st === 'done' ? '&#10003;' : st === 'active' ? '&#9656;' : '&#183;'
+      }
+    })
   }
 }
 
 function decisionRow(d) {
   const open = d.status === 'open'
   return '<div class="row">'
-    + '<span class="chip" style="' + (open ? 'border:1px solid var(--line2);color:var(--warn)' : 'background:var(--ok-soft);color:var(--ok)') + '">' + esc(d.id) + '</span>'
-    + '<span class="ellip" style="flex:1 1 auto;min-width:0;color:' + (open ? 'var(--text)' : 'var(--dim)') + '">' + esc(d.text) + '</span>'
-    + '<span style="flex:0 0 auto;color:var(--dimmer);font-size:11px">' + esc(open ? 'open' : (d.date || '')) + '</span>'
+    + '<span class="w-ref small ellip ' + (open ? 'fg-active' : 'fg-done') + '" title="' + esc(d.id) + '">' + esc(d.id) + '</span>'
+    + '<span class="c-grow' + (open ? '' : ' fg-dim') + '">' + esc(d.text) + '</span>'
+    + '<span class="c c-right count">' + esc(open ? 'open' : day(d.date)) + '</span>'
     + '</div>'
 }
 
+// phaseVms returns one view model per phase of the last run, and null when no run was recorded.
+// `pct` fills the phase bar, and only a finished phase has a measured one, so an unfinished
+// phase reads 0.
 function phaseVms() {
   const run = lastRun()
   if (!run || !Array.isArray(run.phases)) return null
   return run.phases.map(function (p, i) {
     const st = p.status || 'pending'
     return {
-      num: String(i + 1).padStart(2, '0'), name: p.name || '', artifact: p.artifact || '', status: st,
-      elapsed: p.elapsed || '', color: statusColor(st === 'pending' ? 'planned' : st),
-      pct: st === 'done' ? 100 : st === 'active' ? 55 : 0,
-      labelColor: st === 'pending' ? 'var(--dimmer)' : 'var(--text)'
+      num: String(i + 1).padStart(2, '0'), name: p.name || '', artifact: p.artifact || '',
+      status: st, elapsed: p.elapsed || '', key: uiStatusKey(st),
+      pct: st === 'done' ? 100 : 0
     }
   })
 }
@@ -708,17 +907,25 @@ function timelineStream() {
   })
 }
 
-// One row of the merged stream, at the density of commitRow and decisionRow.
+// One row of the merged stream, at the width of the git table. The overview's activity strip
+// calls this too, so the row states itself and takes nothing from its table.
+//
+// A commit is marked by its sha in the neutral column colour; an event is marked by the stream
+// it came from, coloured by its tier. The kind column carries the colour in both cases. The
+// value is the one data.mjs derived, and it is written inline because a derived colour has no
+// class to carry it; the git table's kind column does the same.
 function timelineRow(it) {
   const isCommit = it.stream === 'commit'
   return '<div class="row">'
-    + '<span class="chip' + (isCommit ? ' sha' : '') + '"'
+    + '<span class="w-sha small' + (isCommit ? ' fg-dim' : '') + '"'
     + (isCommit ? '' : ' style="color:' + it.color + '"') + '>' + esc(it.mark) + '</span>'
-    + '<span class="ellip" style="flex:0 0 122px;color:' + it.color + ';font-size:11px">' + esc(it.label) + '</span>'
-    + '<span class="ellip" style="flex:1 1 auto;min-width:0">' + esc(it.text) + '</span>'
-    + (it.truncated ? '<span class="chip" style="flex:0 0 auto;color:var(--warn)" title="summary cut at the 200-character cap">truncated</span>' : '')
-    + (it.path ? '<span class="ellip" style="flex:0 1 190px;color:var(--dimmer);font-size:11px;text-align:right">' + esc(it.path) + '</span>' : '')
-    + '<span style="flex:0 0 42px;text-align:right;color:var(--dimmer);font-size:11px">' + esc(clock(it.date) || it.when) + '</span>'
+    + '<span class="w-owner ellip small" style="color:' + it.color + '">' + esc(it.label) + '</span>'
+    + '<span class="c-grow">' + esc(it.text) + '</span>'
+    + (it.truncated
+      ? '<span class="c status fg-active" title="summary cut at the 200-character cap">truncated</span>'
+      : '')
+    + (it.path ? '<span class="w-author c-right ellip count">' + esc(it.path) + '</span>' : '')
+    + '<span class="w-when c-right count">' + esc(clock(it.date) || it.when) + '</span>'
     + '</div>'
 }
 
@@ -752,16 +959,17 @@ function vTimeline() {
   const stream = timelineStream()
   const eventCount = timeline().events.length
   const commitCount = commits().length
-  const bar = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:0 4px">'
-    + '<span style="color:var(--dim);font-size:11.5px">' + eventCount + ' recorded event'
+  const tools = '<div class="tools">'
+    + '<span class="fg-dim small">' + eventCount + ' recorded event'
     + (eventCount === 1 ? '' : 's') + ' &#183; ' + commitCount + ' commit'
     + (commitCount === 1 ? '' : 's') + '</span>'
-    + '<span style="margin-left:auto;color:var(--dim);font-size:11.5px">' + stream.length + ' in the merged stream</span></div>'
-  const note = '<div style="padding:0 6px;color:var(--dim);font-size:11.5px;line-height:1.65">'
-    + esc(timelineWindowLine()) + '</div>'
+    + '<span class="push fg-dim small">' + stream.length + ' in the merged stream</span></div>'
+  const windowPanel = '<section class="panel">'
+    + '<div class="panel-head short"><span class="eyebrow">window</span></div>'
+    + '<div class="pad prose fg-dim">' + esc(timelineWindowLine()) + '</div></section>'
 
   if (!stream.length) {
-    return bar + note + '<section class="panel"><div class="empty">'
+    return tools + windowPanel + '<section class="panel"><div class="empty">'
       + 'No events and no commits in this snapshot. The timeline fills in as intents and runs '
       + 'are recorded under the runs area and as commits land in the window.</div></section>'
   }
@@ -774,254 +982,297 @@ function vTimeline() {
     else days.push({ key: key, items: [it] })
   })
 
-  return bar + note + days.map(function (day) {
+  // One panel per day, one head row per session block inside it. The path column is labelled
+  // only when the day holds an item that carries a path.
+  return tools + windowPanel + days.map(function (bucket) {
     const blocks = []
-    day.items.forEach(function (it) {
+    bucket.items.forEach(function (it) {
       const key = groupKey(it)
       const last = blocks[blocks.length - 1]
       if (last && last.key === key) last.items.push(it)
       else blocks.push({ key: key, label: groupLabel(it), items: [it] })
     })
-    return '<section class="panel"><div class="panel-head">'
-      + '<span class="eyebrow">' + esc(dayLabel(day.key)) + '</span>'
-      + '<span style="margin-left:auto;color:var(--dimmer);font-size:11px">' + day.items.length
-      + ' item' + (day.items.length === 1 ? '' : 's') + '</span></div>'
-      + '<div style="display:flex;flex-direction:column;gap:10px">'
+    const hasPath = bucket.items.some(function (it) { return !!it.path })
+    return '<section class="panel">'
+      + '<div class="panel-head short"><span class="eyebrow">' + esc(dayLabel(bucket.key)) + '</span>'
+      + '<span class="panel-meta">' + bucket.items.length + ' item'
+      + (bucket.items.length === 1 ? '' : 's') + '</span></div>'
+      + '<div class="thead"><span class="w-sha">mark</span><span class="w-owner">kind</span>'
+      + '<span class="c-grow">summary</span>'
+      + (hasPath ? '<span class="w-author c-right">path</span>' : '')
+      + '<span class="w-when c-right">when</span></div>'
       + blocks.map(function (b) {
-        return '<div><div style="display:flex;align-items:center;gap:9px;padding:0 10px 4px 10px">'
-          + '<span style="color:var(--dimmer);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase">'
-          + esc(b.label) + '</span>'
-          + '<span style="margin-left:auto;color:var(--dimmer);font-size:10.5px">' + b.items.length + '</span></div>'
-          + '<div style="display:flex;flex-direction:column;gap:2px">' + b.items.map(timelineRow).join('') + '</div></div>'
+        return '<div class="row group"><span class="c-grow eyebrow">' + esc(b.label) + '</span>'
+          + '<span class="count">' + b.items.length + '</span></div>'
+          + b.items.map(timelineRow).join('')
       }).join('')
-      + '</div></section>'
+      + '</section>'
   }).join('')
 }
 
 /* == src/views/overview.mjs == */
-// Overview: lifecycle (grid or console layout), roadmap brief, knowledge counts,
-// recent git, decisions. Sections without a data producer render empty states.
+// Overview: the lifecycle strip, then the roadmap brief beside the knowledge counts, the
+// activity strip across both columns, and git history beside the decisions. Sections without a
+// data producer render empty states.
 
 
 
 
-
-function lifecycleGrid(phases, run) {
-  return '<section class="panel"><div class="panel-head"><span class="eyebrow">lifecycle</span>'
-    + '<span style="color:var(--dimmer);font-size:11.5px">' + esc(run.id || '') + '</span>'
-    + '<span class="chip" style="margin-left:auto;padding:4px 11px;color:var(--text);font-size:11.5px">'
-    + phases.filter(function (p) { return p.status === 'done' }).length + '/' + phases.length + ' done</span></div>'
-    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px">'
-    + phases.map(function (p) {
-      return '<div class="tile" style="padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0;'
-        + (p.status === 'active' ? 'background:var(--accent-soft);border:1px solid var(--accent-line)' : 'border:1px solid transparent') + '">'
-        + '<div style="display:flex;align-items:center;gap:7px"><span style="width:7px;height:7px;border-radius:50%;background:' + p.color + '"></span>'
-        + '<span style="color:var(--dimmer);font-size:10.5px">' + p.num + '</span></div>'
-        + '<div class="sans ellip" style="color:' + p.labelColor + ';font-size:13.5px;font-weight:500">' + esc(p.name) + '</div>'
-        + '<div class="bar"><span style="background:' + p.color + ';width:' + p.pct + '%"></span></div>'
-        + '<div class="ellip" style="color:var(--dimmer);font-size:10.5px">' + esc(p.artifact) + '</div></div>'
-    }).join('') + '</div></section>'
+// The right side of the lifecycle head names the phase the run sits on. With no phase active it
+// states how far the run got instead.
+function lifecycleMeta(phases, run) {
+  const at = phases.findIndex(function (p) { return p.status === 'active' })
+  const tail = run.duration ? ' &#183; ' + esc(run.duration) : ''
+  if (at === -1) {
+    const done = phases.filter(function (p) { return p.status === 'done' }).length
+    return done + '/' + phases.length + ' done' + tail
+  }
+  return 'phase ' + (at + 1) + '/' + phases.length + ' &#183; ' + esc(phases[at].name) + tail
 }
 
-function lifecycleConsole(phases, run) {
-  return '<section class="panel"><div class="panel-head">'
-    + '<span class="chip" style="width:26px;height:26px;border-radius:10px;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent);display:grid;place-items:center">&#9656;</span>'
-    + '<span class="sans" style="font-size:14px;font-weight:600">' + esc(run.id || '') + '</span>'
-    + '<span style="color:var(--dim);font-size:11.5px">' + esc(run.workflow || '') + '</span>'
-    + '<span class="chip" style="margin-left:auto;padding:4px 11px;font-size:11.5px">' + esc((run.duration || '') + (run.mode ? ' · ' + run.mode : '')) + '</span></div>'
-    + '<div style="display:flex;flex-direction:column;gap:3px">'
-    + phases.map(function (p) {
-      return '<div style="display:flex;align-items:center;gap:13px;padding:9px 12px;border-radius:13px;background:' + (p.status === 'active' ? 'var(--accent-soft)' : 'var(--tile)') + '">'
-        + '<span style="flex:0 0 16px;color:var(--dimmer);font-size:11px">' + p.num + '</span>'
-        + '<span style="flex:0 0 7px;height:7px;border-radius:50%;background:' + p.color + '"></span>'
-        + '<span class="sans" style="flex:0 0 118px;font-size:13.5px;color:' + p.labelColor + ';font-weight:500">' + esc(p.name) + '</span>'
-        + '<span class="ellip" style="flex:1 1 auto;min-width:0;color:var(--dim);font-size:11.5px">' + esc(p.artifact) + '</span>'
-        + '<span class="chip" style="color:' + p.color + ';letter-spacing:.08em;text-transform:uppercase">' + esc(p.status) + '</span>'
-        + '<span style="flex:0 0 50px;text-align:right;color:var(--dimmer);font-size:11px">' + esc(p.elapsed) + '</span></div>'
-    }).join('') + '</div></section>'
-}
-
-function vOverview() {
+function lifecyclePanel() {
   const phases = phaseVms()
   const run = lastRun()
-  const bar = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:0 4px">'
-    + '<div class="seg">'
-    + '<button data-act="layout" data-v="A" class="' + (S.layout === 'A' ? 'active' : '') + '">grid</button>'
-    + '<button data-act="layout" data-v="B" class="' + (S.layout === 'B' ? 'active' : '') + '">console</button>'
-    + '</div>'
-    + (run ? '<span style="margin-left:auto;color:var(--dim);font-size:11.5px">last run <span style="color:var(--text)">' + esc(run.id || '') + '</span>' + (run.duration ? ' &#183; ' + esc(run.duration) : '') + '</span>' : '')
-    + '</div>'
-
-  let lifecycle
-  if (!phases) {
-    lifecycle = '<section class="panel"><div class="panel-head"><span class="eyebrow">lifecycle</span></div>'
-      + '<div class="empty">No runs recorded yet. The lifecycle tiles light up when workflow runs start writing phase records.</div></section>'
-  } else {
-    lifecycle = S.layout === 'A' ? lifecycleGrid(phases, run) : lifecycleConsole(phases, run)
+  if (!phases || !phases.length) {
+    return '<section class="panel"><div class="panel-head"><span class="eyebrow">lifecycle</span></div>'
+      + '<div class="empty">No runs recorded yet. The lifecycle tiles light up when workflow runs start writing phase records.</div>'
+      + '</section>'
   }
+  return '<section class="panel"><div class="panel-head">'
+    + '<span class="eyebrow">lifecycle</span>'
+    + '<span class="panel-note">' + esc(run.id || '') + '</span>'
+    + '<span class="panel-meta">' + lifecycleMeta(phases, run) + '</span></div>'
+    + '<div class="phases">'
+    + phases.map(function (p) {
+      return '<div class="phase' + (p.status === 'active' ? ' on' : '') + '">'
+        + '<div class="phase-top"><span class="sq ' + p.key + '"></span>'
+        + '<span class="count">' + p.num + '</span>'
+        + '<span class="count push">' + esc(p.elapsed) + '</span></div>'
+        + '<div class="phase-name' + (p.status === 'pending' ? ' fg-dimmer' : '') + '">' + esc(p.name) + '</div>'
+        + '<span class="bar"><span class="' + p.key + '" style="width:' + p.pct + '%"></span></span>'
+        + '<div class="ellip count">' + esc(p.artifact) + '</div></div>'
+    }).join('')
+    + '</div></section>'
+}
 
+// The three cross-links into the other views are plain anchors. A data-act would hand them to
+// the delegated click handler, which replaces the current history entry instead of pushing one,
+// and Back would then leave the dashboard rather than return to the overview. As anchors they
+// move the fragment, and the hashchange listener in main.mjs routes them.
+function vOverview() {
   const ms = roadmap().map(milestoneVm)
-  const roadmapBrief = '<section class="panel" style="grid-column:span 7">'
-    + '<div class="panel-head"><span class="eyebrow">roadmap</span><a href="#/roadmap" style="margin-left:auto;font-size:11.5px">open &#8594;</a></div>'
-    + (ms.length ? '<div style="display:flex;flex-direction:column;gap:8px">' + ms.map(function (m) {
-      return '<div class="tile" style="display:flex;align-items:center;gap:12px;padding:10px 12px">'
-        + '<span style="width:7px;height:7px;flex:0 0 auto;border-radius:50%;background:' + m.color + '"></span>'
-        + '<span class="sans ellip" style="flex:1 1 auto;min-width:0;font-size:13.5px">' + esc(m.title) + '</span>'
-        + '<span style="flex:0 0 auto;color:var(--dimmer);font-size:11px">' + m.done + '/' + m.total + '</span>'
-        + '<span class="bar" style="flex:0 0 96px;height:4px"><span style="height:4px;background:' + m.color + ';width:' + m.pct + '%"></span></span>'
-        + '<span style="flex:0 0 36px;text-align:right;font-size:11.5px">' + m.pct + '%</span></div>'
-    }).join('') + '</div>' : '<div class="empty">No roadmap data yet. Milestones appear when the track phase starts writing them.</div>')
+  const roadmapBrief = '<section class="panel"><div class="panel-head">'
+    + '<span class="eyebrow">roadmap</span>'
+    + '<a href="#/roadmap" class="panel-meta">open</a></div>'
+    + (ms.length ? ms.map(function (m) {
+      return '<div class="row tall">'
+        + '<span class="sq ' + m.key + '"></span>'
+        + '<span class="c-grow">' + esc(m.title) + '</span>'
+        + '<span class="w-count c-right count">' + m.done + '/' + m.total + '</span>'
+        + '<span class="bar w-bar"><span class="' + m.key + '" style="width:' + esc(m.pct) + '%"></span></span>'
+        + '<span class="w-pct c-right small fg-dim">' + esc(m.pct) + '%</span></div>'
+    }).join('')
+      : '<div class="empty">No roadmap data yet. Milestones appear when the track phase starts writing them.</div>')
     + '</section>'
 
-  const knowledgePanel = '<section class="panel" style="grid-column:span 5">'
-    + '<div class="panel-head"><span class="eyebrow">' + esc(root()) + '</span>'
-    + '<span style="margin-left:auto;color:var(--dimmer);font-size:11px">okf 0.2 bundle</span></div>'
-    + '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">'
+  const knowledgePanel = '<section class="panel"><div class="panel-head">'
+    + '<span class="eyebrow">' + esc(root()) + '</span>'
+    + '<span class="panel-note push">okf 0.2</span></div>'
     + counts().map(function (c) {
-      return '<div class="tile" style="padding:12px;display:flex;flex-direction:column;gap:2px">'
-        + '<span class="sans" style="font-size:24px;font-weight:600;letter-spacing:-.02em">' + c.n + '</span>'
-        + '<span style="color:var(--dim);font-size:11px">' + esc(c.label) + '</span></div>'
-    }).join('') + '</div></section>'
+      return '<div class="row tall">'
+        + '<span class="c-grow fg-dim">' + esc(c.label) + '</span>'
+        + '<span class="c num" style="font-weight:500">' + c.n + '</span></div>'
+    }).join('')
+    + '</section>'
 
   const recent = timelineStream().slice(0, 5)
-  const activityStrip = '<section class="panel" style="grid-column:span 12">'
-    + '<div class="panel-head"><span class="eyebrow">activity</span>'
-    + '<span style="color:var(--dimmer);font-size:11px">last ' + recent.length + ' of the merged stream</span>'
-    + '<a href="#/timeline" style="margin-left:auto;font-size:11.5px">timeline &#8594;</a></div>'
-    + (recent.length ? '<div style="display:flex;flex-direction:column;gap:2px">' + recent.map(timelineRow).join('') + '</div>'
+  const activityStrip = '<section class="panel span2"><div class="panel-head">'
+    + '<span class="eyebrow">activity</span>'
+    + '<span class="panel-note">last ' + recent.length + ' of the merged stream</span>'
+    + '<a href="#/timeline" class="panel-meta">timeline</a></div>'
+    + (recent.length ? recent.map(timelineRow).join('')
       : '<div class="empty">No activity in the snapshot yet: no recorded events and no commits.</div>')
     + '</section>'
 
   const commitList = commits()
-  const gitPanel = '<section class="panel" style="grid-column:span 7">'
-    + '<div class="panel-head"><span class="eyebrow">git history</span><a href="#/git" style="margin-left:auto;font-size:11.5px">full log &#8594;</a></div>'
-    + (commitList.length ? '<div style="display:flex;flex-direction:column;gap:2px">' + commitList.slice(0, 7).map(commitRow).join('') + '</div>'
+  const gitPanel = '<section class="panel"><div class="panel-head">'
+    + '<span class="eyebrow">git history</span>'
+    + '<a href="#/git" class="panel-meta">full log</a></div>'
+    + (commitList.length ? commitList.slice(0, 7).map(commitRow).join('')
       : '<div class="empty">No commits in the snapshot.</div>')
     + '</section>'
 
   const decisionList = decisions()
-  const decisionsPanel = '<section class="panel" style="grid-column:span 5">'
-    + '<div class="panel-head"><span class="eyebrow">decisions</span>'
-    + '<span style="margin-left:auto;color:var(--dimmer);font-size:11px">'
+  const decisionsPanel = '<section class="panel"><div class="panel-head">'
+    + '<span class="eyebrow">decisions</span>'
+    + '<span class="panel-note push">'
     + decisionList.filter(function (d) { return d.status !== 'open' }).length + ' closed &#183; '
     + decisionList.filter(function (d) { return d.status === 'open' }).length + ' open</span></div>'
-    + (decisionList.length ? '<div style="display:flex;flex-direction:column;gap:2px">' + decisionList.slice(0, 7).map(decisionRow).join('') + '</div>'
+    + (decisionList.length ? decisionList.slice(0, 7).map(decisionRow).join('')
       : '<div class="empty">No decision records in the bundle yet (OKF concepts with type: decision).</div>')
     + '</section>'
 
-  return bar + '<div style="display:flex;flex-direction:column;gap:14px">' + lifecycle
-    + '<div class="grid12">' + roadmapBrief + knowledgePanel + activityStrip + gitPanel + decisionsPanel + '</div></div>'
+  return lifecyclePanel()
+    + '<div class="grid2">' + roadmapBrief + knowledgePanel + activityStrip + gitPanel + decisionsPanel + '</div>'
 }
 
 /* == src/views/roadmap.mjs == */
-// Roadmap: overall progress plus one section per milestone with its tasks.
+// Roadmap: the overall progress header, then one table whose group rows are the milestones and
+// whose rows are their tasks.
 
 
 
 function vRoadmap() {
   const ms = roadmap().map(milestoneVm)
-  if (!ms.length) return '<section class="panel"><div class="empty">No roadmap data yet. This view fills in when the track phase starts writing milestones into the snapshot.</div></section>'
+
+  // The empty state carries no head, because column labels over no rows label nothing. This is
+  // the rule views/git.mjs states for its churn column.
+  if (!ms.length) {
+    return '<section class="panel">'
+      + '<div class="empty">No roadmap data yet. This view fills in when the track phase starts writing milestones into the snapshot.</div>'
+      + '</section>'
+  }
+
+  const thead = '<div class="thead">'
+    + '<span class="w-mark"></span>'
+    + '<span class="w-ref">ref</span>'
+    + '<span class="c-grow">task</span>'
+    + '<span class="w-owner">owner</span>'
+    + '<span class="w-status c-right">status</span></div>'
+
   const done = ms.filter(function (m) { return m.status === 'done' }).length
   const active = ms.filter(function (m) { return m.status === 'active' }).length
   const overall = Math.round(ms.reduce(function (a, m) { return a + m.pct }, 0) / ms.length)
-  const head = '<section class="panel" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">'
-    + '<div style="display:flex;flex-direction:column;gap:1px"><span class="eyebrow">overall</span>'
-    + '<span class="sans" style="font-size:26px;font-weight:600">' + overall + '%</span></div>'
-    + '<div class="bar" style="flex:1 1 240px;height:7px"><span style="height:7px;background:var(--accent);width:' + overall + '%"></span></div>'
-    + '<div style="display:flex;gap:8px">'
-    + '<span class="chip" style="padding:5px 12px;background:var(--ok-soft);color:var(--ok);font-size:11.5px">' + done + ' done</span>'
-    + '<span class="chip" style="padding:5px 12px;background:var(--accent-soft);color:var(--accent);font-size:11.5px">' + active + ' active</span>'
-    + '<span class="chip" style="padding:5px 12px;font-size:11.5px">' + (ms.length - done - active) + ' planned</span>'
+
+  const head = '<section class="panel"><div class="pad tools">'
+    + '<span class="eyebrow">overall</span>'
+    + '<span class="sans num" style="font-size:18px;font-weight:600">' + overall + '%</span>'
+    + '<span class="bar wide" style="flex:1 1 200px"><span style="width:' + overall + '%"></span></span>'
+    + '<span class="small fg-dim nowrap"><span class="fg-done">&#9632;</span> ' + done + ' done</span>'
+    + '<span class="small fg-dim nowrap"><span class="fg-active">&#9632;</span> ' + active + ' active</span>'
+    + '<span class="small fg-dim nowrap"><span class="fg-idle">&#9632;</span> ' + (ms.length - done - active) + ' planned</span>'
     + '</div></section>'
-  return head + ms.map(function (m) {
-    return '<section class="panel"><div class="panel-head">'
-      + '<span style="width:8px;height:8px;border-radius:50%;background:' + m.color + '"></span>'
-      + '<span class="sans" style="font-size:15px;font-weight:600">' + esc(m.title) + '</span>'
-      + '<span style="color:var(--dimmer);font-size:11.5px">' + esc(m.version) + '</span>'
-      + '<span class="chip" style="padding:2px 10px;color:' + m.color + ';letter-spacing:.08em;text-transform:uppercase">' + esc(m.status) + '</span>'
-      + '<span style="margin-left:auto;display:flex;align-items:center;gap:12px;color:var(--dim);font-size:11.5px">'
-      + '<span>' + m.done + '/' + m.total + ' tasks</span>'
-      + '<span class="bar" style="width:120px;height:4px;display:inline-block"><span style="height:4px;background:' + m.color + ';width:' + m.pct + '%"></span></span>'
-      + '<span style="width:36px;text-align:right;color:var(--text)">' + m.pct + '%</span></span></div>'
-      + '<div style="display:flex;flex-direction:column;gap:3px">'
+
+  const table = '<section class="panel">' + thead + ms.map(function (m) {
+    return '<div class="row group">'
+      + '<span class="sq ' + m.key + '"></span>'
+      + '<span class="c" style="font-weight:500">' + esc(m.title) + '</span>'
+      + '<span class="c count">' + esc(m.version) + '</span>'
+      + '<span class="push tools small fg-dim">'
+      + '<span class="num">' + m.done + '/' + m.total + '</span>'
+      + '<span class="bar w-bar"><span class="' + m.key + '" style="width:' + esc(m.pct) + '%"></span></span>'
+      + '<span class="w-pct c-right fg-text">' + esc(m.pct) + '%</span></span></div>'
       + m.tasks.map(function (t) {
-        const mark = t.status === 'done' ? '✓' : t.status === 'active' ? '▸' : '·'
-        const mc = t.status === 'done' ? 'var(--ok)' : t.status === 'active' ? 'var(--accent)' : 'var(--dimmer)'
-        return '<div class="tile" style="display:flex;align-items:center;gap:12px;padding:9px 12px">'
-          + '<span style="flex:0 0 14px;color:' + mc + ';font-size:12px">' + mark + '</span>'
-          + '<span class="chip">' + esc(t.ref || '') + '</span>'
-          + '<span style="flex:1 1 auto;min-width:0;color:' + (t.status === 'todo' ? 'var(--dim)' : 'var(--text)') + '">' + esc(t.title || '') + '</span>'
-          + '<span style="flex:0 0 auto;color:var(--dimmer);font-size:11px">' + esc(t.owner || '') + '</span></div>'
-      }).join('') + '</div></section>'
-  }).join('')
+        return '<div class="row wrap">'
+          + '<span class="w-mark small fg-' + t.key + '">' + t.mark + '</span>'
+          + '<span class="w-ref count">' + esc(t.ref) + '</span>'
+          + '<span class="c-wrap' + (t.status === 'todo' ? ' fg-dim' : '') + '">' + esc(t.title) + '</span>'
+          + '<span class="w-owner small fg-dim ellip">' + esc(t.owner) + '</span>'
+          + '<span class="w-status c-right status fg-' + t.key + '">' + esc(t.status) + '</span></div>'
+      }).join('')
+  }).join('') + '</section>'
+
+  return head + table
 }
 
 /* == src/views/git.mjs == */
-// Git: full commit window with text filter and conventional-kind segments.
+// Git: the full commit window, narrowed by a text filter and by conventional kind.
 
 
 
+
+const GIT_KINDS = ['all', 'feat', 'fix', 'docs', 'test', 'chore', 'refactor']
+
+// The churn column is dropped whole when no commit in the window carries diff stats, so the
+// head and the rows state the same columns rather than a label over nothing.
+function gitCommitRow(c, hasStat) {
+  return '<div class="row">'
+    + '<span class="w-sha fg-dim small">' + esc(c.sha) + '</span>'
+    + '<span class="w-kind small" style="color:' + c.kindColor + '">' + esc(c.kind) + '</span>'
+    + '<span class="c-grow">' + esc(c.subject) + '</span>'
+    + '<span class="w-author ellip fg-dim small">' + esc(c.author) + '</span>'
+    + (hasStat
+      ? '<span class="w-churn c-right num small"><span class="fg-done">+' + esc(c.add || 0) + '</span> '
+        + '<span class="fg-neg">&#8722;' + esc(c.del || 0) + '</span></span>'
+      : '')
+    + '<span class="w-when c-right count">' + esc(c.when) + '</span>'
+    + '</div>'
+}
 
 function vGit() {
   const q = S.query.trim().toLowerCase()
   const all = commits()
+  // The query runs over `fullSubject`, the line the repository wrote, while the cell shows the
+  // stripped one. A word that lives only in the prefix therefore still matches, so typing
+  // `release` finds `chore(release): manifests at 0.28.0`, whose cell prints the tail alone.
   const visible = all.filter(function (c) {
     return (S.filter === 'all' || c.kind === S.filter)
-      && (!q || (c.subject + ' ' + c.sha + ' ' + c.author).toLowerCase().indexOf(q) !== -1)
+      && (!q || (c.fullSubject + ' ' + c.sha + ' ' + c.author).toLowerCase().indexOf(q) !== -1)
   })
-  const kinds = ['all', 'feat', 'fix', 'docs', 'test', 'chore', 'refactor']
-  const bar = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:0 4px">'
-    + '<div class="pill" style="flex:0 0 300px;gap:9px"><span style="color:var(--dimmer)">&#9906;</span>'
-    + '<input id="git-q" type="text" placeholder="filter subject, sha, author" value="' + esc(S.query) + '" '
-    + 'style="flex:1 1 auto;min-width:0;border:0;outline:none;background:transparent;color:var(--text);font-family:inherit;font-size:12.5px"></div>'
-    + '<div class="seg">' + kinds.map(function (k) {
-      return '<button data-act="filter" data-v="' + k + '" class="' + (S.filter === k ? 'active' : '') + '">' + k + '</button>'
+
+  // Both returns below wrap the tools row and its table in one tight stack, so the row sits
+  // closer to the table than the gap the view leaves between blocks. dashboard.css owns both gaps.
+  //
+  // The input carries no listener of its own. main.mjs binds one after every render, which is
+  // what keeps it at exactly one listener per rendered element.
+  const tools = '<div class="stack tight"><div class="tools">'
+    + '<div class="filter"><span>filter</span>'
+    + '<input id="git-q" type="text" placeholder="subject, sha, author" value="' + esc(S.query) + '"></div>'
+    + '<div class="seg">' + GIT_KINDS.map(function (k) {
+      return '<button data-act="filter" data-v="' + k + '"'
+        + (S.filter === k ? ' class="active"' : '') + '>' + k + '</button>'
     }).join('') + '</div>'
-    + '<span style="margin-left:auto;color:var(--dim);font-size:11.5px">' + visible.length + ' of ' + all.length + ' commits</span></div>'
-  if (!all.length) return bar + '<section class="panel"><div class="empty">No commits in the snapshot.</div></section>'
+    + '<span class="push fg-dim small">' + visible.length + ' of ' + all.length + ' commits</span>'
+    + '</div>'
+
+  if (!all.length) {
+    return tools + '<section class="panel"><div class="empty">No commits in the snapshot.</div></section></div>'
+  }
+
   const hasStat = all.some(function (c) { return c.add != null })
-  return bar + '<section class="panel" style="padding:14px 14px 8px 14px">'
-    + '<div style="display:flex;gap:12px;padding:0 12px 10px 12px;color:var(--dim);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase">'
-    + '<span style="flex:0 0 78px">sha</span><span style="flex:0 0 58px">kind</span><span style="flex:1 1 auto">subject</span>'
-    + '<span style="flex:0 0 130px">author</span>' + (hasStat ? '<span style="flex:0 0 84px">files</span>' : '')
-    + '<span style="flex:0 0 84px">when</span></div>'
-    + '<div style="display:flex;flex-direction:column;gap:2px">'
-    + visible.map(function (c) {
-      return '<div class="row" style="gap:12px;padding:9px 12px">'
-        + '<span style="flex:0 0 78px"><span class="chip sha">' + esc(c.sha) + '</span></span>'
-        + '<span style="flex:0 0 58px;color:' + c.kindColor + ';font-size:11px">' + esc(c.kind) + '</span>'
-        + '<span class="ellip" style="flex:1 1 auto;min-width:0">' + esc(c.subject) + '</span>'
-        + '<span class="ellip" style="flex:0 0 130px;color:var(--dim);font-size:11.5px">' + esc(c.author) + '</span>'
-        + (hasStat ? '<span style="flex:0 0 84px;font-size:11px"><span style="color:var(--ok)">+' + (c.add || 0) + '</span> <span style="color:var(--stop)">&#8722;' + (c.del || 0) + '</span></span>' : '')
-        + '<span style="flex:0 0 84px;color:var(--dimmer);font-size:11px">' + esc(c.when) + '</span></div>'
-    }).join('') + '</div></section>'
+  return tools + '<section class="panel">'
+    + '<div class="thead">'
+    + '<span class="w-sha">sha</span>'
+    + '<span class="w-kind">kind</span>'
+    + '<span class="c-grow">subject</span>'
+    + '<span class="w-author">author</span>'
+    + (hasStat ? '<span class="w-churn c-right">churn</span>' : '')
+    + '<span class="w-when c-right">when</span>'
+    + '</div>'
+    + visible.map(function (c) { return gitCommitRow(c, hasStat) }).join('')
+    + '</section></div>'
 }
 
 /* == src/views/knowledge.mjs == */
-// Knowledge: bundle tree navigation plus the file viewer with frontmatter chips.
+// Knowledge: the bundle tree on the left, the selected file on the right.
 //
 // Bodies no longer travel in the listing (D43 point 4): each entry carries an opaque id and its
 // body is fetched from the server one file at a time. This view stays a pure string builder and
 // never fetches; main.mjs issues the request for whatever file is selected and parks the result
-// in S, so the four states below are just a read of that state.
+// in S, so the states below are just a read of that state.
 
 
 
 
-function treeBtn(f, i) {
-  const on = S.file === i
-  return '<button class="navbtn" data-act="file" data-v="' + i + '" style="border-radius:12px;padding:8px 10px;padding-left:28px;'
-    + (on ? 'background:var(--accent-soft);color:var(--accent)' : '') + '">'
-    + '<span style="color:var(--dimmer)">·</span>'
-    + '<span class="ellip" style="flex:1 1 auto;min-width:0">' + esc((f.path || '').split('/').pop()) + '</span>'
-    + '<span style="color:var(--dimmer);font-size:10.5px">' + esc((f.frontmatter && f.frontmatter.type) || f.type || '') + '</span></button>'
+// A group heading carries no data-act, so it is a row and not a control. The tree's buttons are
+// its files and nothing else.
+function kTreeDirRow(g) {
+  return '<div class="treebtn dir">'
+    + '<span class="c-grow">' + esc(g.label) + (g.dir === null ? '' : '/') + '</span>'
+    + '<span class="c count">' + g.entries.length + '</span>'
+    + '</div>'
 }
 
-// The body pane, in the four states a fetched body can be in. The empty state this replaces
-// said the body was "not embedded in the snapshot (over the window cap or metadata-only)",
-// which described a 32 KB per-file cap that D43 point 4 removed; there is no cap left to blame
-// and no reason left for a body to be missing other than a request that has not landed, has
-// failed, or an entry that carries no id to ask with.
+function kTreeFileRow(f, i) {
+  const type = (f.frontmatter && f.frontmatter.type) || f.type || ''
+  return '<button class="treebtn file' + (S.file === i ? ' active' : '') + '" data-act="file" data-v="' + i + '">'
+    + '<span class="c-grow">' + esc((f.path || '').split('/').pop()) + '</span>'
+    + '<span class="c count">' + esc(type) + '</span>'
+    + '</button>'
+}
+
+// The body pane renders whichever state the fetched body is in. A body is missing only because
+// the request has not landed, has failed, or because the entry carries no id to ask with.
 function bodyPane(af) {
   if (S.bodyStatus === 'noid') {
     return '<div class="empty">This entry carries no id, so its body cannot be fetched. '
@@ -1031,11 +1282,12 @@ function bodyPane(af) {
     return '<div class="empty">Loading the body of ' + esc(af.path || 'this file') + '.</div>'
   }
   if (S.bodyStatus === 'failed') {
-    return '<section class="panel" style="background:var(--tile);box-shadow:none">'
-      + '<div class="panel-head"><span class="eyebrow">body unavailable</span>'
-      + '<button class="btn" data-act="bodyretry" style="margin-left:auto">retry</button></div>'
-      + '<div style="color:var(--dim);font-size:12px;line-height:1.7;word-break:break-word">'
-      + esc(S.bodyError || 'the request failed and the server said nothing about why') + '</div></section>'
+    return '<div class="banner">'
+      + '<span class="eyebrow fg-neg">body unavailable</span>'
+      + '<span class="msg fg-dim small">'
+      + esc(S.bodyError || 'the request failed and the server said nothing about why') + '</span>'
+      + '<button class="btn" data-act="bodyretry">retry</button>'
+      + '</div>'
   }
   if (S.bodyStatus === 'ready') {
     if (S.bodyText === '') return '<div class="empty">This file has no body: frontmatter only.</div>'
@@ -1048,47 +1300,49 @@ function vKnowledge() {
   const list = files()
   if (!list.length) return '<section class="panel"><div class="empty">The knowledge bundle is empty.</div></section>'
   const af = list[S.file] || list[0]
+
   // One button per entry of knowledge.files[], and never more or fewer: the groups are the
   // partition data.mjs derives, so the tree and the rail's count state the same number by
   // construction. Group headings and their order are explained at deriveGroups; a heading is
-  // escaped because a directory name is data from the served bundle, not a literal from here.
-  //
-  // Gone with the fixed area list: the branch that rendered an entry whose basename is index.md
-  // unindented at the top of the tree. index.md is the bundle index, not a concept, and the
-  // server's concept walk skips it at every depth, so no listing the server produces can contain
-  // one; the page is served by that server and always reflects it, so no older artifact can
-  // reach this code either. Keeping the branch would also break the invariant above, since an
-  // entry it matched would get that button plus its group's button.
+  // escaped because a directory name is data from the served bundle.
   let tree = ''
   groups().forEach(function (g) {
-    tree += '<div style="display:flex;align-items:center;gap:9px;padding:8px 10px;color:var(--dim);font-size:12.5px">'
-      + '<span style="color:var(--dimmer)">&#9656;</span><span>' + esc(g.label) + (g.dir === null ? '' : '/') + '</span>'
-      + '<span style="margin-left:auto;color:var(--dimmer);font-size:10.5px">' + g.entries.length + '</span></div>'
-    g.entries.forEach(function (e) { tree += treeBtn(e.file, e.index) })
+    tree += kTreeDirRow(g)
+    g.entries.forEach(function (e) { tree += kTreeFileRow(e.file, e.index) })
   })
+
   const fm = af.frontmatter || {}
   const fmRows = Object.keys(fm).map(function (k) {
     const v = fm[k]
-    return '<div class="tile" style="display:flex;gap:10px;padding:8px 12px;border-radius:12px">'
-      + '<span style="flex:0 0 auto;color:var(--dim);font-size:11.5px">' + esc(k) + '</span>'
-      + '<span style="flex:1 1 auto;min-width:0;font-size:12px;word-break:break-word;text-align:right">' + esc(typeof v === 'object' ? JSON.stringify(v) : v) + '</span></div>'
+    return '<div class="row kv">'
+      + '<span class="w-fmkey fg-dim small">' + esc(k) + '</span>'
+      + '<span class="c-wrap">' + esc(typeof v === 'object' ? JSON.stringify(v) : v) + '</span>'
+      + '</div>'
   }).join('')
-  return '<div style="display:grid;grid-template-columns:minmax(240px,300px) minmax(0,1fr);gap:14px;align-items:start">'
-    + '<section class="panel" style="padding:14px"><div class="panel-head" style="padding:2px 8px 12px 8px">'
+
+  const type = fm.type || af.type || ''
+  return '<div class="gridk">'
+    + '<section class="panel">'
+    + '<div class="panel-head short">'
     + '<span class="eyebrow">' + esc(root()) + '</span>'
-    + '<span class="chip" style="margin-left:auto">okf 0.2</span></div>'
-    + '<div style="display:flex;flex-direction:column;gap:2px">' + tree + '</div></section>'
-    + '<section class="panel" style="min-width:0"><div class="panel-head">'
-    + '<span class="sans ellip" style="font-size:14.5px;font-weight:600;min-width:0">' + esc(af.path || '') + '</span>'
-    + (fm.type || af.type ? '<span class="chip" style="background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent)">' + esc(fm.type || af.type) + '</span>' : '')
-    + '<span style="margin-left:auto;color:var(--dimmer);font-size:11px;white-space:nowrap">' + esc(af.size || '') + (af.updated ? ' &#183; ' + rel(af.updated) : '') + '</span></div>'
-    + (fmRows ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px;padding-bottom:14px">' + fmRows + '</div>' : '')
+    + '<span class="panel-note">okf 0.2</span>'
+    + '<span class="panel-meta">' + list.length + ' file' + (list.length === 1 ? '' : 's') + '</span>'
+    + '</div>' + tree + '</section>'
+    + '<section class="panel">'
+    + '<div class="panel-head">'
+    + '<span class="c-grow">' + esc(af.path || '') + '</span>'
+    + (type ? '<span class="c status fg-dim">' + esc(type) + '</span>' : '')
+    + '<span class="panel-meta count">' + esc(af.size || '')
+    + (af.updated ? ' &#183; ' + esc(rel(af.updated)) : '') + '</span>'
+    + '</div>'
+    + fmRows
     + bodyPane(af)
-    + '</section></div>'
+    + '</section>'
+    + '</div>'
 }
 
 /* == src/views/config.mjs == */
-// Config: sectioned key/value tables or the raw JSON, straight from the served snapshot.
+// Config: the served configuration as one sectioned key/value table, or as the raw JSON.
 
 
 
@@ -1099,34 +1353,58 @@ function fmtV(v) {
   return v === '' ? '(empty)' : String(v)
 }
 
+function cfgLeafRow(k, v) {
+  return '<div class="row wrap">'
+    + '<span class="w-key fg-dim small">' + esc(k) + '</span>'
+    + '<span class="c-wrap' + (v === '(empty)' ? ' fg-dimmer' : '') + '">' + esc(v) + '</span>'
+    + '</div>'
+}
+
+// One top-level config key renders as one section. An object or an array opens a header row and
+// lists its members under it; a scalar states its value on the header row itself, so no key is
+// written twice.
+function cfgSection(key, v) {
+  const head = '<div class="row group"><span class="w-key eyebrow">' + esc(key) + '</span>'
+  if (Array.isArray(v)) {
+    return head + '</div>' + (v.length
+      ? v.map(function (x, i) { return cfgLeafRow('[' + i + ']', fmtV(x)) }).join('')
+      : cfgLeafRow('[ ]', '(empty)'))
+  }
+  if (typeof v === 'object' && v !== null) {
+    return head + '</div>' + Object.keys(v).map(function (k) { return cfgLeafRow(k, fmtV(v[k])) }).join('')
+  }
+  return head + '<span class="c-wrap">' + esc(fmtV(v)) + '</span></div>'
+}
+
 function vConfig() {
   const config = cfg()
-  const bar = '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:0 4px">'
+  // Every return below wraps the tools row and its table in one tight stack, for the reason
+  // views/git.mjs gives.
+  const tools = '<div class="stack tight"><div class="tools">'
     + '<div class="seg">'
-    + '<button data-act="cfgmode" data-v="table" class="' + (S.configMode === 'table' ? 'active' : '') + '">table</button>'
-    + '<button data-act="cfgmode" data-v="raw" class="' + (S.configMode === 'raw' ? 'active' : '') + '">raw json</button></div>'
-    + '<span style="color:var(--dim);font-size:11.5px">.claude/major-tom.json &#183; schemaVersion ' + esc(config.schemaVersion != null ? config.schemaVersion : '?') + '</span>'
-    + '<span class="chip" style="margin-left:auto;display:flex;align-items:center;gap:8px;padding:5px 12px;background:var(--ok-soft);color:var(--ok);font-size:11.5px"><span class="dot"></span>validated at onboard</span></div>'
+    + '<button data-act="cfgmode" data-v="table"' + (S.configMode === 'table' ? ' class="active"' : '') + '>table</button>'
+    + '<button data-act="cfgmode" data-v="raw"' + (S.configMode === 'raw' ? ' class="active"' : '') + '>raw json</button>'
+    + '</div>'
+    + '<span class="fg-dim small">.claude/major-tom.json &#183; schemaVersion '
+    + esc(config.schemaVersion != null ? config.schemaVersion : '?') + '</span>'
+    + '<span class="push sq done"></span><span class="fg-dim small">validated at onboard</span>'
+    + '</div>'
+
   if (S.configMode === 'raw') {
-    return bar + '<section class="panel"><div class="panel-head"><span class="eyebrow">raw</span></div>'
-      + '<pre class="body" style="white-space:pre;overflow:auto">' + esc(JSON.stringify(config, null, 2)) + '</pre></section>'
+    return tools + '<section class="panel">'
+      + '<div class="panel-head short"><span class="eyebrow">raw</span></div>'
+      + '<pre class="body raw">' + esc(JSON.stringify(config, null, 2)) + '</pre>'
+      + '</section></div>'
   }
-  const sections = Object.keys(config).map(function (key) {
-    const v = config[key]
-    let rows
-    if (Array.isArray(v)) rows = v.length ? v.map(function (x, i) { return { k: '[' + i + ']', v: fmtV(x) } }) : [{ k: '[ ]', v: '(empty)' }]
-    else if (typeof v === 'object' && v !== null) rows = Object.keys(v).map(function (k) { return { k: k, v: fmtV(v[k]) } })
-    else rows = [{ k: key, v: fmtV(v) }]
-    return '<section class="panel"><div class="panel-head">'
-      + '<span class="sans" style="font-size:14px;font-weight:600">' + esc(key) + '</span></div>'
-      + '<div style="display:flex;flex-direction:column;gap:2px">'
-      + rows.map(function (r) {
-        return '<div class="tile" style="display:flex;gap:12px;padding:8px 12px;border-radius:12px">'
-          + '<span style="flex:0 0 160px;color:var(--dim);font-size:11.5px;word-break:break-word">' + esc(r.k) + '</span>'
-          + '<span style="flex:1 1 auto;min-width:0;color:' + (r.v === '(empty)' ? 'var(--dimmer)' : 'var(--text)') + ';word-break:break-word">' + esc(r.v) + '</span></div>'
-      }).join('') + '</div></section>'
-  }).join('')
-  return bar + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px;align-items:start">' + sections + '</div>'
+
+  const keys = Object.keys(config)
+  if (!keys.length) {
+    return tools + '<section class="panel"><div class="empty">No configuration in the snapshot.</div></section></div>'
+  }
+  return tools + '<section class="panel">'
+    + '<div class="thead"><span class="w-key">key</span><span class="c-grow">value</span></div>'
+    + keys.map(function (key) { return cfgSection(key, config[key]) }).join('')
+    + '</section></div>'
 }
 
 /* == src/main.mjs == */
@@ -1158,52 +1436,61 @@ const VIEW_FN = { overview: vOverview, roadmap: vRoadmap, timeline: vTimeline, g
 
 function renderRail() {
   const config = cfg()
+  const version = config.onboard && config.onboard.pluginVersion ? 'v' + config.onboard.pluginVersion : ''
   const items = [
-    ['overview', '◈', ''], ['roadmap', '⌗', roadmap().length || ''], ['timeline', '⧖', timelineStream().length || ''],
+    ['overview', '■', ''], ['roadmap', '≡', roadmap().length || ''], ['timeline', '⧖', timelineStream().length || ''],
     ['git', '⎇', commits().length || ''], ['knowledge', '▤', files().length || ''],
     ['config', '{ }', Object.keys(config).length || '']
   ]
   document.getElementById('rail').innerHTML =
-    '<div class="brand"><div class="brand-badge">MT</div>'
-    + '<div class="rail-label" style="display:flex;flex-direction:column">'
-    + '<span class="sans" style="font-size:14px;font-weight:600;letter-spacing:-.01em">Major Tom</span>'
-    + '<span style="font-size:10.5px;color:var(--dimmer)">' + esc(config.onboard && config.onboard.pluginVersion ? 'v' + config.onboard.pluginVersion : '') + '</span></div></div>'
+    '<div class="brand"><span class="brand-badge">MT</span>'
+    + '<span class="brand-name rail-label">major tom</span>'
+    + (version ? '<span class="count rail-label">' + esc(version) + '</span>' : '')
+    + '</div><div class="rail-nav">'
     + items.map(function (it) {
       return '<button class="navbtn ' + (S.view === it[0] ? 'active' : '') + '" data-act="view" data-v="' + it[0] + '" title="' + it[0] + '">'
         + '<span class="glyph">' + it[1] + '</span><span class="rail-label">' + it[0] + '</span>'
         + (it[2] !== '' ? '<span class="count rail-label">' + it[2] + '</span>' : '') + '</button>'
     }).join('')
-    + '<div style="margin-top:auto;display:flex;flex-direction:column;gap:6px">'
-    + '<button class="navbtn" data-act="theme" title="Theme"><span style="flex:0 0 22px;text-align:center">' + (S.theme === 'light' ? '◑' : '◐') + '</span><span class="rail-label">' + S.theme + '</span></button>'
-    + '<button class="navbtn" data-act="rail" title="Collapse"><span style="flex:0 0 22px;text-align:center">' + (S.rail ? '«' : '»') + '</span><span class="rail-label">collapse</span></button>'
+    + '</div><div class="rail-foot">'
+    + '<button class="navbtn" data-act="theme" title="Theme"><span class="glyph">' + (S.theme === 'light' ? '◑' : '◐') + '</span><span class="rail-label">' + S.theme + '</span></button>'
+    + '<button class="navbtn" data-act="rail" title="Collapse"><span class="glyph">' + (S.rail ? '«' : '»') + '</span><span class="rail-label">collapse</span></button>'
     + '</div>'
 }
 
 // The time of the last computation, which is what generatedAt now means: the server stamps it
 // when it computes, and it moves on every refresh instead of being frozen at onboard time.
-function pillTime() {
+function computedTime() {
   const at = generatedAt()
   if (!at) return 'n/a'
   const hm = clock(at)
   return hm ? hm + ' (' + rel(at) + ')' : String(at)
 }
 
-function pillLabel() {
-  if (S.busy) return S.hasData ? 'recomputing, last ' + pillTime() : 'computing'
-  if (S.status === 'failed') return S.hasData ? 'stale, last computed ' + pillTime() : 'not computed'
-  return 'computed ' + pillTime()
+function statusLabel() {
+  if (S.busy) return S.hasData ? 'recomputing, last ' + computedTime() : 'computing'
+  if (S.status === 'failed') return S.hasData ? 'stale, last computed ' + computedTime() : 'not computed'
+  return 'computed ' + computedTime()
 }
 
-// The window control of D45, in the header beside the computed-at pill and the refresh control
-// and deliberately not inside a view. The window cuts two of the six views, the timeline and
+// The square states the colour and the motion separately, because they answer different
+// questions. The colour is where the page stands and the pulse is whether a request is in the
+// air, so a retry over a failed page pulses in the failure colour instead of hiding it.
+function statusSquare() {
+  const colour = S.status === 'failed' ? 'neg' : S.busy ? 'active' : 'done'
+  return S.busy ? colour + ' busy' : colour
+}
+
+// The window control of D45, a header cell beside the status cell and the refresh control and
+// deliberately not inside a view. The window cuts two of the six views, the timeline and
 // git, so it belongs where the page's global state already lives and where a reader on any view
 // can see which window is in force. Inside one of those two views it would read as that view's
 // own setting, which is precisely the reading D42 and D45 point 4 exist to prevent: one window
 // cuts both streams, and a control that looked like the timeline's would suggest the git side
 // has another.
 //
-// The affordance: two fields and an explicit apply, not fields that fetch as they change. A
-// reader typing a window one character at a time passes through "3", "36" and "365", and each
+// The control is two fields and an explicit apply, and the fields do not fetch as they change.
+// A reader typing a window one character at a time passes through "3", "36" and "365", and each
 // of those is a different window a live field would go and fetch, so two requests nobody asked
 // for would land before the one that was meant, and the first of them would come back refused.
 // Debouncing would only make that wrong answer arrive later. The submit removes the whole class
@@ -1228,18 +1515,19 @@ function windowHtml() {
       + ' aria-label="' + label + '" title="' + label + '" placeholder="' + label + '"'
       + ' value="' + esc(d[key]) + '">'
   }
-  return '<span class="pill" title="The window the timeline and the git streams are both read over">'
-    + '<span style="color:var(--dimmer)">window</span>'
-    + field('win-days', 'days', 'days') + '<span style="color:var(--dimmer)">d</span>'
-    + field('win-limit', 'limit', 'limit') + '<span style="color:var(--dimmer)">events</span>'
-    + '<button class="pill-btn" data-act="window" title="Apply this window to both streams"'
+  return '<span class="cell" title="The window the timeline and the git streams are both read over">'
+    + '<span class="fg-dimmer">window</span>'
+    + field('win-days', 'days', 'days') + '<span class="fg-dimmer">d</span>'
+    + field('win-limit', 'limit', 'limit') + '<span class="fg-dimmer">events</span>'
+    + '<button class="btn" data-act="window" title="Apply this window to both streams"'
     + (S.busy ? ' disabled' : '') + '>' + (S.windowBusy ? 'applying' : 'apply') + '</button></span>'
 }
 
-// A refused window, stated at the control that sent it. This is a correction and it is built to
-// read as one: it names what was refused, repeats the server's own sentence, and says that the
-// page did not move, which is the fact that separates it from every state below. It carries no
-// retry, because the correction is the retry: fix the number and apply again.
+// A refused window is stated in a full-width strip under the header the control sits in. This is
+// a correction and it is built to read as one: it names what was refused, repeats the server's
+// own sentence, and says that the page did not move, which is the fact that separates it from
+// every state below. It carries no retry, because fixing the number and applying again is the
+// retry. The strip spans the page so the server's sentence wraps instead of stretching the header.
 //
 // The window it states as still showing is read from the snapshot on screen, not from the
 // fields, which are holding the value that was just refused. The two disagree at exactly this
@@ -1251,44 +1539,45 @@ function windowErrorHtml() {
     ? 'Still showing the last window that was accepted: ' + esc(String(w.days)) + ' days, '
       + esc(String(w.ceilingEvents)) + ' events.'
     : 'The window on screen did not change.'
-  return '<span class="pill" style="flex:1 1 100%;white-space:normal;align-items:flex-start;'
-    + 'border-color:var(--accent-line)">'
-    + '<span class="chip" style="flex:0 0 auto;color:var(--stop)">window refused</span>'
-    + '<span style="flex:1 1 auto;min-width:0;color:var(--stop);word-break:break-word">'
-    + esc(S.windowError) + '</span>'
-    + '<span style="flex:0 0 auto;color:var(--dimmer)">' + showing + '</span></span>'
+  return '<div class="strip">'
+    + '<span class="strip-label">window refused</span>'
+    + '<span class="msg fg-neg">' + esc(S.windowError) + '</span>'
+    + '<span class="fg-dimmer">' + showing + '</span></div>'
 }
 
-// The header pill of D43 point 5: the time of the last computation with the refresh control
-// beside it, in the pill that used to read "snapshot <generatedAt>". Refresh is the same
+// The header status cell of D43 point 5: the time of the last computation, the square that
+// states what the page is doing, and the refresh control beside them. Refresh is the same
 // GET /api/snapshot issued again, because the server keeps no cache and has no recompute verb.
 // While a request is in flight the control says so and is disabled; loadSnapshot refuses a
 // second one anyway, so two clicks can never put two requests in the air.
+//
+// The cells run left to right in widening scope: what the project is, how it is worked, the
+// window it is read over, and the state of the reading.
 function headerHtml() {
   const config = cfg()
   const p = config.project || {}
   const ex = config.execution || {}
-  const teamPill = ex.workingModel === 'team' && ex.team
+  const teamCell = ex.workingModel === 'team' && ex.team
     ? 'team &#183; ' + ((ex.team.members || []).length) + ' + coordinator'
     : esc(ex.workingModel || '')
-  return '<header class="top"><div style="display:flex;flex-direction:column;gap:2px;min-width:0">'
+  return '<header class="top">'
     + '<h1 class="sans">' + esc(S.view) + '</h1>'
-    + '<span style="color:var(--dim);font-size:12px">' + esc(subtitles()[S.view]) + '</span></div>'
-    + '<div style="display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap">'
-    + '<span class="pill"><span class="dot' + (S.busy ? ' pulse' : '') + '"' + (S.status === 'failed' ? ' style="background:var(--stop)"' : '') + '></span>'
-    + esc(pillLabel())
-    + '<button class="pill-btn" data-act="refresh" title="Recompute the snapshot on the server"'
-    + (S.busy ? ' disabled' : '') + '>' + (S.busy ? 'working' : 'refresh') + '</button></span>'
+    + '<span class="top-sep">/</span>'
+    + '<span class="top-sub">' + esc(subtitles()[S.view]) + '</span>'
+    + '<div class="top-cells">'
+    + (p.name ? '<span class="cell">' + esc(p.name) + (p.topology ? ' &#183; ' + esc(p.topology) : '') + '</span>' : '')
+    + (teamCell ? '<span class="cell">' + teamCell + '</span>' : '')
     + windowHtml()
-    + (p.name ? '<span class="pill">' + esc(p.name) + (p.topology ? ' &#183; ' + esc(p.topology) : '') + '</span>' : '')
-    + (teamPill ? '<span class="pill accent">' + teamPill + '</span>' : '')
-    + windowErrorHtml()
+    + '<span class="cell"><span class="sq ' + statusSquare() + '"></span>'
+    + esc(statusLabel())
+    + '<button class="btn" data-act="refresh" title="Recompute the snapshot on the server"'
+    + (S.busy ? ' disabled' : '') + '>' + (S.busy ? 'working' : 'refresh') + '</button></span>'
     + '</div></header>'
 }
 
 function loadingPanel() {
   return '<section class="panel"><div class="panel-head"><span class="eyebrow">loading</span>'
-    + '<span class="dot pulse" style="margin-left:auto"></span></div>'
+    + '<span class="sq active busy push"></span></div>'
     + '<div class="empty">Computing the snapshot on the server and fetching it.</div></section>'
 }
 
@@ -1297,15 +1586,15 @@ function loadingPanel() {
 // gets: there is no island behind this page and no stale copy to show instead.
 function errorPanel() {
   return '<section class="panel"><div class="panel-head"><span class="eyebrow">no data</span>'
-    + '<span class="chip" style="color:var(--stop)">' + esc(S.errorRoute || 'the request') + ' failed</span></div>'
-    + '<div style="padding:2px 2px 12px 2px;font-size:13px;line-height:1.7">'
+    + '<span class="panel-meta fg-neg">' + esc(S.errorRoute || 'the request') + ' failed</span></div>'
+    + '<div class="pad prose">'
     + 'The dashboard could not load its data, so there is nothing to show. This page carries no '
     + 'embedded copy to fall back on: the server computes the data on every request.</div>'
-    + '<div class="tile" style="padding:14px 16px;color:var(--stop);font-size:12.5px;line-height:1.7;word-break:break-word">'
+    + '<div class="pad quote sep">'
     + esc(S.error || 'the request failed and said nothing about why') + '</div>'
-    + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-top:14px">'
+    + '<div class="pad tools sep">'
     + '<button class="btn" data-act="refresh"' + (S.busy ? ' disabled' : '') + '>' + (S.busy ? 'retrying' : 'retry') + '</button>'
-    + '<span style="color:var(--dimmer);font-size:11.5px">If the server is not running, start it with /major-tom:dashboard.</span>'
+    + '<span class="fg-dimmer small">If the server is not running, start it with /major-tom:dashboard.</span>'
     + '</div></section>'
 }
 
@@ -1313,10 +1602,10 @@ function errorPanel() {
 // view because a later request failed would destroy information the user still has. The
 // failure is stated above the view it did not manage to replace.
 function errorBanner() {
-  return '<section class="panel" style="border-color:var(--accent-line);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
-    + '<span class="chip" style="color:var(--stop)">' + esc(S.errorRoute || 'the request') + ' failed</span>'
-    + '<span style="flex:1 1 220px;min-width:0;color:var(--dim);font-size:12px;word-break:break-word">' + esc(S.error) + '</span>'
-    + '<span style="color:var(--dimmer);font-size:11.5px">Showing the last snapshot that loaded.</span>'
+  return '<section class="panel banner">'
+    + '<span class="fg-neg small">' + esc(S.errorRoute || 'the request') + ' failed</span>'
+    + '<span class="msg fg-dim small">' + esc(S.error) + '</span>'
+    + '<span class="fg-dimmer small">Showing the last snapshot that loaded.</span>'
     + '<button class="btn" data-act="refresh"' + (S.busy ? ' disabled' : '') + '>' + (S.busy ? 'retrying' : 'retry') + '</button></section>'
 }
 
@@ -1401,8 +1690,11 @@ function bindWindowFields() {
   bind('win-limit', 'limit')
 }
 
+// The main area is a fixed header, the refusal strip when there is one, and the scrolling body
+// the view is rendered into.
 function renderMain() {
-  document.getElementById('main').innerHTML = headerHtml() + mainBody()
+  document.getElementById('main').innerHTML =
+    headerHtml() + windowErrorHtml() + '<div class="view">' + mainBody() + '</div>'
   bindWindowFields()
   const q = document.getElementById('git-q')
   if (q) {
@@ -1514,7 +1806,6 @@ document.addEventListener('click', function (e) {
   const act = btn.getAttribute('data-act')
   const v = btn.getAttribute('data-v')
   if (act === 'view') { S.view = v; history.replaceState(null, '', '#/' + v); render() }
-  else if (act === 'layout') { S.layout = v; renderMain() }
   else if (act === 'filter') { S.filter = v; renderMain() }
   else if (act === 'file') { S.file = Number(v); renderMain() }
   else if (act === 'cfgmode') { S.configMode = v; renderMain() }

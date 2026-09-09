@@ -1,6 +1,6 @@
-// Shared fragments: escaping, status colors, reusable row and card builders.
+// Shared fragments: escaping, the status mapping, and the rows more than one view builds.
 
-import { lastRun } from './data.mjs'
+import { day, lastRun } from './data.mjs'
 
 export function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -8,48 +8,63 @@ export function esc(s) {
   })
 }
 
-export function statusColor(st) {
-  return st === 'done' ? 'var(--ok)' : st === 'active' ? 'var(--accent)' : 'var(--line2)'
+// Every status word collapses to one of three states, and the word this returns is both the
+// token name and the class stem: `sq done`, `fg-active`, a bar fill of `idle`.
+function uiStatusKey(st) {
+  return st === 'done' ? 'done' : st === 'active' ? 'active' : 'idle'
 }
 
+// The overview's git brief renders one commit per row. The full log has its own row in
+// views/git.mjs.
 export function commitRow(c) {
   return '<div class="row">'
-    + '<span class="chip sha">' + esc(c.sha) + '</span>'
-    + '<span style="flex:0 0 58px;color:' + c.kindColor + ';font-size:11px">' + esc(c.kind) + '</span>'
-    + '<span class="ellip" style="flex:1 1 auto;min-width:0">' + esc(c.subject) + '</span>'
-    + '<span style="flex:0 0 auto;color:var(--dimmer);font-size:11px">' + esc(c.when) + '</span>'
+    + '<span class="w-sha fg-dim small">' + esc(c.sha) + '</span>'
+    + '<span class="w-kind fg-dimmer small">' + esc(c.kind) + '</span>'
+    + '<span class="c-grow">' + esc(c.subject) + '</span>'
+    + '<span class="w-when c-right count">' + esc(c.when) + '</span>'
     + '</div>'
 }
 
+// `mark` is already an HTML entity, so a view writes it without escaping it.
 export function milestoneVm(m) {
   const tasks = Array.isArray(m.tasks) ? m.tasks : []
   const done = tasks.filter(function (t) { return t.status === 'done' }).length
   return {
     title: m.title || '', version: m.version || '', status: m.status || 'planned',
     pct: m.pct != null ? m.pct : (tasks.length ? Math.round(done / tasks.length * 100) : 0),
-    color: statusColor(m.status), done: done, total: tasks.length, tasks: tasks
+    key: uiStatusKey(m.status), done: done, total: tasks.length,
+    tasks: tasks.map(function (t) {
+      const st = t.status || 'todo'
+      return {
+        ref: t.ref || '', title: t.title || '', owner: t.owner || '', status: st,
+        key: uiStatusKey(st),
+        mark: st === 'done' ? '&#10003;' : st === 'active' ? '&#9656;' : '&#183;'
+      }
+    })
   }
 }
 
 export function decisionRow(d) {
   const open = d.status === 'open'
   return '<div class="row">'
-    + '<span class="chip" style="' + (open ? 'border:1px solid var(--line2);color:var(--warn)' : 'background:var(--ok-soft);color:var(--ok)') + '">' + esc(d.id) + '</span>'
-    + '<span class="ellip" style="flex:1 1 auto;min-width:0;color:' + (open ? 'var(--text)' : 'var(--dim)') + '">' + esc(d.text) + '</span>'
-    + '<span style="flex:0 0 auto;color:var(--dimmer);font-size:11px">' + esc(open ? 'open' : (d.date || '')) + '</span>'
+    + '<span class="w-ref small ellip ' + (open ? 'fg-active' : 'fg-done') + '" title="' + esc(d.id) + '">' + esc(d.id) + '</span>'
+    + '<span class="c-grow' + (open ? '' : ' fg-dim') + '">' + esc(d.text) + '</span>'
+    + '<span class="c c-right count">' + esc(open ? 'open' : day(d.date)) + '</span>'
     + '</div>'
 }
 
+// phaseVms returns one view model per phase of the last run, and null when no run was recorded.
+// `pct` fills the phase bar, and only a finished phase has a measured one, so an unfinished
+// phase reads 0.
 export function phaseVms() {
   const run = lastRun()
   if (!run || !Array.isArray(run.phases)) return null
   return run.phases.map(function (p, i) {
     const st = p.status || 'pending'
     return {
-      num: String(i + 1).padStart(2, '0'), name: p.name || '', artifact: p.artifact || '', status: st,
-      elapsed: p.elapsed || '', color: statusColor(st === 'pending' ? 'planned' : st),
-      pct: st === 'done' ? 100 : st === 'active' ? 55 : 0,
-      labelColor: st === 'pending' ? 'var(--dimmer)' : 'var(--text)'
+      num: String(i + 1).padStart(2, '0'), name: p.name || '', artifact: p.artifact || '',
+      status: st, elapsed: p.elapsed || '', key: uiStatusKey(st),
+      pct: st === 'done' ? 100 : 0
     }
   })
 }

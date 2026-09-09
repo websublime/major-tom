@@ -1,4 +1,4 @@
-// Config: sectioned key/value tables or the raw JSON, straight from the served snapshot.
+// Config: the served configuration as one sectioned key/value table, or as the raw JSON.
 
 import { cfg } from '../data.mjs'
 import { S } from '../state.mjs'
@@ -10,32 +10,56 @@ function fmtV(v) {
   return v === '' ? '(empty)' : String(v)
 }
 
+function cfgLeafRow(k, v) {
+  return '<div class="row wrap">'
+    + '<span class="w-key fg-dim small">' + esc(k) + '</span>'
+    + '<span class="c-wrap' + (v === '(empty)' ? ' fg-dimmer' : '') + '">' + esc(v) + '</span>'
+    + '</div>'
+}
+
+// One top-level config key renders as one section. An object or an array opens a header row and
+// lists its members under it; a scalar states its value on the header row itself, so no key is
+// written twice.
+function cfgSection(key, v) {
+  const head = '<div class="row group"><span class="w-key eyebrow">' + esc(key) + '</span>'
+  if (Array.isArray(v)) {
+    return head + '</div>' + (v.length
+      ? v.map(function (x, i) { return cfgLeafRow('[' + i + ']', fmtV(x)) }).join('')
+      : cfgLeafRow('[ ]', '(empty)'))
+  }
+  if (typeof v === 'object' && v !== null) {
+    return head + '</div>' + Object.keys(v).map(function (k) { return cfgLeafRow(k, fmtV(v[k])) }).join('')
+  }
+  return head + '<span class="c-wrap">' + esc(fmtV(v)) + '</span></div>'
+}
+
 export function vConfig() {
   const config = cfg()
-  const bar = '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:0 4px">'
+  // Every return below wraps the tools row and its table in one tight stack, for the reason
+  // views/git.mjs gives.
+  const tools = '<div class="stack tight"><div class="tools">'
     + '<div class="seg">'
-    + '<button data-act="cfgmode" data-v="table" class="' + (S.configMode === 'table' ? 'active' : '') + '">table</button>'
-    + '<button data-act="cfgmode" data-v="raw" class="' + (S.configMode === 'raw' ? 'active' : '') + '">raw json</button></div>'
-    + '<span style="color:var(--dim);font-size:11.5px">.claude/major-tom.json &#183; schemaVersion ' + esc(config.schemaVersion != null ? config.schemaVersion : '?') + '</span>'
-    + '<span class="chip" style="margin-left:auto;display:flex;align-items:center;gap:8px;padding:5px 12px;background:var(--ok-soft);color:var(--ok);font-size:11.5px"><span class="dot"></span>validated at onboard</span></div>'
+    + '<button data-act="cfgmode" data-v="table"' + (S.configMode === 'table' ? ' class="active"' : '') + '>table</button>'
+    + '<button data-act="cfgmode" data-v="raw"' + (S.configMode === 'raw' ? ' class="active"' : '') + '>raw json</button>'
+    + '</div>'
+    + '<span class="fg-dim small">.claude/major-tom.json &#183; schemaVersion '
+    + esc(config.schemaVersion != null ? config.schemaVersion : '?') + '</span>'
+    + '<span class="push sq done"></span><span class="fg-dim small">validated at onboard</span>'
+    + '</div>'
+
   if (S.configMode === 'raw') {
-    return bar + '<section class="panel"><div class="panel-head"><span class="eyebrow">raw</span></div>'
-      + '<pre class="body" style="white-space:pre;overflow:auto">' + esc(JSON.stringify(config, null, 2)) + '</pre></section>'
+    return tools + '<section class="panel">'
+      + '<div class="panel-head short"><span class="eyebrow">raw</span></div>'
+      + '<pre class="body raw">' + esc(JSON.stringify(config, null, 2)) + '</pre>'
+      + '</section></div>'
   }
-  const sections = Object.keys(config).map(function (key) {
-    const v = config[key]
-    let rows
-    if (Array.isArray(v)) rows = v.length ? v.map(function (x, i) { return { k: '[' + i + ']', v: fmtV(x) } }) : [{ k: '[ ]', v: '(empty)' }]
-    else if (typeof v === 'object' && v !== null) rows = Object.keys(v).map(function (k) { return { k: k, v: fmtV(v[k]) } })
-    else rows = [{ k: key, v: fmtV(v) }]
-    return '<section class="panel"><div class="panel-head">'
-      + '<span class="sans" style="font-size:14px;font-weight:600">' + esc(key) + '</span></div>'
-      + '<div style="display:flex;flex-direction:column;gap:2px">'
-      + rows.map(function (r) {
-        return '<div class="tile" style="display:flex;gap:12px;padding:8px 12px;border-radius:12px">'
-          + '<span style="flex:0 0 160px;color:var(--dim);font-size:11.5px;word-break:break-word">' + esc(r.k) + '</span>'
-          + '<span style="flex:1 1 auto;min-width:0;color:' + (r.v === '(empty)' ? 'var(--dimmer)' : 'var(--text)') + ';word-break:break-word">' + esc(r.v) + '</span></div>'
-      }).join('') + '</div></section>'
-  }).join('')
-  return bar + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px;align-items:start">' + sections + '</div>'
+
+  const keys = Object.keys(config)
+  if (!keys.length) {
+    return tools + '<section class="panel"><div class="empty">No configuration in the snapshot.</div></section></div>'
+  }
+  return tools + '<section class="panel">'
+    + '<div class="thead"><span class="w-key">key</span><span class="c-grow">value</span></div>'
+    + keys.map(function (key) { return cfgSection(key, config[key]) }).join('')
+    + '</section></div>'
 }

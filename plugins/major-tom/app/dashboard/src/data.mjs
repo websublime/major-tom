@@ -28,8 +28,22 @@ export const AREAS = ['memories', 'docs', 'runs', 'monitors', 'logs']
 // including a directory literally called "(bundle root)".
 export const ROOT_GROUP_LABEL = '/ (bundle root)'
 
-export const KIND_COLOR = { feat: 'var(--accent)', fix: 'var(--stop)', docs: 'var(--dim)', test: 'var(--ok)', chore: 'var(--dimmer)', refactor: 'var(--warn)' }
-export const TIER_COLOR = { trivial: 'var(--dimmer)', task: 'var(--warn)', substantive: 'var(--accent)' }
+// The kind mapping the mockup states, and a tier mapping built to match it. A tier reads at the
+// weight of the commit kind it resembles, so a substantive intent takes the colour of a feat and
+// a trivial one the colour of a chore. A run is --done, which no tier uses, so the two streams
+// stay apart at a glance.
+//
+// Both are Maps because both are keyed by a word the repository wrote. A plain object answers
+// `constructor` and `toString` with an inherited member, and that member would then be written
+// into a style attribute as if it were a colour. A Map holds only what was put in it, so an
+// unknown key misses and falls back by construction rather than by luck.
+const KIND_COLOR = new Map([
+  ['feat', 'var(--text)'], ['fix', 'var(--neg)'], ['docs', 'var(--dim)'],
+  ['test', 'var(--done)'], ['chore', 'var(--dimmer)'], ['refactor', 'var(--active)']
+])
+const TIER_COLOR = new Map([
+  ['trivial', 'var(--dimmer)'], ['task', 'var(--active)'], ['substantive', 'var(--text)']
+])
 
 export function rel(iso) {
   if (!iso) return ''
@@ -42,6 +56,16 @@ export function rel(iso) {
   return Math.round(m / 1440) + ' d ago'
 }
 
+// The calendar day a timestamp falls on, which is how a dated record reads. Anything that
+// does not parse is shown as it was written.
+export function day(iso) {
+  if (!iso) return ''
+  const t = Date.parse(iso)
+  if (isNaN(t)) return String(iso)
+  const d = new Date(t)
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+}
+
 export function clock(iso) {
   const t = Date.parse(iso)
   if (isNaN(t)) return ''
@@ -49,12 +73,24 @@ export function clock(iso) {
   return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')
 }
 
+// The commit subject without the conventional prefix, which the kind column states beside it.
+// The prefix is only removed when it parses as one, so a subject like 'fix the build' is
+// untouched. The snapshot keeps serving the full subject; this is presentation.
+function conventionalBody(subject) {
+  return String(subject).replace(/^(feat|fix|docs|test|chore|refactor)(\([^)]*\))?!?:\s*/, '')
+}
+
+// Every commit carries its subject twice. `subject` is the cell, stripped of a prefix the kind
+// column already states; `fullSubject` is the line the repository wrote, prefix and scope
+// included. The git filter searches `fullSubject`, so a word that only lives in the prefix, such
+// as the scope in `chore(release):`, still matches what the reader typed.
 function deriveCommits(raw) {
   return (Array.isArray(raw.git) ? raw.git : []).map(function (c) {
     const kind = c.kind || (String(c.subject || '').match(/^(feat|fix|docs|test|chore|refactor)/) || [])[1] || 'other'
     return {
-      sha: String(c.hash || '').slice(0, 7), kind: kind, kindColor: KIND_COLOR[kind] || 'var(--dim)',
-      subject: c.subject || '', author: c.author || '', add: c.add, del: c.del,
+      sha: String(c.hash || '').slice(0, 7), kind: kind, kindColor: KIND_COLOR.get(kind) || 'var(--dim)',
+      subject: conventionalBody(c.subject || ''), fullSubject: String(c.subject || ''),
+      author: c.author || '', add: c.add, del: c.del,
       when: rel(c.date), date: c.date || ''
     }
   })
@@ -175,7 +211,7 @@ function deriveTimeline(raw) {
     return {
       stream: 'event', kind: isRun ? 'run' : 'intent', tier: tier,
       type: isRun || e.type == null ? null : String(e.type),
-      color: isRun ? 'var(--ok)' : (TIER_COLOR[tier] || 'var(--dim)'),
+      color: isRun ? 'var(--done)' : (TIER_COLOR.get(tier) || 'var(--dim)'),
       text: e.summary == null ? '' : String(e.summary),
       truncated: e.summaryTruncated === true,
       promptId: e.promptId == null ? '' : String(e.promptId),
