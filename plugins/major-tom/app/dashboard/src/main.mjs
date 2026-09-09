@@ -27,52 +27,61 @@ const VIEW_FN = { overview: vOverview, roadmap: vRoadmap, timeline: vTimeline, g
 
 function renderRail() {
   const config = cfg()
+  const version = config.onboard && config.onboard.pluginVersion ? 'v' + config.onboard.pluginVersion : ''
   const items = [
-    ['overview', '◈', ''], ['roadmap', '⌗', roadmap().length || ''], ['timeline', '⧖', timelineStream().length || ''],
+    ['overview', '■', ''], ['roadmap', '≡', roadmap().length || ''], ['timeline', '⧖', timelineStream().length || ''],
     ['git', '⎇', commits().length || ''], ['knowledge', '▤', files().length || ''],
     ['config', '{ }', Object.keys(config).length || '']
   ]
   document.getElementById('rail').innerHTML =
-    '<div class="brand"><div class="brand-badge">MT</div>'
-    + '<div class="rail-label" style="display:flex;flex-direction:column">'
-    + '<span class="sans" style="font-size:14px;font-weight:600;letter-spacing:-.01em">Major Tom</span>'
-    + '<span style="font-size:10.5px;color:var(--dimmer)">' + esc(config.onboard && config.onboard.pluginVersion ? 'v' + config.onboard.pluginVersion : '') + '</span></div></div>'
+    '<div class="brand"><span class="brand-badge">MT</span>'
+    + '<span class="brand-name rail-label">major tom</span>'
+    + (version ? '<span class="count rail-label">' + esc(version) + '</span>' : '')
+    + '</div><div class="rail-nav">'
     + items.map(function (it) {
       return '<button class="navbtn ' + (S.view === it[0] ? 'active' : '') + '" data-act="view" data-v="' + it[0] + '" title="' + it[0] + '">'
         + '<span class="glyph">' + it[1] + '</span><span class="rail-label">' + it[0] + '</span>'
         + (it[2] !== '' ? '<span class="count rail-label">' + it[2] + '</span>' : '') + '</button>'
     }).join('')
-    + '<div style="margin-top:auto;display:flex;flex-direction:column;gap:6px">'
-    + '<button class="navbtn" data-act="theme" title="Theme"><span style="flex:0 0 22px;text-align:center">' + (S.theme === 'light' ? '◑' : '◐') + '</span><span class="rail-label">' + S.theme + '</span></button>'
-    + '<button class="navbtn" data-act="rail" title="Collapse"><span style="flex:0 0 22px;text-align:center">' + (S.rail ? '«' : '»') + '</span><span class="rail-label">collapse</span></button>'
+    + '</div><div class="rail-foot">'
+    + '<button class="navbtn" data-act="theme" title="Theme"><span class="glyph">' + (S.theme === 'light' ? '◑' : '◐') + '</span><span class="rail-label">' + S.theme + '</span></button>'
+    + '<button class="navbtn" data-act="rail" title="Collapse"><span class="glyph">' + (S.rail ? '«' : '»') + '</span><span class="rail-label">collapse</span></button>'
     + '</div>'
 }
 
 // The time of the last computation, which is what generatedAt now means: the server stamps it
 // when it computes, and it moves on every refresh instead of being frozen at onboard time.
-function pillTime() {
+function computedTime() {
   const at = generatedAt()
   if (!at) return 'n/a'
   const hm = clock(at)
   return hm ? hm + ' (' + rel(at) + ')' : String(at)
 }
 
-function pillLabel() {
-  if (S.busy) return S.hasData ? 'recomputing, last ' + pillTime() : 'computing'
-  if (S.status === 'failed') return S.hasData ? 'stale, last computed ' + pillTime() : 'not computed'
-  return 'computed ' + pillTime()
+function statusLabel() {
+  if (S.busy) return S.hasData ? 'recomputing, last ' + computedTime() : 'computing'
+  if (S.status === 'failed') return S.hasData ? 'stale, last computed ' + computedTime() : 'not computed'
+  return 'computed ' + computedTime()
 }
 
-// The window control of D45, in the header beside the computed-at pill and the refresh control
-// and deliberately not inside a view. The window cuts two of the six views, the timeline and
+// The square states the colour and the motion separately, because they answer different
+// questions. The colour is where the page stands and the pulse is whether a request is in the
+// air, so a retry over a failed page pulses in the failure colour instead of hiding it.
+function statusSquare() {
+  const colour = S.status === 'failed' ? 'neg' : S.busy ? 'active' : 'done'
+  return S.busy ? colour + ' busy' : colour
+}
+
+// The window control of D45, a header cell beside the status cell and the refresh control and
+// deliberately not inside a view. The window cuts two of the six views, the timeline and
 // git, so it belongs where the page's global state already lives and where a reader on any view
 // can see which window is in force. Inside one of those two views it would read as that view's
 // own setting, which is precisely the reading D42 and D45 point 4 exist to prevent: one window
 // cuts both streams, and a control that looked like the timeline's would suggest the git side
 // has another.
 //
-// The affordance: two fields and an explicit apply, not fields that fetch as they change. A
-// reader typing a window one character at a time passes through "3", "36" and "365", and each
+// The control is two fields and an explicit apply, and the fields do not fetch as they change.
+// A reader typing a window one character at a time passes through "3", "36" and "365", and each
 // of those is a different window a live field would go and fetch, so two requests nobody asked
 // for would land before the one that was meant, and the first of them would come back refused.
 // Debouncing would only make that wrong answer arrive later. The submit removes the whole class
@@ -97,18 +106,19 @@ function windowHtml() {
       + ' aria-label="' + label + '" title="' + label + '" placeholder="' + label + '"'
       + ' value="' + esc(d[key]) + '">'
   }
-  return '<span class="pill" title="The window the timeline and the git streams are both read over">'
-    + '<span style="color:var(--dimmer)">window</span>'
-    + field('win-days', 'days', 'days') + '<span style="color:var(--dimmer)">d</span>'
-    + field('win-limit', 'limit', 'limit') + '<span style="color:var(--dimmer)">events</span>'
-    + '<button class="pill-btn" data-act="window" title="Apply this window to both streams"'
+  return '<span class="cell" title="The window the timeline and the git streams are both read over">'
+    + '<span class="fg-dimmer">window</span>'
+    + field('win-days', 'days', 'days') + '<span class="fg-dimmer">d</span>'
+    + field('win-limit', 'limit', 'limit') + '<span class="fg-dimmer">events</span>'
+    + '<button class="btn" data-act="window" title="Apply this window to both streams"'
     + (S.busy ? ' disabled' : '') + '>' + (S.windowBusy ? 'applying' : 'apply') + '</button></span>'
 }
 
-// A refused window, stated at the control that sent it. This is a correction and it is built to
-// read as one: it names what was refused, repeats the server's own sentence, and says that the
-// page did not move, which is the fact that separates it from every state below. It carries no
-// retry, because the correction is the retry: fix the number and apply again.
+// A refused window is stated in a full-width strip under the header the control sits in. This is
+// a correction and it is built to read as one: it names what was refused, repeats the server's
+// own sentence, and says that the page did not move, which is the fact that separates it from
+// every state below. It carries no retry, because fixing the number and applying again is the
+// retry. The strip spans the page so the server's sentence wraps instead of stretching the header.
 //
 // The window it states as still showing is read from the snapshot on screen, not from the
 // fields, which are holding the value that was just refused. The two disagree at exactly this
@@ -120,44 +130,45 @@ function windowErrorHtml() {
     ? 'Still showing the last window that was accepted: ' + esc(String(w.days)) + ' days, '
       + esc(String(w.ceilingEvents)) + ' events.'
     : 'The window on screen did not change.'
-  return '<span class="pill" style="flex:1 1 100%;white-space:normal;align-items:flex-start;'
-    + 'border-color:var(--accent-line)">'
-    + '<span class="chip" style="flex:0 0 auto;color:var(--stop)">window refused</span>'
-    + '<span style="flex:1 1 auto;min-width:0;color:var(--stop);word-break:break-word">'
-    + esc(S.windowError) + '</span>'
-    + '<span style="flex:0 0 auto;color:var(--dimmer)">' + showing + '</span></span>'
+  return '<div class="strip">'
+    + '<span class="strip-label">window refused</span>'
+    + '<span class="msg fg-neg">' + esc(S.windowError) + '</span>'
+    + '<span class="fg-dimmer">' + showing + '</span></div>'
 }
 
-// The header pill of D43 point 5: the time of the last computation with the refresh control
-// beside it, in the pill that used to read "snapshot <generatedAt>". Refresh is the same
+// The header status cell of D43 point 5: the time of the last computation, the square that
+// states what the page is doing, and the refresh control beside them. Refresh is the same
 // GET /api/snapshot issued again, because the server keeps no cache and has no recompute verb.
 // While a request is in flight the control says so and is disabled; loadSnapshot refuses a
 // second one anyway, so two clicks can never put two requests in the air.
+//
+// The cells run left to right in widening scope: what the project is, how it is worked, the
+// window it is read over, and the state of the reading.
 function headerHtml() {
   const config = cfg()
   const p = config.project || {}
   const ex = config.execution || {}
-  const teamPill = ex.workingModel === 'team' && ex.team
+  const teamCell = ex.workingModel === 'team' && ex.team
     ? 'team &#183; ' + ((ex.team.members || []).length) + ' + coordinator'
     : esc(ex.workingModel || '')
-  return '<header class="top"><div style="display:flex;flex-direction:column;gap:2px;min-width:0">'
+  return '<header class="top">'
     + '<h1 class="sans">' + esc(S.view) + '</h1>'
-    + '<span style="color:var(--dim);font-size:12px">' + esc(subtitles()[S.view]) + '</span></div>'
-    + '<div style="display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap">'
-    + '<span class="pill"><span class="dot' + (S.busy ? ' pulse' : '') + '"' + (S.status === 'failed' ? ' style="background:var(--stop)"' : '') + '></span>'
-    + esc(pillLabel())
-    + '<button class="pill-btn" data-act="refresh" title="Recompute the snapshot on the server"'
-    + (S.busy ? ' disabled' : '') + '>' + (S.busy ? 'working' : 'refresh') + '</button></span>'
+    + '<span class="top-sep">/</span>'
+    + '<span class="top-sub">' + esc(subtitles()[S.view]) + '</span>'
+    + '<div class="top-cells">'
+    + (p.name ? '<span class="cell">' + esc(p.name) + (p.topology ? ' &#183; ' + esc(p.topology) : '') + '</span>' : '')
+    + (teamCell ? '<span class="cell">' + teamCell + '</span>' : '')
     + windowHtml()
-    + (p.name ? '<span class="pill">' + esc(p.name) + (p.topology ? ' &#183; ' + esc(p.topology) : '') + '</span>' : '')
-    + (teamPill ? '<span class="pill accent">' + teamPill + '</span>' : '')
-    + windowErrorHtml()
+    + '<span class="cell"><span class="sq ' + statusSquare() + '"></span>'
+    + esc(statusLabel())
+    + '<button class="btn" data-act="refresh" title="Recompute the snapshot on the server"'
+    + (S.busy ? ' disabled' : '') + '>' + (S.busy ? 'working' : 'refresh') + '</button></span>'
     + '</div></header>'
 }
 
 function loadingPanel() {
   return '<section class="panel"><div class="panel-head"><span class="eyebrow">loading</span>'
-    + '<span class="dot pulse" style="margin-left:auto"></span></div>'
+    + '<span class="sq active busy push"></span></div>'
     + '<div class="empty">Computing the snapshot on the server and fetching it.</div></section>'
 }
 
@@ -166,15 +177,15 @@ function loadingPanel() {
 // gets: there is no island behind this page and no stale copy to show instead.
 function errorPanel() {
   return '<section class="panel"><div class="panel-head"><span class="eyebrow">no data</span>'
-    + '<span class="chip" style="color:var(--stop)">' + esc(S.errorRoute || 'the request') + ' failed</span></div>'
-    + '<div style="padding:2px 2px 12px 2px;font-size:13px;line-height:1.7">'
+    + '<span class="panel-meta fg-neg">' + esc(S.errorRoute || 'the request') + ' failed</span></div>'
+    + '<div class="pad prose">'
     + 'The dashboard could not load its data, so there is nothing to show. This page carries no '
     + 'embedded copy to fall back on: the server computes the data on every request.</div>'
-    + '<div class="tile" style="padding:14px 16px;color:var(--stop);font-size:12.5px;line-height:1.7;word-break:break-word">'
+    + '<div class="pad quote sep">'
     + esc(S.error || 'the request failed and said nothing about why') + '</div>'
-    + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-top:14px">'
+    + '<div class="pad tools sep">'
     + '<button class="btn" data-act="refresh"' + (S.busy ? ' disabled' : '') + '>' + (S.busy ? 'retrying' : 'retry') + '</button>'
-    + '<span style="color:var(--dimmer);font-size:11.5px">If the server is not running, start it with /major-tom:dashboard.</span>'
+    + '<span class="fg-dimmer small">If the server is not running, start it with /major-tom:dashboard.</span>'
     + '</div></section>'
 }
 
@@ -182,10 +193,10 @@ function errorPanel() {
 // view because a later request failed would destroy information the user still has. The
 // failure is stated above the view it did not manage to replace.
 function errorBanner() {
-  return '<section class="panel" style="border-color:var(--accent-line);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
-    + '<span class="chip" style="color:var(--stop)">' + esc(S.errorRoute || 'the request') + ' failed</span>'
-    + '<span style="flex:1 1 220px;min-width:0;color:var(--dim);font-size:12px;word-break:break-word">' + esc(S.error) + '</span>'
-    + '<span style="color:var(--dimmer);font-size:11.5px">Showing the last snapshot that loaded.</span>'
+  return '<section class="panel banner">'
+    + '<span class="fg-neg small">' + esc(S.errorRoute || 'the request') + ' failed</span>'
+    + '<span class="msg fg-dim small">' + esc(S.error) + '</span>'
+    + '<span class="fg-dimmer small">Showing the last snapshot that loaded.</span>'
     + '<button class="btn" data-act="refresh"' + (S.busy ? ' disabled' : '') + '>' + (S.busy ? 'retrying' : 'retry') + '</button></section>'
 }
 
@@ -270,8 +281,11 @@ function bindWindowFields() {
   bind('win-limit', 'limit')
 }
 
+// The main area is a fixed header, the refusal strip when there is one, and the scrolling body
+// the view is rendered into.
 function renderMain() {
-  document.getElementById('main').innerHTML = headerHtml() + mainBody()
+  document.getElementById('main').innerHTML =
+    headerHtml() + windowErrorHtml() + '<div class="view">' + mainBody() + '</div>'
   bindWindowFields()
   const q = document.getElementById('git-q')
   if (q) {
@@ -383,7 +397,6 @@ document.addEventListener('click', function (e) {
   const act = btn.getAttribute('data-act')
   const v = btn.getAttribute('data-v')
   if (act === 'view') { S.view = v; history.replaceState(null, '', '#/' + v); render() }
-  else if (act === 'layout') { S.layout = v; renderMain() }
   else if (act === 'filter') { S.filter = v; renderMain() }
   else if (act === 'file') { S.file = Number(v); renderMain() }
   else if (act === 'cfgmode') { S.configMode = v; renderMain() }

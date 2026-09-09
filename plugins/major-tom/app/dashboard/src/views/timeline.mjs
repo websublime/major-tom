@@ -75,17 +75,25 @@ export function timelineStream() {
   })
 }
 
-// One row of the merged stream, at the density of commitRow and decisionRow.
+// One row of the merged stream, at the width of the git table. The overview's activity strip
+// calls this too, so the row states itself and takes nothing from its table.
+//
+// A commit is marked by its sha in the neutral column colour; an event is marked by the stream
+// it came from, coloured by its tier. The kind column carries the colour in both cases. The
+// value is the one data.mjs derived, and it is written inline because a derived colour has no
+// class to carry it; the git table's kind column does the same.
 export function timelineRow(it) {
   const isCommit = it.stream === 'commit'
   return '<div class="row">'
-    + '<span class="chip' + (isCommit ? ' sha' : '') + '"'
+    + '<span class="w-sha small' + (isCommit ? ' fg-dim' : '') + '"'
     + (isCommit ? '' : ' style="color:' + it.color + '"') + '>' + esc(it.mark) + '</span>'
-    + '<span class="ellip" style="flex:0 0 122px;color:' + it.color + ';font-size:11px">' + esc(it.label) + '</span>'
-    + '<span class="ellip" style="flex:1 1 auto;min-width:0">' + esc(it.text) + '</span>'
-    + (it.truncated ? '<span class="chip" style="flex:0 0 auto;color:var(--warn)" title="summary cut at the 200-character cap">truncated</span>' : '')
-    + (it.path ? '<span class="ellip" style="flex:0 1 190px;color:var(--dimmer);font-size:11px;text-align:right">' + esc(it.path) + '</span>' : '')
-    + '<span style="flex:0 0 42px;text-align:right;color:var(--dimmer);font-size:11px">' + esc(clock(it.date) || it.when) + '</span>'
+    + '<span class="w-owner ellip small" style="color:' + it.color + '">' + esc(it.label) + '</span>'
+    + '<span class="c-grow">' + esc(it.text) + '</span>'
+    + (it.truncated
+      ? '<span class="c status fg-active" title="summary cut at the 200-character cap">truncated</span>'
+      : '')
+    + (it.path ? '<span class="w-author c-right ellip count">' + esc(it.path) + '</span>' : '')
+    + '<span class="w-when c-right count">' + esc(clock(it.date) || it.when) + '</span>'
     + '</div>'
 }
 
@@ -119,16 +127,17 @@ export function vTimeline() {
   const stream = timelineStream()
   const eventCount = timeline().events.length
   const commitCount = commits().length
-  const bar = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:0 4px">'
-    + '<span style="color:var(--dim);font-size:11.5px">' + eventCount + ' recorded event'
+  const tools = '<div class="tools">'
+    + '<span class="fg-dim small">' + eventCount + ' recorded event'
     + (eventCount === 1 ? '' : 's') + ' &#183; ' + commitCount + ' commit'
     + (commitCount === 1 ? '' : 's') + '</span>'
-    + '<span style="margin-left:auto;color:var(--dim);font-size:11.5px">' + stream.length + ' in the merged stream</span></div>'
-  const note = '<div style="padding:0 6px;color:var(--dim);font-size:11.5px;line-height:1.65">'
-    + esc(timelineWindowLine()) + '</div>'
+    + '<span class="push fg-dim small">' + stream.length + ' in the merged stream</span></div>'
+  const windowPanel = '<section class="panel">'
+    + '<div class="panel-head short"><span class="eyebrow">window</span></div>'
+    + '<div class="pad prose fg-dim">' + esc(timelineWindowLine()) + '</div></section>'
 
   if (!stream.length) {
-    return bar + note + '<section class="panel"><div class="empty">'
+    return tools + windowPanel + '<section class="panel"><div class="empty">'
       + 'No events and no commits in this snapshot. The timeline fills in as intents and runs '
       + 'are recorded under the runs area and as commits land in the window.</div></section>'
   }
@@ -141,26 +150,30 @@ export function vTimeline() {
     else days.push({ key: key, items: [it] })
   })
 
-  return bar + note + days.map(function (day) {
+  // One panel per day, one head row per session block inside it. The path column is labelled
+  // only when the day holds an item that carries a path.
+  return tools + windowPanel + days.map(function (bucket) {
     const blocks = []
-    day.items.forEach(function (it) {
+    bucket.items.forEach(function (it) {
       const key = groupKey(it)
       const last = blocks[blocks.length - 1]
       if (last && last.key === key) last.items.push(it)
       else blocks.push({ key: key, label: groupLabel(it), items: [it] })
     })
-    return '<section class="panel"><div class="panel-head">'
-      + '<span class="eyebrow">' + esc(dayLabel(day.key)) + '</span>'
-      + '<span style="margin-left:auto;color:var(--dimmer);font-size:11px">' + day.items.length
-      + ' item' + (day.items.length === 1 ? '' : 's') + '</span></div>'
-      + '<div style="display:flex;flex-direction:column;gap:10px">'
+    const hasPath = bucket.items.some(function (it) { return !!it.path })
+    return '<section class="panel">'
+      + '<div class="panel-head short"><span class="eyebrow">' + esc(dayLabel(bucket.key)) + '</span>'
+      + '<span class="panel-meta">' + bucket.items.length + ' item'
+      + (bucket.items.length === 1 ? '' : 's') + '</span></div>'
+      + '<div class="thead"><span class="w-sha">mark</span><span class="w-owner">kind</span>'
+      + '<span class="c-grow">summary</span>'
+      + (hasPath ? '<span class="w-author c-right">path</span>' : '')
+      + '<span class="w-when c-right">when</span></div>'
       + blocks.map(function (b) {
-        return '<div><div style="display:flex;align-items:center;gap:9px;padding:0 10px 4px 10px">'
-          + '<span style="color:var(--dimmer);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase">'
-          + esc(b.label) + '</span>'
-          + '<span style="margin-left:auto;color:var(--dimmer);font-size:10.5px">' + b.items.length + '</span></div>'
-          + '<div style="display:flex;flex-direction:column;gap:2px">' + b.items.map(timelineRow).join('') + '</div></div>'
+        return '<div class="row group"><span class="c-grow eyebrow">' + esc(b.label) + '</span>'
+          + '<span class="count">' + b.items.length + '</span></div>'
+          + b.items.map(timelineRow).join('')
       }).join('')
-      + '</div></section>'
+      + '</section>'
   }).join('')
 }
