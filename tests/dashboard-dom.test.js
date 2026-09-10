@@ -588,11 +588,13 @@ function ago(ms) {
   return new Date(Date.now() - ms).toISOString()
 }
 
-// A snapshot in the shape the server serves, plus the two keys the client also reads. The
-// server's payload carries exactly config, decisions, generatedAt, git, knowledge and
-// timeline; roadmap and lastRun are keys the views consume and no producer writes yet, so
-// they are here to exercise those views, and the test named for the served shape drops them
-// again and asserts the empty states instead.
+// A snapshot in the shape the server serves, plus the two keys that are optional in it. Six
+// keys are always there: config, decisions, generatedAt, git, knowledge and timeline. lastRun
+// is added when a run record carries a run block, and roadmap has no producer at all, so the
+// test named for the served shape drops both again and asserts the empty states instead.
+//
+// The lastRun here is a hand-shaped run that exercises the grid in general. The shape the one
+// producer actually emits is narrower and is covered by onboardRunShape below.
 //
 // Built fresh on every call, so no test can leave a mutation behind for the next one.
 function snapshotFixture() {
@@ -800,7 +802,8 @@ function snapshotFixture() {
   }
 }
 
-// The payload the server actually serves today: the six keys and nothing else.
+// The payload for a repository whose run records carry no run block: the six required keys and
+// neither optional one.
 function servedShape() {
   const snapshot = snapshotFixture()
   delete snapshot.roadmap
@@ -814,6 +817,36 @@ function servedShape() {
 function windowedShape(days, limit) {
   const snapshot = snapshotFixture()
   snapshot.timeline.window = { days, floorEvents: 50, ceilingEvents: limit }
+  return snapshot
+}
+
+// The lastRun of a real onboard, over an otherwise unchanged fixture. The onboard is the one
+// producer of the key, so this is the shape the strip has to render, and it differs from the
+// shape the schema permits in three ways.
+//
+// It declares four phases, not the nine the strip was drawn for. Three of them carry no elapsed:
+// Check and Prepare ran in stage 1 of the workflow, a separate script run whose reports never
+// reach the record, and Finalize has a startedAt and no finish, for which formatSpan in
+// plugins/major-tom/app/snapshot.js returns null and readRunBlock omits the key. And Finalize is
+// active rather than done, because it is the phase writing the record it appears in, so an
+// onboard record never reaches the N/N done branch of the head.
+//
+// The values are what the producer emits, not what a hand-written fixture would guess: the
+// spans are already formatted, and the two untimed phases carry a null artifact.
+function onboardRunShape() {
+  const snapshot = snapshotFixture()
+  snapshot.lastRun = {
+    id: 'onboard-2026-09-10T09-59-00Z',
+    workflow: 'onboard',
+    mode: 'team',
+    duration: '12.0s',
+    phases: [
+      { name: 'Check', artifact: null, status: 'done' },
+      { name: 'Prepare', artifact: null, status: 'done' },
+      { name: 'Execute', artifact: '.claude/major-tom.json', status: 'done', elapsed: '8.0s' },
+      { name: 'Finalize', artifact: '.knowledge/runs/onboard-2026.md', status: 'active' },
+    ],
+  }
   return snapshot
 }
 
@@ -1023,6 +1056,59 @@ test('views: the phase grid states the elapsed time and the status of every phas
   // The head states where the run stands, which is the phase it sits on while one is active.
   has(env.main.innerHTML, 'phase 3/3 &#183; implement &#183; 12m',
     'the lifecycle head must state the position of the run and how long it has taken')
+})
+
+// A phase the onboard records as failed must not read like a phase that has not started. The
+// onboard writes failed for Execute when one of its agents did not complete while the run
+// carried on (D57 point 8), and idle is the key every unknown status falls to, so the two
+// would be one grey square if the client did not tell them apart.
+test('views: a failed phase is drawn apart from a phase that never started', async () => {
+  const snapshot = onboardRunShape()
+  snapshot.lastRun.phases[2] = { name: 'Execute', artifact: '.claude/major-tom.json', status: 'failed', elapsed: '8.0s' }
+  snapshot.lastRun.phases.push({ name: 'Publish', artifact: null, status: 'pending' })
+  const env = await bootLoaded({ snapshot })
+  const cards = phaseCards(env)
+
+  assert.deepEqual(cards.map((card) => card.status), ['done', 'done', 'neg', 'active', 'idle'],
+    'a failed phase and a pending one must not resolve to the same mark')
+
+  // The failure keeps the span its agents did measure, so the card still states its time.
+  assert.equal(cards[2].elapsed, '8.0s', 'a failed phase states the elapsed time the record carries')
+})
+
+test('views: the phase grid renders the record a real onboard writes', async () => {
+  const env = await bootLoaded({ snapshot: onboardRunShape() })
+  const html = env.main.innerHTML
+  const cards = phaseCards(env)
+
+  lacks(html, 'No runs recorded yet.', 'a run block on the snapshot must retire the empty state')
+  has(html, 'onboard-2026-09-10T09-59-00Z', 'the panel must name the run it renders')
+
+  // Four phases, because the grid takes the count from the record. The nine-phase lifecycle it
+  // was drawn for is not a shape it requires.
+  assert.deepEqual(cards.map((card) => card.name), ['Check', 'Prepare', 'Execute', 'Finalize'],
+    'the cards must be the phases the onboard declares, in the order the record lists them')
+
+  // A phase nobody timed states nothing rather than a zero: Check and Prepare ran in a stage
+  // whose stamps never reached the record, and Finalize has no finish because it is still
+  // running.
+  assert.deepEqual(cards.map((card) => card.elapsed), ['', '', '8.0s', ''],
+    'only a phase whose record carries both instants states an elapsed time')
+
+  assert.deepEqual(cards.map((card) => card.status), ['done', 'done', 'done', 'active'],
+    'every phase must be drawn in the status the record gave it')
+  assert.deepEqual(cards.filter((card) => card.on).map((card) => card.name), ['Finalize'],
+    'the phase writing the record is the card the run is marked on')
+
+  // The head counts the phases the record holds, and it names Finalize because that phase is
+  // active. An onboard record never reaches the done branch.
+  has(html, 'phase 4/4 &#183; Finalize &#183; 12.0s',
+    'the head must state the position of the run inside the four phases it has')
+  lacks(html, '4/4 done', 'the done branch is unreachable while the last phase is still running')
+
+  // artifact is null on the two phases that reported nothing, and a null must not reach the
+  // screen as a word.
+  lacks(html, '<div class="ellip count">null</div>', 'an absent artifact must render as nothing')
 })
 
 test('views: roadmap renders every milestone with its tasks and its progress', async () => {

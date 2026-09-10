@@ -96,6 +96,41 @@ function loadMeta() {
 // Fixtures
 // ---------------------------------------------------------------------------
 
+// These are the clock readings the stubbed agents report (D57). The script reads no clock of
+// its own and reduces
+// them into the phase spans the run record carries. They are deliberately not in call order:
+// the Execute span is the earliest start and the latest finish across that phase's agents, and
+// a fixture ordered by call would pass under a first-and-last implementation just as well. The
+// renderer starts after the installer and finishes after it, so the latest finish in Execute
+// belongs to an agent that is not the last one called.
+const CLOCK = {
+  preconditions: ['2026-03-01T10:00:00Z', '2026-03-01T10:00:20Z'],
+  scan: ['2026-03-01T10:00:25Z', '2026-03-01T10:01:00Z'],
+  validate: ['2026-03-01T10:02:00Z', '2026-03-01T10:02:30Z'],
+  write: ['2026-03-01T10:02:31Z', '2026-03-01T10:03:40Z'],
+  quarantine: ['2026-03-01T10:03:41Z', '2026-03-01T10:03:50Z'],
+  render: ['2026-03-01T10:03:55Z', '2026-03-01T10:05:30Z'],
+  install: ['2026-03-01T10:03:51Z', '2026-03-01T10:04:10Z'],
+  finalize: ['2026-03-01T10:05:35Z', '2026-03-01T10:06:00Z'],
+}
+
+function clock(name) {
+  return { startedAt: CLOCK[name][0], finishedAt: CLOCK[name][1] }
+}
+
+// These two build an agent that reported no clock reading at all, and one that reported a
+// chosen pair.
+function unstamped(report) {
+  const copy = Object.assign({}, report)
+  delete copy.startedAt
+  delete copy.finishedAt
+  return copy
+}
+
+function stamped(report, startedAt, finishedAt) {
+  return Object.assign({}, report, { startedAt: startedAt, finishedAt: finishedAt })
+}
+
 function preconditions(overrides) {
   return Object.assign(
     {
@@ -108,6 +143,8 @@ function preconditions(overrides) {
       projectTypeGuess: 'existing',
       residuePlan: [],
       notes: '',
+      startedAt: CLOCK.preconditions[0],
+      finishedAt: CLOCK.preconditions[1],
     },
     overrides || {}
   )
@@ -123,6 +160,8 @@ function scan(overrides) {
       units: [],
       specialistCandidates: [],
       evidence: ['package.json'],
+      startedAt: CLOCK.scan[0],
+      finishedAt: CLOCK.scan[1],
     },
     overrides || {}
   )
@@ -135,6 +174,7 @@ function config(overrides) {
       persistence: { root: '.knowledge' },
       specialists: [{ name: 'nextjs-expert', source: 'sub-agents.directory' }],
       mcp: ['codebase-memory-mcp'],
+      execution: { workingModel: 'team', team: { coordinator: 'coordinator', members: ['architect', 'qa', 'code-reviewer'] } },
       onboard: { completedAt: '2026-01-01T00:00:00Z', pluginVersion: '0.26.0' },
     },
     overrides || {}
@@ -159,24 +199,28 @@ const QUARANTINE_DONE = {
   skipped: ['SKIPPED       .claude/server/dashboard-server.js  -- the evidence that this is ours does not hold'],
   failed: [],
   notes: '',
+  startedAt: CLOCK.quarantine[0],
+  finishedAt: CLOCK.quarantine[1],
 }
 const QUARANTINE_FAILED = {
   quarantined: [],
   skipped: [],
   failed: ['FAILED        .knowledge/dashboard.html  -- EACCES: permission denied'],
   notes: '',
+  startedAt: CLOCK.quarantine[0],
+  finishedAt: CLOCK.quarantine[1],
 }
 
 function defaultResponses() {
   return {
     preconditions: preconditions(),
     scan: scan(),
-    'validate config': { valid: true, errors: [] },
-    'write config + knowledge root': { written: ['.claude/major-tom.json'], failures: [], notes: '' },
+    'validate config': Object.assign({ valid: true, errors: [] }, clock('validate')),
+    'write config + knowledge root': Object.assign({ written: ['.claude/major-tom.json'], failures: [], notes: '' }, clock('write')),
     'quarantine residue': QUARANTINE_DONE,
-    'render context templates': { written: ['AGENTS.md', 'CLAUDE.md'], failures: [], notes: '' },
-    'install specialists': { installed: [{ name: 'nextjs-expert', source: 'sub-agents.directory' }], skipped: [], notes: '' },
-    'finalize + run record': { revalidated: true, mapVerified: true, runRecordPath: '.knowledge/runs/onboard-x.md', problems: [] },
+    'render context templates': Object.assign({ written: ['AGENTS.md', 'CLAUDE.md'], failures: [], notes: '' }, clock('render')),
+    'install specialists': Object.assign({ installed: [{ name: 'nextjs-expert', source: 'sub-agents.directory' }], skipped: [], notes: '' }, clock('install')),
+    'finalize + run record': Object.assign({ revalidated: true, mapVerified: true, runRecordPath: '.knowledge/runs/onboard-x.md', problems: [] }, clock('finalize')),
   }
 }
 
@@ -247,6 +291,40 @@ function has(prompt, token) {
   return prompt.indexOf(token) !== -1
 }
 
+// Every report schema ends its required list with the two stamps (D57), which one test below
+// owns outright. The per-report tests are about that report's own places, so they read the
+// required list with the stamps taken off and keep saying what they were written to say.
+function places(schema) {
+  assert.deepEqual(schema.required.slice(-2), ['startedAt', 'finishedAt'], 'a report schema without the two stamps')
+  return schema.required.slice(0, -2)
+}
+
+// The run block reaches Finalize as a JSON literal inside the prompt. Reading it back is what
+// lets the tests assert the structure the agent is handed instead of matching a sentence.
+function runBlockFrom(prompt) {
+  const start = prompt.indexOf('{\n  "workflow": "onboard"')
+  assert.notEqual(start, -1, 'the Finalize prompt must carry the run block as JSON')
+  let depth = 0
+  for (let i = start; i < prompt.length; i += 1) {
+    if (prompt[i] === '{') depth += 1
+    else if (prompt[i] === '}') {
+      depth -= 1
+      if (depth === 0) return JSON.parse(prompt.slice(start, i + 1))
+    }
+  }
+  return assert.fail('the run block JSON in the Finalize prompt is unterminated')
+}
+
+function runBlock(run_) {
+  return runBlockFrom(promptFor(run_, 'finalize + run record'))
+}
+
+function phaseNamed(block, name) {
+  const found = block.phases.filter((entry) => entry.name === name)
+  assert.equal(found.length, 1, 'expected exactly one phase entry named ' + JSON.stringify(name))
+  return found[0]
+}
+
 // ---------------------------------------------------------------------------
 // The runtime contract of the file itself
 // ---------------------------------------------------------------------------
@@ -292,7 +370,7 @@ test('the precondition schema declares exactly the facts the workflow branches o
   const result = await run({})
   const schema = callFor(result, 'preconditions').opts.schema
   assert.equal(schema.additionalProperties, false)
-  assert.deepEqual(schema.required, [
+  assert.deepEqual(places(schema), [
     'isGitRepo',
     'hasExistingConfig',
     'existingConfig',
@@ -364,7 +442,7 @@ test('the scan agent is given the detection schema', async () => {
   const result = await run({})
   const schema = callFor(result, 'scan').opts.schema
   assert.equal(schema.additionalProperties, false)
-  assert.deepEqual(schema.required, [
+  assert.deepEqual(places(schema), [
     'stack',
     'devops',
     'topologyGuess',
@@ -483,7 +561,7 @@ test('the validation agent gets the shipped schema path and the validation schem
   const call = callFor(result, 'validate config')
   assert.ok(has(call.prompt, PLUGIN + '/config.schema.json'))
   assert.equal(call.opts.schema.additionalProperties, false)
-  assert.deepEqual(call.opts.schema.required, ['valid', 'errors'])
+  assert.deepEqual(places(call.opts.schema), ['valid', 'errors'])
 })
 
 test('the validation agent is handed the config byte for byte', async () => {
@@ -526,7 +604,7 @@ test('the writer report declares three places and no fourth (D53, D55)', async (
   assert.equal(schema.additionalProperties, false)
   // The quarantine is not the writer's work and must not be reported through the writer's
   // failures, which halt the onboard; it has a step and a report of its own.
-  assert.deepEqual(schema.required, ['written', 'failures', 'notes'])
+  assert.deepEqual(places(schema), ['written', 'failures', 'notes'])
 })
 
 test('the writer carries the exact merge-script command lines', async () => {
@@ -582,7 +660,7 @@ test('the quarantine report declares four places (D53 applied to D55)', async ()
   const result = await run({ args: stage2({ quarantine: true }) })
   const schema = callFor(result, 'quarantine residue').opts.schema
   assert.equal(schema.additionalProperties, false)
-  assert.deepEqual(schema.required, ['quarantined', 'skipped', 'failed', 'notes'])
+  assert.deepEqual(places(schema), ['quarantined', 'skipped', 'failed', 'notes'])
 })
 
 test('the quarantine runs after the writer and before the renders and the record', async () => {
@@ -716,7 +794,7 @@ test('the render report declares three places', async () => {
   const result = await run({ args: stage2() })
   const schema = callFor(result, 'render context templates').opts.schema
   assert.equal(schema.additionalProperties, false)
-  assert.deepEqual(schema.required, ['written', 'failures', 'notes'])
+  assert.deepEqual(places(schema), ['written', 'failures', 'notes'])
 })
 
 test('the installer is the plugin installer agent with the install report schema', async () => {
@@ -724,7 +802,7 @@ test('the installer is the plugin installer agent with the install report schema
   const call = callFor(result, 'install specialists')
   assert.equal(call.opts.agentType, 'major-tom:agent-installer')
   assert.equal(call.opts.schema.additionalProperties, false)
-  assert.deepEqual(call.opts.schema.required, ['installed', 'skipped', 'notes'])
+  assert.deepEqual(places(call.opts.schema), ['installed', 'skipped', 'notes'])
 })
 
 test('the installer is handed exactly the confirmed specialists and the mcp list (D24, D52)', async () => {
@@ -780,7 +858,7 @@ test('finalize re-validates against the shipped schema and reports the two claim
   const call = callFor(result, 'finalize + run record')
   assert.ok(has(call.prompt, PLUGIN + '/config.schema.json'))
   assert.equal(call.opts.schema.additionalProperties, false)
-  assert.deepEqual(call.opts.schema.required, ['revalidated', 'mapVerified', 'runRecordPath', 'problems'])
+  assert.deepEqual(places(call.opts.schema), ['revalidated', 'mapVerified', 'runRecordPath', 'problems'])
 })
 
 test('the run record is written under the knowledge root the config declares', async () => {
@@ -837,4 +915,191 @@ test('the closing instructions still cover the rest of the run', async () => {
   // beyond the file list; both are mechanisms, not phrasing.
   assert.ok(has(result.result.instructions, '/major-tom:dashboard'))
   assert.ok(has(result.result.instructions, '/major-tom:onboard'))
+})
+
+// ---------------------------------------------------------------------------
+// The run record's timing block (D57)
+// ---------------------------------------------------------------------------
+
+test('the script reads no clock, which is the constraint the whole design exists for', () => {
+  // The runtime makes these throw, so a call would not be a wrong number: it would end the run
+  // (workflows/README.md, hard constraints). The stamps exist because of this line.
+  const text = source()
+  assert.equal(has(text, 'Date.now('), false)
+  assert.equal(has(text, 'new Date('), false)
+  assert.equal(has(text, 'Math.random('), false)
+})
+
+test('every report schema carries the two stamps, in one fixed UTC format', async () => {
+  const stage1 = await run({})
+  const stage2Run = await run({ args: stage2({ quarantine: true }) })
+  const schemas = new Map()
+  for (const call of stage1.calls.concat(stage2Run.calls)) schemas.set(call.label, call.opts.schema)
+  // These eight report-producing agents are every agent the workflow spawns.
+  assert.deepEqual(Array.from(schemas.keys()).sort(), [
+    'finalize + run record',
+    'install specialists',
+    'preconditions',
+    'quarantine residue',
+    'render context templates',
+    'scan',
+    'validate config',
+    'write config + knowledge root',
+  ])
+  for (const [label, schema] of schemas) {
+    assert.equal(schema.additionalProperties, false, label)
+    assert.deepEqual(schema.required.slice(-2), ['startedAt', 'finishedAt'], label)
+    for (const field of ['startedAt', 'finishedAt']) {
+      assert.equal(schema.properties[field].type, 'string', label + '.' + field)
+      // The pattern is what makes the reduction sound. The spans are compared as strings, which
+      // is exact only while every stamp is the same fixed-width UTC form.
+      const pattern = new RegExp(schema.properties[field].pattern)
+      assert.equal(pattern.test('2026-03-01T10:00:00Z'), true, label + '.' + field)
+      assert.equal(pattern.test('2026-03-01T10:00:00.000Z'), false, label + '.' + field)
+      assert.equal(pattern.test('2026-03-01T10:00:00+01:00'), false, label + '.' + field)
+      assert.equal(pattern.test('2026-03-01 10:00:00'), false, label + '.' + field)
+    }
+  }
+})
+
+test("every phase's agents are told to read the real clock twice", async () => {
+  const stage1 = await run({})
+  const stage2Run = await run({ args: stage2({ quarantine: true }) })
+  for (const call of stage1.calls.concat(stage2Run.calls)) {
+    // The command is the contract and the sentence around it is only wording. It is the only
+    // thing that produces the exact format the schemas pin, and the script cannot produce it.
+    assert.ok(has(call.prompt, 'date -u +%Y-%m-%dT%H:%M:%SZ'), call.label)
+    assert.ok(has(call.prompt, 'startedAt'), call.label)
+    assert.ok(has(call.prompt, 'finishedAt'), call.label)
+  }
+})
+
+test('the run block states the workflow, the working model and nothing invented', async () => {
+  const block = runBlock(await run({ args: stage2({ quarantine: true }) }))
+  assert.deepEqual(Object.keys(block).sort(), ['mode', 'phases', 'startedAt', 'workflow'])
+  assert.equal(block.workflow, 'onboard')
+  assert.equal(block.mode, 'team')
+  // The block carries no resumed flag, because the runtime exposes no signal a script can read
+  // to tell a fresh run from a replayed one, and a flag nothing can set is worse than an absence
+  // the PRD explains.
+  assert.equal('resumed' in block, false)
+})
+
+test('a config with no execution block leaves mode out rather than writing it empty', async () => {
+  const cfg = config()
+  delete cfg.execution
+  const block = runBlock(await run({ args: stage2({ config: cfg }) }))
+  assert.equal('mode' in block, false)
+})
+
+test('the block carries the three phases the script measured and leaves Finalize to the writer', async () => {
+  const result = await run({ args: stage2({ quarantine: true }) })
+  const block = runBlock(result)
+  assert.deepEqual(block.phases.map((entry) => entry.name), ['Check', 'Prepare', 'Execute'])
+  // Finalize is the agent's own entry because the phase is writing the record it appears in, so
+  // its end is not knowable here. The three tokens are the values the record must carry.
+  const prompt = promptFor(result, 'finalize + run record')
+  assert.ok(has(prompt, 'Finalize'))
+  assert.ok(has(prompt, 'active'))
+  assert.ok(has(prompt, 'no finishedAt'))
+})
+
+test('the phases that ran in stage 1 are listed without stamps, never with empty ones', async () => {
+  const block = runBlock(await run({ args: stage2() }))
+  // Stage 1 is a separate run of this script and its reports do not reach stage 2; the only
+  // channel between them carries the config and the consent (D21). The record says the phases
+  // happened and claims no timing it does not have.
+  assert.deepEqual(phaseNamed(block, 'Check'), { name: 'Check', status: 'done' })
+  assert.deepEqual(phaseNamed(block, 'Prepare'), { name: 'Prepare', status: 'done' })
+})
+
+test('the Execute phase names the artifact it produced and its own span', async () => {
+  const block = runBlock(await run({ args: stage2({ quarantine: true }) }))
+  assert.deepEqual(phaseNamed(block, 'Execute'), {
+    name: 'Execute',
+    artifact: '.claude/major-tom.json',
+    status: 'done',
+    startedAt: CLOCK.preconditions[0],
+    finishedAt: CLOCK.render[1],
+  })
+  // The run starts where its earliest agent started.
+  assert.equal(block.startedAt, CLOCK.preconditions[0])
+})
+
+test('a span is the earliest start and the latest finish, not the first and the last', async () => {
+  // The installer is called last and starts first; the validator is called second and finishes
+  // last. Reading the span off call order instead of off the stamps fails here.
+  const result = await run({
+    args: stage2({ quarantine: true }),
+    responses: {
+      'install specialists': stamped(defaultResponses()['install specialists'], '2026-03-01T09:00:00Z', '2026-03-01T09:30:00Z'),
+      'validate config': stamped(defaultResponses()['validate config'], '2026-03-01T10:02:00Z', '2026-03-01T11:00:00Z'),
+    },
+  })
+  const execute = phaseNamed(runBlock(result), 'Execute')
+  assert.equal(execute.startedAt, '2026-03-01T09:00:00Z')
+  assert.equal(execute.finishedAt, '2026-03-01T11:00:00Z')
+})
+
+test('the conditional quarantine is inside the span exactly when it ran', async () => {
+  const late = stamped(QUARANTINE_DONE, '2026-03-01T10:03:41Z', '2026-03-01T10:09:00Z')
+  const ran = await run({ args: stage2({ quarantine: true }), responses: { 'quarantine residue': late } })
+  assert.equal(phaseNamed(runBlock(ran), 'Execute').finishedAt, '2026-03-01T10:09:00Z')
+
+  const declined = await run({ args: stage2({ quarantine: false }), responses: { 'quarantine residue': late } })
+  assert.equal(phaseNamed(runBlock(declined), 'Execute').finishedAt, CLOCK.render[1])
+})
+
+test('an agent that did not complete drops out of the span and fails the phase', async () => {
+  const result = await run({ args: stage2(), responses: { 'render context templates': null } })
+  const execute = phaseNamed(runBlock(result), 'Execute')
+  assert.equal(execute.startedAt, CLOCK.preconditions[0])
+  // The renderer held the latest finish; without it the installer's is the latest that exists.
+  assert.equal(execute.finishedAt, CLOCK.install[1])
+  // The onboard does not halt here and reports the gap to the session instead, so the record is
+  // the only place that can state it. Recorded done, this run would claim a finished Execute,
+  // with a measured elapsed, over templates that were never rendered.
+  assert.equal(execute.status, 'failed')
+})
+
+test('every agent of the phase that did not complete fails it', async () => {
+  const installer = await run({ args: stage2(), responses: { 'install specialists': null } })
+  assert.equal(phaseNamed(runBlock(installer), 'Execute').status, 'failed')
+
+  // The quarantine counts as an agent of the phase whenever the user authorised it, because
+  // then it did run and returned nothing.
+  const cleaner = await run({ args: stage2({ quarantine: true }), responses: { 'quarantine residue': null } })
+  assert.equal(phaseNamed(runBlock(cleaner), 'Execute').status, 'failed')
+})
+
+test('Execute is done when every agent of the phase completed', async () => {
+  const authorised = await run({ args: stage2({ quarantine: true }) })
+  assert.equal(phaseNamed(runBlock(authorised), 'Execute').status, 'done')
+
+  // The quarantine runs only where there is consent, and a step that never ran did not fail.
+  const declined = await run({ args: stage2({ quarantine: false }) })
+  assert.equal(phaseNamed(runBlock(declined), 'Execute').status, 'done')
+})
+
+test('the Finalize prompt states the vocabulary the statuses come from', async () => {
+  const prompt = promptFor(await run({ args: stage2() }), 'finalize + run record')
+  // The three words are the contract, and the sentence around them is only wording. A prompt
+  // that forbids failed would have the agent overwrite the one status this script computes.
+  assert.ok(has(prompt, 'done, failed and active'))
+  assert.equal(has(prompt, 'status is done or active and never anything else'), false)
+})
+
+test('a phase whose agents reported no stamps carries no timing at all', async () => {
+  const responses = {}
+  const defaults = defaultResponses()
+  for (const label of ['preconditions', 'validate config', 'write config + knowledge root', 'render context templates', 'install specialists']) {
+    responses[label] = unstamped(defaults[label])
+  }
+  const block = runBlock(await run({ args: stage2(), responses: responses }))
+  assert.deepEqual(phaseNamed(block, 'Execute'), {
+    name: 'Execute',
+    artifact: '.claude/major-tom.json',
+    status: 'done',
+  })
+  assert.equal('startedAt' in block, false)
 })

@@ -27,6 +27,9 @@ const path = require('node:path')
 const REPO_ROOT = path.resolve(__dirname, '..')
 const SCRIPT = path.join(REPO_ROOT, 'plugins', 'major-tom', 'app', 'snapshot.js')
 const VENDOR_DIR = path.join(REPO_ROOT, 'plugins', 'major-tom', 'app', 'vendor')
+// The producer of the run record. This suite reads it for one thing only, the stamp pattern it
+// pins on every agent report, which is the rule the reader has to apply to the same records.
+const WORKFLOW = path.join(REPO_ROOT, 'plugins', 'major-tom', 'workflows', 'onboard.js')
 
 // Every third-party file shipped inside the plugin, with the size and the SHA-256 that
 // plugins/major-tom/app/vendor/README.md records for it. This list is the pin, so a vendored file
@@ -179,6 +182,73 @@ function legacyLogLine(fields) {
   return [entry.at.toISOString(), entry.tier, entry.type, entry.promptId, entry.summary].join('\t')
 }
 
+// A fixture value as a YAML scalar. A Date becomes the fixed-width UTC stamp the onboard writes
+// and everything else is quoted, so no value is ever read back as a YAML type the fixture did
+// not mean and no fixture states an instant in a spelling the producer never emits.
+function yamlScalar(value) {
+  return JSON.stringify(value instanceof Date ? stamp(value) : String(value))
+}
+
+// The spelling `date -u +%Y-%m-%dT%H:%M:%SZ` prints, which is what every agent reports and what
+// the record therefore carries. Every fixture date is a whole second already, so nothing is
+// lost by dropping the milliseconds.
+function stamp(date) {
+  return date.toISOString().replace(/\.\d{3}Z$/, 'Z')
+}
+
+// A run record: an OKF concept declaring type: run, its generated timestamp, and the
+// structured run block the lastRun reader consumes.
+//
+//   at        the generated timestamp, a Date
+//   title     the record title, defaulting to "A run"
+//   run       the run block as an object; phases are {name, artifact, status, startedAt,
+//             finishedAt} and a key left out is left out of the YAML, which is how a fixture
+//             states a phase that has not finished
+//   rawRun    the block written out verbatim instead, for the shapes an object cannot express
+//
+// Every instant is written from a Date the test fixed, so a fixture never depends on the clock
+// the script reads.
+function runRecord(fields) {
+  const lines = [
+    'type: run',
+    `title: ${fields.title || 'A run'}`,
+    'generated:',
+    '  by: major-tom-onboard',
+    `  at: ${yamlScalar(fields.at)}`,
+  ]
+  if (fields.rawRun !== undefined) {
+    lines.push(fields.rawRun)
+  } else if (fields.run) {
+    lines.push('run:')
+    for (const [key, value] of Object.entries(fields.run)) {
+      if (key !== 'phases') lines.push(`  ${key}: ${yamlScalar(value)}`)
+    }
+    if (fields.run.phases) {
+      lines.push('  phases:')
+      for (const phase of fields.run.phases) {
+        const entries = Object.entries(phase)
+        lines.push(`    - ${entries[0][0]}: ${yamlScalar(entries[0][1])}`)
+        for (const [key, value] of entries.slice(1)) lines.push(`      ${key}: ${yamlScalar(value)}`)
+      }
+    }
+  }
+  return conceptExact(lines.join('\n'), 'the run body')
+}
+
+// A run block that is sound in every respect, for the fixtures whose subject is something
+// other than the block's own content. started fixes both the run and its single phase.
+function soundRun(id, started, spanMs) {
+  const finished = new Date(started.getTime() + spanMs)
+  return {
+    id,
+    workflow: 'onboard',
+    mode: 'team',
+    startedAt: started,
+    finishedAt: finished,
+    phases: [{ name: 'Prepare', artifact: 'config draft', status: 'done', startedAt: started, finishedAt: finished }],
+  }
+}
+
 // Builds a fixture repository.
 //
 //   noConfig        do not write .claude/major-tom.json at all
@@ -282,10 +352,15 @@ function importCommits(dir, commits) {
 // Running the script under test
 // ---------------------------------------------------------------------------
 
-function runSnapshot(t, repoDir) {
+// env, when given, is merged over the suite's own environment for that one run. Only the
+// timezone test uses it.
+function runSnapshot(t, repoDir, env) {
   const outPath = path.join(tmpDir(t, 'major-tom-out-'), 'snapshot.json')
+  const options = env
+    ? Object.assign({}, EXEC_OPTIONS, { env: Object.assign({}, process.env, env) })
+    : EXEC_OPTIONS
   try {
-    execFileSync(process.execPath, [SCRIPT, '--repo', repoDir, '--out', outPath], EXEC_OPTIONS)
+    execFileSync(process.execPath, [SCRIPT, '--repo', repoDir, '--out', outPath], options)
   } catch (err) {
     assert.fail(`snapshot.js exited with ${err.status}: ${String(err.stderr || err.message).trim()}`)
   }
@@ -1033,6 +1108,376 @@ test('timeline: no intents and no run records yield an empty timeline', (t) => {
 })
 
 // ---------------------------------------------------------------------------
+// lastRun
+// ---------------------------------------------------------------------------
+
+test('lastRun: a run record with a run block produces the key with every field', (t) => {
+  const started = insideHorizon(3)
+  const dir = initRepo(t, {
+    knowledge: {
+      'runs/onboard-2026.md': runRecord({
+        at: insideHorizon(2),
+        run: {
+          id: 'run-2026-09-10-onboard',
+          workflow: 'onboard',
+          mode: 'team',
+          startedAt: started,
+          finishedAt: new Date(started.getTime() + 73000),
+          phases: [
+            {
+              name: 'Prepare',
+              artifact: 'config draft',
+              status: 'done',
+              startedAt: started,
+              finishedAt: new Date(started.getTime() + 12000),
+            },
+            {
+              name: 'Finalize',
+              artifact: 'run record',
+              status: 'active',
+              startedAt: new Date(started.getTime() + 12000),
+            },
+          ],
+        },
+      }),
+    },
+  })
+  const snapshot = runSnapshot(t, dir)
+
+  assert.deepEqual(snapshot.lastRun, {
+    id: 'run-2026-09-10-onboard',
+    workflow: 'onboard',
+    mode: 'team',
+    duration: '1m 13s',
+    phases: [
+      { name: 'Prepare', artifact: 'config draft', status: 'done', elapsed: '12.0s' },
+      { name: 'Finalize', artifact: 'run record', status: 'active' },
+    ],
+  })
+
+  // Finalize writes the record while it is still running, so it has no finish and therefore no
+  // elapsed at all. Absent, not zero and not an empty string.
+  assert.equal('elapsed' in snapshot.lastRun.phases[1], false)
+})
+
+test('lastRun: elapsed and duration read as seconds, then minutes, then hours', (t) => {
+  const started = insideHorizon(3)
+  const phase = (name, spanMs) => ({
+    name,
+    artifact: 'an artifact',
+    status: 'done',
+    startedAt: started,
+    finishedAt: new Date(started.getTime() + spanMs),
+  })
+  const dir = initRepo(t, {
+    knowledge: {
+      'runs/onboard-2026.md': runRecord({
+        at: insideHorizon(2),
+        run: {
+          id: 'r-1',
+          workflow: 'onboard',
+          mode: 'team',
+          startedAt: started,
+          finishedAt: new Date(started.getTime() + 3723000),
+          phases: [
+            phase('seconds', 12000),
+            phase('the last second under a minute', 59000),
+            // The branch is chosen on the rounded value, so the minute boundary reads as 1m 0s
+            // and never as 60.0s.
+            phase('the minute boundary', 60000),
+            phase('minutes', 73000),
+            phase('hours', 3723000),
+            // A finish before its start is not a span, so no value is invented for it.
+            { name: 'backwards', artifact: 'an artifact', status: 'done', startedAt: started, finishedAt: new Date(started.getTime() - 1000) },
+          ],
+        },
+      }),
+    },
+  })
+  const snapshot = runSnapshot(t, dir)
+
+  assert.deepEqual(
+    snapshot.lastRun.phases.map((p) => p.elapsed),
+    ['12.0s', '59.0s', '1m 0s', '1m 13s', '1h 2m', undefined]
+  )
+  assert.equal('elapsed' in snapshot.lastRun.phases[5], false)
+  assert.equal(snapshot.lastRun.duration, '1h 2m')
+})
+
+test('lastRun: a phase that carries no stamps at all carries no elapsed', (t) => {
+  // The record the onboard writes: whole-second UTC stamps, phases from an earlier stage that
+  // reported no timing at all, and a Finalize phase that is writing the record it appears in.
+  const stamp = (s) => `2026-09-10T09:58:${String(s).padStart(2, '0')}Z`
+  const dir = initRepo(t, {
+    knowledge: {
+      'runs/onboard-2026.md': runRecord({
+        at: insideHorizon(2),
+        rawRun: [
+          'run:',
+          '  id: onboard-2026-09-10T09-59-00Z',
+          '  workflow: onboard',
+          '  mode: team',
+          `  startedAt: "${stamp(47)}"`,
+          `  finishedAt: "${stamp(59)}"`,
+          '  phases:',
+          '    - name: Check',
+          '      status: done',
+          '    - name: Prepare',
+          '      status: done',
+          '    - name: Execute',
+          '      artifact: .claude/major-tom.json',
+          '      status: done',
+          `      startedAt: "${stamp(47)}"`,
+          `      finishedAt: "${stamp(55)}"`,
+          '    - name: Finalize',
+          '      artifact: .knowledge/runs/onboard-2026.md',
+          '      status: active',
+          `      startedAt: "${stamp(59)}"`,
+        ].join('\n'),
+      }),
+    },
+  })
+  const snapshot = runSnapshot(t, dir)
+
+  assert.deepEqual(snapshot.lastRun, {
+    id: 'onboard-2026-09-10T09-59-00Z',
+    workflow: 'onboard',
+    mode: 'team',
+    duration: '12.0s',
+    phases: [
+      // A phase nobody timed states no timing: null where the record said nothing, and no
+      // elapsed key at all rather than a zero.
+      { name: 'Check', artifact: null, status: 'done' },
+      { name: 'Prepare', artifact: null, status: 'done' },
+      { name: 'Execute', artifact: '.claude/major-tom.json', status: 'done', elapsed: '8.0s' },
+      { name: 'Finalize', artifact: '.knowledge/runs/onboard-2026.md', status: 'active' },
+    ],
+  })
+})
+
+test('lastRun: an instant in any spelling but the producer\'s carries no elapsed', (t) => {
+  // Neither of these is an instant. Without the Z the reader would resolve the stamp against
+  // its own timezone, and an offset moves the same wall clock to a different moment, so both
+  // make the snapshot depend on the machine that built it. The reader treats them the way it
+  // treats a stamp that is not there at all.
+  const dir = initRepo(t, {
+    knowledge: {
+      'runs/onboard-2026.md': runRecord({
+        at: insideHorizon(2),
+        rawRun: [
+          'run:',
+          '  id: r-loose',
+          '  workflow: onboard',
+          '  startedAt: "2026-09-10T09:58:47"',
+          '  finishedAt: "2026-09-10T09:58:59"',
+          '  phases:',
+          '    - name: no zone',
+          '      status: done',
+          '      startedAt: "2026-09-10T09:58:47"',
+          '      finishedAt: "2026-09-10T09:58:55"',
+          '    - name: an offset',
+          '      status: done',
+          '      startedAt: "2026-09-10T10:58:47+01:00"',
+          '      finishedAt: "2026-09-10T10:58:55+01:00"',
+          '    - name: milliseconds',
+          '      status: done',
+          '      startedAt: "2026-09-10T09:58:47.000Z"',
+          '      finishedAt: "2026-09-10T09:58:55.000Z"',
+        ].join('\n'),
+      }),
+    },
+  })
+  const snapshot = runSnapshot(t, dir)
+
+  // The block is still usable and the run is still reported. What is absent is every span.
+  assert.equal(snapshot.lastRun.id, 'r-loose')
+  assert.equal('duration' in snapshot.lastRun, false)
+  assert.deepEqual(snapshot.lastRun.phases, [
+    { name: 'no zone', artifact: null, status: 'done' },
+    { name: 'an offset', artifact: null, status: 'done' },
+    { name: 'milliseconds', artifact: null, status: 'done' },
+  ])
+})
+
+test('lastRun: an instant that is not a string carries no elapsed', (t) => {
+  // Stringifying a number and parsing it as a date is how 12345 and 12350 become a span of
+  // 43824 hours. A number is not an instant and states nothing about when anything happened.
+  const dir = initRepo(t, {
+    knowledge: {
+      'runs/onboard-2026.md': runRecord({
+        at: insideHorizon(2),
+        rawRun: [
+          'run:',
+          '  id: r-numbers',
+          '  workflow: onboard',
+          '  startedAt: 12345',
+          '  finishedAt: 12350',
+          '  phases:',
+          '    - name: Execute',
+          '      status: done',
+          '      startedAt: 12345',
+          '      finishedAt: 12350',
+          '    - name: booleans',
+          '      status: done',
+          '      startedAt: true',
+          '      finishedAt: true',
+        ].join('\n'),
+      }),
+    },
+  })
+  const snapshot = runSnapshot(t, dir)
+
+  assert.equal(snapshot.lastRun.id, 'r-numbers')
+  assert.equal('duration' in snapshot.lastRun, false)
+  assert.deepEqual(snapshot.lastRun.phases, [
+    { name: 'Execute', artifact: null, status: 'done' },
+    { name: 'booleans', artifact: null, status: 'done' },
+  ])
+})
+
+// The producer pins the stamp format on every agent report it collects and the reader applies
+// the same format to the records that come back. The workflow runtime lets neither file import
+// the other, so this is what stops the two literals drifting apart.
+test('lastRun: the reader applies the stamp rule the producer pins', () => {
+  const reader = /const RUN_STAMP_PATTERN = '([^']+)'/.exec(fs.readFileSync(SCRIPT, 'utf8'))
+  const producer = /const STAMP = \{ type: 'string', pattern: '([^']+)' \}/.exec(fs.readFileSync(WORKFLOW, 'utf8'))
+  assert.ok(reader, 'snapshot.js must hold the stamp pattern in one named constant')
+  assert.ok(producer, 'onboard.js must pin the stamp pattern on its report schemas')
+  assert.equal(reader[1], producer[1])
+
+  // Both captures are the source text of a JS string literal, so the escapes are still escapes.
+  // JSON.parse turns the literal back into the pattern it stands for.
+  const rule = new RegExp(JSON.parse('"' + reader[1] + '"'))
+  assert.equal(rule.test('2026-03-01T10:00:00Z'), true)
+  assert.equal(rule.test('2026-03-01T10:00:00'), false)
+  assert.equal(rule.test('2026-03-01T10:00:00.000Z'), false)
+  assert.equal(rule.test('2026-03-01T10:00:00+01:00'), false)
+})
+
+test('lastRun: a phase the record states as failed is reported as failed', (t) => {
+  // The onboard finishes and records failed for a phase whose agent did not complete, so the
+  // reader passes the word through. Flattening it to pending would report a phase that never
+  // started, which is a different and untrue fact.
+  const at = insideHorizon(2)
+  const dir = initRepo(t, {
+    knowledge: {
+      'runs/onboard-2026.md': runRecord({
+        at,
+        rawRun: [
+          'run:',
+          '  id: r-failed',
+          '  workflow: onboard',
+          '  phases:',
+          '    - name: Execute',
+          '      artifact: .claude/major-tom.json',
+          '      status: failed',
+          `      startedAt: ${yamlScalar(at)}`,
+          `      finishedAt: ${yamlScalar(new Date(at.getTime() + 8000))}`,
+          '    - name: Invented',
+          '      status: whatever the record made up',
+        ].join('\n'),
+      }),
+    },
+  })
+  const snapshot = runSnapshot(t, dir)
+
+  assert.deepEqual(snapshot.lastRun.phases, [
+    { name: 'Execute', artifact: '.claude/major-tom.json', status: 'failed', elapsed: '8.0s' },
+    // A word outside the vocabulary is still pending, and a failed phase still carries the span
+    // it was measured over.
+    { name: 'Invented', artifact: null, status: 'pending' },
+  ])
+})
+
+test('lastRun: a repository whose run records carry no run block omits the key', (t) => {
+  const dir = initRepo(t, {
+    knowledge: {
+      'runs/onboard-2026.md': runRecord({ at: insideHorizon(2) }),
+      'docs/alpha.md': concept('type: doc\ntitle: Alpha', 'alpha body'),
+    },
+  })
+  const snapshot = runSnapshot(t, dir)
+
+  assert.equal('lastRun' in snapshot, false)
+  assert.deepEqual(
+    Object.keys(snapshot).sort(),
+    ['config', 'decisions', 'generatedAt', 'git', 'knowledge', 'timeline']
+  )
+
+  // What the record lacks is the block, not the record: it is still a timeline event.
+  assert.equal(snapshot.timeline.events.length, 1)
+  assert.equal(snapshot.timeline.events[0].kind, 'run')
+})
+
+test('lastRun: an unusable run block is skipped and never fails the snapshot', (t) => {
+  const sound = insideHorizon(20)
+  const dir = initRepo(t, {
+    knowledge: {
+      'runs/a-sound.md': runRecord({ at: sound, run: soundRun('r-sound', sound, 2000) }),
+      'runs/b-scalar.md': runRecord({ at: insideHorizon(4), rawRun: 'run: not a mapping' }),
+      'runs/c-no-phases.md': runRecord({ at: insideHorizon(3), rawRun: 'run:\n  id: r-c\n  workflow: onboard' }),
+      'runs/d-phases-scalar.md': runRecord({ at: insideHorizon(2), rawRun: 'run:\n  id: r-d\n  phases: 3' }),
+      'runs/e-phases-not-mappings.md': runRecord({
+        at: insideHorizon(1),
+        rawRun: 'run:\n  id: r-e\n  phases:\n    - just a string\n    - 7',
+      }),
+    },
+  })
+  const snapshot = runSnapshot(t, dir)
+
+  // Four newer records carry blocks nothing can be read out of, so the newest usable one wins.
+  assert.equal(snapshot.lastRun.id, 'r-sound')
+  assert.equal(snapshot.lastRun.duration, '2.0s')
+
+  // The snapshot itself is intact, and every record is still a timeline event: an unusable
+  // block is skipped, never the file it sits in.
+  assert.equal(snapshot.timeline.events.length, 5)
+  assert.equal(snapshot.timeline.events.every((e) => e.kind === 'run'), true)
+})
+
+test('lastRun: two runs recorded in the same second resolve the way the timeline resolves them', (t) => {
+  const at = insideHorizon(2)
+  const dir = initRepo(t, {
+    knowledge: {
+      'runs/a-first.md': runRecord({ title: 'Run A', at, run: soundRun('r-a', at, 1000) }),
+      'runs/b-second.md': runRecord({ title: 'Run B', at, run: soundRun('r-b', at, 1000) }),
+    },
+  })
+  const snapshot = runSnapshot(t, dir)
+
+  // The tie breaks on the concept walk, which is path sorted, and it breaks the same way in
+  // both keys: whichever run the timeline lists first is the one lastRun reports.
+  assert.equal(snapshot.timeline.events[0].path, 'runs/a-first.md')
+  assert.equal(snapshot.lastRun.id, 'r-a')
+})
+
+test('lastRun: a narrowed window drops the run from the timeline and never from lastRun', (t) => {
+  const ran = outsideHorizon(90)
+  const log = []
+  for (let i = 0; i < 60; i += 1) {
+    log.push(logLine({ at: new Date(NOW - (i + 1) * MINUTE), promptId: `p-${i}`, summary: `intent ${i}` }))
+  }
+  const dir = initRepo(t, {
+    knowledge: { 'runs/old-onboard.md': runRecord({ at: ran, run: soundRun('r-old', ran, 5000) }) },
+    intentsLog: log,
+  })
+
+  // Sixty intents sit inside a one-day horizon, so the floor of 50 is already met and the run,
+  // ninety days old, is genuinely cut from the timeline rather than pulled back in.
+  const narrow = buildWith(dir, { days: 1 })
+  assert.equal(narrow.timeline.window.days, 1)
+  assert.equal(narrow.timeline.events.length, 60)
+  assert.equal(narrow.timeline.events.some((e) => e.path === 'runs/old-onboard.md'), false)
+  assert.equal(narrow.timeline.omitted.count, 1)
+
+  // The last run is a fact about the repository and not about the window, so the key is there
+  // with the same content the wide window gives it.
+  assert.equal(narrow.lastRun.id, 'r-old')
+  assert.equal(narrow.lastRun.duration, '5.0s')
+  assert.deepEqual(narrow.lastRun, buildWith(dir).lastRun)
+})
+
+// ---------------------------------------------------------------------------
 // Determinism
 // ---------------------------------------------------------------------------
 
@@ -1046,10 +1491,18 @@ test('determinism: two runs over an unchanged repository differ only in generate
         `type: intent\ntitle: An intent\nrecorded_at: "${insideHorizon(1).toISOString()}"\ntier: substantive\nrequest_type: feature\nprompt_id: p-md\nsession_id: s-md`,
         'a substantive intent'
       ),
-      'runs/onboard-2026.md': conceptExact(
-        `type: run\ntitle: An onboard run\ngenerated:\n  by: major-tom-onboard\n  at: "${insideHorizon(4).toISOString()}"`,
-        'the run body'
-      ),
+      // Two run records recorded in the same second, so the lastRun tie has to break the same
+      // way on both runs for the two snapshots to match.
+      'runs/onboard-2026.md': runRecord({
+        title: 'An onboard run',
+        at: insideHorizon(4),
+        run: soundRun('r-onboard', insideHorizon(4), 73000),
+      }),
+      'runs/track-2026.md': runRecord({
+        title: 'A track run',
+        at: insideHorizon(4),
+        run: soundRun('r-track', insideHorizon(4), 4000),
+      }),
     },
     intentsLog: [
       logLine({ at: insideHorizon(2), promptId: 'p-log', summary: 'a logged intent' }),
@@ -1072,6 +1525,42 @@ test('determinism: two runs over an unchanged repository differ only in generate
   // Comparing the re-serialized objects also compares key order, so a reordered walk is a
   // failure here even though the values match.
   assert.equal(JSON.stringify(second), JSON.stringify(first))
+})
+
+test('determinism: two runs under different timezones differ only in generatedAt', (t) => {
+  // The test above builds twice in one process, where a value read off the reader's own
+  // timezone matches itself and passes. This one runs the script twice under two timezones, one
+  // of which moves its clock between the two instants in the fixture: parsed as local time
+  // those instants are two minutes apart in New York and sixty-two in UTC.
+  const dir = initRepo(t, {
+    knowledge: {
+      'docs/alpha.md': concept('type: decision\nid: D1\ntitle: A decision\nstatus: open', 'why'),
+      'runs/onboard-2026.md': runRecord({
+        at: insideHorizon(2),
+        rawRun: [
+          'run:',
+          '  id: r-dst',
+          '  workflow: onboard',
+          '  startedAt: "2026-03-08T01:59:00"',
+          '  finishedAt: "2026-03-08T03:01:00"',
+          '  phases:',
+          '    - name: Execute',
+          '      status: done',
+          '      startedAt: "2026-03-08T01:59:00"',
+          '      finishedAt: "2026-03-08T03:01:00"',
+        ].join('\n'),
+      }),
+    },
+    intentsLog: [logLine({ at: insideHorizon(2), promptId: 'p-log', summary: 'a logged intent' })],
+    commits: [{ message: 'feat: first', date: insideHorizon(8), files: { 'a.txt': 'one\n' } }],
+  })
+
+  const utc = runSnapshot(t, dir, { TZ: 'UTC' })
+  const newYork = runSnapshot(t, dir, { TZ: 'America/New_York' })
+
+  delete utc.generatedAt
+  delete newYork.generatedAt
+  assert.equal(JSON.stringify(newYork), JSON.stringify(utc))
 })
 
 // ---------------------------------------------------------------------------

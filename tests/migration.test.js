@@ -49,9 +49,11 @@ const IGNORED_PATHS = ['.claude/worktrees/', '.claude/session/', '.claude/server
 const LAUNCH_ENTRY_NAME = 'major-tom-dashboard'
 const LAUNCHER_PROGRAM = '.claude/server/launcher.js'
 
-// The plugin versions the transitions turn on, as D54 records them.
+// The plugin versions the transitions turn on, as D54 records them. CURRENT is the version the
+// newest transition ships in, so a fixture stamped with it is a project onboarded by the plugin
+// as it stands.
 const BEFORE_EVERYTHING = '0.19.0'
-const CURRENT = '0.26.0'
+const CURRENT = '0.29.0'
 
 // The suffix D55 quarantines onto.
 const RETIRED_SUFFIX = '.retired'
@@ -165,8 +167,49 @@ function defaultConfig(overrides) {
   return Object.assign(config, overrides || {})
 }
 
+const RUN_RECORD_NAME = 'onboard-2026-08-07T10-00-00-000Z.md'
+
+// The onboard run record, in the two shapes a repository can hold it. Both are the same
+// artifact at the same path: type run, the same title, the same generated block, the same prose
+// body. The run block of D57 is the only difference, written the way the Finalize prompt asks
+// for it, a nested block with one entry per phase and stamps only where a phase has them.
+function runRecord(options) {
+  const opts = options || {}
+  const name = opts.name || RUN_RECORD_NAME
+  const head = [
+    '---',
+    'type: run',
+    'title: Onboard',
+    'generated: {by: major-tom-onboard, at: 2026-08-07T10:00:00Z}',
+  ]
+  const block = [
+    'run:',
+    '  id: ' + name.replace(/\.md$/, ''),
+    '  workflow: onboard',
+    '  mode: subagents',
+    '  startedAt: 2026-08-07T09:58:00Z',
+    '  finishedAt: 2026-08-07T10:00:00Z',
+    '  phases:',
+    '    - name: Check',
+    '      status: done',
+    '    - name: Execute',
+    '      artifact: .claude/major-tom.json',
+    '      status: done',
+    '      startedAt: 2026-08-07T09:58:00Z',
+    '      finishedAt: 2026-08-07T09:59:30Z',
+    '    - name: Finalize',
+    '      artifact: ' + KNOWLEDGE_ROOT + '/runs/' + name,
+    '      status: active',
+    '      startedAt: 2026-08-07T10:00:00Z',
+  ]
+  return head
+    .concat(opts.runBlock ? block : [], ['---', '', 'Onboard run record.', ''])
+    .join('\n')
+}
+
 // A project in the shape a current onboard leaves behind: every entry the map declares as
-// always required, and nothing else.
+// always required, and nothing else. `runBlock: false` writes the run record as a plugin before
+// D57 wrote it, which is the same artifact minus that block.
 function onboardedProject(options) {
   const opts = options || {}
   const root = tempDir('major-tom-map-')
@@ -183,20 +226,7 @@ function onboardedProject(options) {
     KNOWLEDGE_ROOT + '/index.md',
     ['---', 'okf_version: 0.2', '---', '', '## runs', '', '- runs/onboard-fixture.md type=run', ''].join('\n')
   )
-  write(
-    root,
-    KNOWLEDGE_ROOT + '/runs/onboard-2026-08-07T10-00-00-000Z.md',
-    [
-      '---',
-      'type: run',
-      'title: Onboard',
-      'generated: {by: major-tom-onboard, at: 2026-08-07T10:00:00Z}',
-      '---',
-      '',
-      'Onboard run record.',
-      '',
-    ].join('\n')
-  )
+  write(root, KNOWLEDGE_ROOT + '/runs/' + RUN_RECORD_NAME, runRecord({ runBlock: opts.runBlock !== false }))
 
   write(root, 'AGENTS.md', [HTML_BEGIN, '# fixture', '', 'Context.', HTML_END, ''].join('\n'))
   write(root, 'CLAUDE.md', [HTML_BEGIN, '@AGENTS.md', HTML_END, ''].join('\n'))
@@ -497,6 +527,25 @@ test('--verify expands one entry per configured specialist', (t) => {
   assert.equal(missing.status, 1)
 })
 
+test('--verify accepts an onboard run record with or without the run block', (t) => {
+  // The regression this suite exists to catch on the D57 side. The block is not evidence: a
+  // record written before it is just as much ours, and calling it UNRECOGNISED would report
+  // true history as a defect and offer no way out, because a run record is never rewritten.
+  const current = onboardedProject()
+  const older = onboardedProject({ runBlock: false, config: { onboard: { completedAt: '2026-08-06T10:00:00Z', pluginVersion: BEFORE_EVERYTHING } } })
+  t.after(() => {
+    remove(current)
+    remove(older)
+  })
+
+  const record = KNOWLEDGE_ROOT + '/runs/' + RUN_RECORD_NAME
+  for (const [label, repo] of [['with the block', current], ['without it', older]]) {
+    const result = run(['--verify', repo])
+    assert.equal(statusOf(result.stdout, record), 'ok', 'the record ' + label + ' must verify\n' + result.all)
+    assert.equal(result.status, 0, result.all)
+  }
+})
+
 test('--verify reports a retired artifact wherever it finds one, whatever the config says', (t) => {
   const repo = onboardedProject()
   t.after(() => remove(repo))
@@ -633,6 +682,54 @@ test('--assets covers every runtime asset the onboard reaches for', () => {
 })
 
 // ---------------------------------------------------------------------------
+// writtenBy
+// ---------------------------------------------------------------------------
+
+// writtenBy is the map's only pointer from an artifact back to the mechanism that writes it,
+// and for two entries that pointer names a numbered step of a prompt that lives in another
+// file. No mode of the map checks it, so the two drifted once already and nothing noticed.
+// This test reads the step numbers out of the onboard's own Finalize prompt and holds the map
+// to them, which is the whole reason the field is worth having.
+//
+// The map is required here rather than driven as a child process, because writtenBy is
+// documentation the modes never print.
+test('writtenBy cites the Finalize steps the onboard actually numbers', () => {
+  const finalize = finalizePrompt()
+  const runRecordStep = stepNumber(finalize, 'Write the run record')
+  const indexStep = stepNumber(finalize, "Append the run record's one-line entry")
+
+  assert.match(
+    mapEntry('run-record-onboard').writtenBy,
+    new RegExp('workflows/onboard\\.js, Finalize step ' + runRecordStep + '\\b')
+  )
+  assert.match(
+    mapEntry('bundle-index').writtenBy,
+    new RegExp('appended to by Finalize step ' + indexStep + '\\b')
+  )
+})
+
+// The Finalize prompt of the onboard, as source text. Its steps are numbered in the prompt
+// itself, and those numbers are what writtenBy cites.
+function finalizePrompt() {
+  const source = fs.readFileSync(path.join(PLUGIN_ROOT, 'workflows', 'onboard.js'), 'utf8')
+  const start = source.indexOf("phase('Finalize')")
+  assert.notEqual(start, -1, 'the onboard must still open a Finalize phase')
+  return source.slice(start)
+}
+
+function stepNumber(prompt, instruction) {
+  const match = new RegExp('[`\'"](\\d+)\\. ' + instruction).exec(prompt)
+  assert.ok(match, 'the Finalize prompt must still carry the step ' + JSON.stringify(instruction))
+  return match[1]
+}
+
+function mapEntry(id) {
+  const found = require(SCRIPT).MAP.filter((entry) => entry.id === id)
+  assert.equal(found.length, 1, 'the map must declare exactly one entry with id ' + JSON.stringify(id))
+  return found[0]
+}
+
+// ---------------------------------------------------------------------------
 // --check
 // ---------------------------------------------------------------------------
 
@@ -742,6 +839,21 @@ test('--check fails on a residue that claims any remedy other than a quarantine'
   assert.match(result.stderr, /deleting-residue: a residue is remedied by quarantine and by nothing else \(D55\)/)
 })
 
+test('--check refuses a remedy outside the declared vocabulary', (t) => {
+  // --plan prints this word ahead of the sentence explaining it and a consumer groups on it, so
+  // a fifth name has to fail at declaration time rather than reach a user's report.
+  const script = pluginCopyWithTransition(
+    t,
+    "{ id: 'invented-remedy', species: 'gap', since: '0.20.0', decision: 'none', " +
+      "subject: { entry: 'config', key: 'x' }, describe: 'x', " +
+      "remedy: 'ask-somebody', remedyBy: 'x', detect() { return [] } }"
+  )
+
+  const result = run(['--check'], { script })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /invented-remedy: unknown remedy "ask-somebody"/)
+})
+
 test('--check refuses evidence on anything that is not a residue', (t) => {
   const script = pluginCopyWithTransition(
     t,
@@ -761,9 +873,11 @@ test('--check refuses evidence on anything that is not a residue', (t) => {
 // ---------------------------------------------------------------------------
 
 // A project onboarded before every transition, carrying what each of them is about: the two
-// retired artifacts, the two wrong values and the missing block.
+// retired artifacts, the two wrong values, the missing snapshot block and a run record from
+// before the run block.
 function legacyProject() {
   const repo = onboardedProject({
+    runBlock: false,
     config: {
       onboard: { completedAt: '2026-08-06T10:00:00Z', pluginVersion: BEFORE_EVERYTHING },
       mcp: ['codebase-memory'],
@@ -817,6 +931,65 @@ test('--plan reports a gap transition and says it needs the interview', (t) => {
   assert.match(result.stdout, /APPLIES {2}gap {2}snapshot-block/)
   assert.match(result.stdout, /config carries no snapshot block/)
   assert.match(result.stdout, /remedy: interview;/)
+})
+
+test('--plan reports the missing run block as a gap the next run closes', (t) => {
+  const repo = legacyProject()
+  t.after(() => remove(repo))
+
+  const result = run(['--plan', repo])
+  assert.equal(result.status, 0, result.all)
+  assert.match(result.stdout, /APPLIES {2}gap {2}run-block/)
+  assert.match(result.stdout, /none of them carrying a run block/)
+  assert.match(result.stdout, /remedy: next-run; re-run \/major-tom:onboard/)
+})
+
+test('--plan never asks anyone to repair a record written before the run block', (t) => {
+  // The report a user of an older repository reads. An older record is a complete record, so
+  // the plan may say what the dashboard lacks and what supplies it, and may not say that
+  // anything on disk is broken or has to be rewritten.
+  const repo = legacyProject()
+  t.after(() => remove(repo))
+
+  const result = run(['--plan', repo])
+  assert.match(result.stdout, /A record written before it is a complete record all the same/)
+  assert.match(result.stdout, /--verify calls it ok/)
+  assert.match(result.stdout, /Nothing repairs a record already written and nothing should/)
+  assert.match(result.stdout, /Every record already on disk stays exactly as it is/)
+})
+
+test('--plan says nothing about the run block once any record carries one', (t) => {
+  // A pre-block record beside a current one is complete history rather than a defect: the
+  // dashboard reads the newest record that has a block, so nothing is left for anyone to do.
+  const repo = onboardedProject({
+    runBlock: false,
+    config: { onboard: { completedAt: '2026-08-06T10:00:00Z', pluginVersion: BEFORE_EVERYTHING } },
+  })
+  t.after(() => remove(repo))
+
+  const second = 'onboard-2026-09-10T12-00-00-000Z.md'
+  write(repo, KNOWLEDGE_ROOT + '/runs/' + second, runRecord({ runBlock: true, name: second }))
+
+  const result = run(['--plan', repo])
+  assert.equal(result.status, 0, result.all)
+  assert.equal(lineFor(result.stdout, 'APPLIES', 'run-block').length, 0, result.all)
+  assert.match(result.stdout, /CLEAR {4}gap {2}run-block/)
+})
+
+test('--plan reports the run-block gap only where a record exists to lack it', (t) => {
+  // With no record at all the artifact is MISSING, which --verify names and a re-onboard
+  // restores. Reporting a gap for the same fact would offer a second, different remedy for it.
+  const repo = onboardedProject({ runBlock: false })
+  t.after(() => remove(repo))
+
+  fs.rmSync(path.join(repo, KNOWLEDGE_ROOT, 'runs', RUN_RECORD_NAME))
+
+  const plan = run(['--plan', repo])
+  assert.equal(plan.status, 0, plan.all)
+  assert.equal(lineFor(plan.stdout, 'APPLIES', 'run-block').length, 0, plan.all)
+
+  const verify = run(['--verify', repo])
+  assert.equal(statusOf(verify.stdout, KNOWLEDGE_ROOT + '/runs/onboard-*.md'), 'MISSING', verify.all)
 })
 
 test('--plan names the three species and never any other', (t) => {
@@ -888,7 +1061,7 @@ test('--plan reports nothing applicable for a current project', (t) => {
 test('--plan separates what applies by version from what this repository actually carries', (t) => {
   // Onboarded before every transition, but carrying none of them: the version says the
   // transitions could apply and the repository says they do not, and a report that only
-  // compared versions would send this user to fix five things that are not there.
+  // compared versions would send this user to fix six things that are not there.
   const repo = onboardedProject({
     config: { onboard: { completedAt: '2026-08-06T10:00:00Z', pluginVersion: BEFORE_EVERYTHING } },
   })
@@ -896,8 +1069,9 @@ test('--plan separates what applies by version from what this repository actuall
 
   const result = run(['--plan', repo])
   assert.equal(result.status, 0, result.all)
-  assert.match(result.stdout, /plan: 0 applies, 6 clear, 0 not applicable/)
+  assert.match(result.stdout, /plan: 0 applies, 7 clear, 0 not applicable/)
   assert.match(result.stdout, /CLEAR {4}residue {2}dashboard-artifact/)
+  assert.match(result.stdout, /CLEAR {4}gap {2}run-block/)
 })
 
 test('--plan reports a residue even when the recorded version would not predict it', (t) => {
