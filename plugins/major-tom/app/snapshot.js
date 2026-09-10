@@ -44,9 +44,9 @@
 // window is measured from.
 //
 // Output: JSON.stringify(snapshot, null, 2) plus a trailing newline, with the six required
-// keys generatedAt, config, git, knowledge, decisions, timeline. lastRun and roadmap are
-// omitted entirely: no mechanism produces them yet and the dashboard shows honest empty
-// states for both.
+// keys generatedAt, config, git, knowledge, decisions, timeline. lastRun is added when a run
+// record carries a run block and is omitted entirely otherwise. roadmap is always omitted: no
+// mechanism produces it and the dashboard shows an honest empty state for it.
 
 'use strict'
 
@@ -97,6 +97,12 @@ const WINDOW_BOUNDS = Object.freeze({
 
 const SUMMARY_MAX = 200
 const DAY_MS = 86400000
+
+// A concept that is an intent, matched by path. The direct children of runs/intents/ are the
+// intents; every other concept under runs/ that declares type: run is a run record. Both the
+// timeline and the lastRun key branch on this, so the two cannot disagree about which files
+// are runs.
+const INTENT_PATH_RE = /^runs\/intents\/[^/]+\.md$/
 
 // The length of a knowledge file's id, in hex characters. 16 hex characters is 64 bits of
 // the SHA-256 of the path: by the birthday bound a bundle would need on the order of 2^32
@@ -604,6 +610,32 @@ function buildDecisions(knowledgeFiles) {
 }
 
 // ---------------------------------------------------------------------------------------
+// run records
+//
+// Two readers walk the same run records, the timeline's third source and the lastRun key, so
+// what a run record is and when it happened are decided here once.
+
+// A run record is a concept under runs/, outside runs/intents/, that declares type: run.
+function isRunRecord(concept) {
+  return (
+    concept.path.startsWith('runs/') &&
+    !INTENT_PATH_RE.test(concept.path) &&
+    concept.frontmatter.type === 'run'
+  )
+}
+
+// When a run record happened. The onboard writes generated: {by, at}; a plain string
+// generated: <timestamp> is accepted too. Without either, the file mtime stands in, so a
+// record is never dropped and no date is invented.
+function runRecordAt(concept) {
+  const fm = concept.frontmatter
+  let at = null
+  if (isPlainObject(fm.generated)) at = nullableString(fm.generated.at)
+  else if (fm.generated !== undefined) at = nullableString(fm.generated)
+  return at || concept.updated
+}
+
+// ---------------------------------------------------------------------------------------
 // timeline
 
 // The three sources, all under the persistence root and nowhere else. .claude/session/ is
@@ -672,9 +704,8 @@ function collectEvents(persistenceRoot, concepts) {
 
   // Source 2: runs/intents/*.md, the substantive intent concepts. Matched by path, as the
   // prose states, so the direct children of runs/intents/ that are concepts are the intents.
-  const intentPathRe = /^runs\/intents\/[^/]+\.md$/
   for (const concept of concepts) {
-    if (!intentPathRe.test(concept.path)) continue
+    if (!INTENT_PATH_RE.test(concept.path)) continue
     const fm = concept.frontmatter
     // at comes from recorded_at; when a concept lacks it the file mtime stands in, the same
     // fallback the run records use, so an event is never dropped and no date is invented.
@@ -698,20 +729,12 @@ function collectEvents(persistenceRoot, concepts) {
   // Source 3: the run records under runs/ whose frontmatter type is "run". A file under
   // runs/intents/ is already an intent by source 2 and is never counted twice here.
   for (const concept of concepts) {
-    if (!concept.path.startsWith('runs/')) continue
-    if (intentPathRe.test(concept.path)) continue
+    if (!isRunRecord(concept)) continue
     const fm = concept.frontmatter
-    if (fm.type !== 'run') continue
-    // The onboard writes generated: {by, at}; a plain string generated: <timestamp> is
-    // accepted too. Without either, the file mtime is the timestamp.
-    let at = null
-    if (isPlainObject(fm.generated)) at = nullableString(fm.generated.at)
-    else if (fm.generated !== undefined) at = nullableString(fm.generated)
-    if (!at) at = concept.updated
     const capped = capSummary(fm.title === undefined || fm.title === null || fm.title === '' ? concept.path : String(fm.title))
     push({
       event: {
-        at,
+        at: runRecordAt(concept),
         kind: 'run',
         tier: null,
         type: null,
@@ -760,6 +783,140 @@ function buildTimeline(candidates, selection) {
 }
 
 // ---------------------------------------------------------------------------------------
+// the last run
+
+// The one shape a run record's instant may take, and the same rule the producer pins on every
+// report it collects (plugins/major-tom/workflows/onboard.js, the STAMP schema). The workflow
+// runtime lets neither file import the other, so the two literals are held equal by a test in
+// tests/snapshot.test.js instead of by a shared module.
+//
+// The form is narrow because a wider one cannot be read the same way twice. A stamp with no Z,
+// or with an offset, is parsed against whatever timezone the reader runs in, so one repository
+// would report different spans on different machines and break the byte-identical guarantee
+// this file makes. A value that is not a string is not an instant either.
+const RUN_STAMP_PATTERN = '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$'
+const RUN_STAMP = new RegExp(RUN_STAMP_PATTERN)
+
+// The instant a value states, or null when the value states none.
+function runStamp(value) {
+  return typeof value === 'string' && RUN_STAMP.test(value) ? value : null
+}
+
+// A span between two of the record's instants, in the spelling the lifecycle strip displays.
+// The record stores instants and the view does no arithmetic, so the formatting rule lives
+// here and reads:
+//
+//   under a minute      seconds with one decimal, 0.0s and 12.0s
+//   a minute and over   whole minutes and whole seconds, 1m 13s
+//   an hour and over    whole hours and whole minutes, 1h 2m
+//
+// The seconds go at an hour because they are noise beside a running total that large and the
+// phase cell is one narrow line. Every stamp is a whole second, so the decimal is always a
+// zero, and the branch is chosen on the rounded value, so 60 seconds reads as 1m 0s and never
+// as 60.0s.
+//
+// Null when either value is not an instant, and null when the end precedes the start. Neither
+// is a span, and the caller omits the field rather than inventing a value for it. No clock is
+// read here, and both instants come from the record, which is what keeps two runs over an
+// unchanged repository byte identical.
+function formatSpan(fromAt, toAt) {
+  const from = runStamp(fromAt)
+  const to = runStamp(toAt)
+  if (from === null || to === null) return null
+  const ms = Date.parse(to) - Date.parse(from)
+  if (!Number.isFinite(ms) || ms < 0) return null
+
+  const tenths = Math.round(ms / 100)
+  if (tenths < 600) return `${(tenths / 10).toFixed(1)}s`
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
+  const minutes = Math.round(ms / 60000)
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
+}
+
+// The statuses a run record may state for a phase, which are the ones the onboard writes.
+const PHASE_STATUS = new Set(['done', 'active', 'failed'])
+
+// One run record's run block, read into the lastRun shape, or null when the block does not
+// carry a run.
+//
+// A usable block is a mapping whose phases are an array holding at least one mapping.
+// Everything below that is skipped rather than repaired, exactly as an unparseable concept is
+// skipped, so a broken record never fails the snapshot and never shadows the sound older run
+// behind it. Everything above it is read leniently, so a missing scalar is null, because a run
+// that did not state its mode is a fact about the record and not a reason to discard it.
+//
+// A status the record states as done, active or failed is passed through and anything else is
+// read as pending. failed is not softened here. The onboard records it for a phase whose agent
+// did not complete while the run itself carried on, and the reader has no business turning that
+// back into a phase that never started.
+//
+// elapsed and duration are omitted when no pair of instants supports them, which is the
+// ordinary case for the phase writing the record, because it is still active and has no finish,
+// so its elapsed is absent rather than zero or empty.
+function readRunBlock(concept) {
+  const block = concept.frontmatter.run
+  if (!isPlainObject(block)) return null
+  if (!Array.isArray(block.phases)) return null
+
+  const phases = []
+  for (const entry of block.phases) {
+    if (!isPlainObject(entry)) continue
+    const phase = {
+      name: nullableString(entry.name),
+      artifact: nullableString(entry.artifact),
+      status: PHASE_STATUS.has(entry.status) ? entry.status : 'pending',
+    }
+    const elapsed = formatSpan(entry.startedAt, entry.finishedAt)
+    if (elapsed !== null) phase.elapsed = elapsed
+    phases.push(phase)
+  }
+  if (phases.length === 0) return null
+
+  // id falls back to the record's path, the same fallback buildDecisions makes for a decision
+  // that names no id. The path is a fact about the record; nothing here is invented.
+  const lastRun = {
+    id: nullableString(block.id) || concept.path,
+    workflow: nullableString(block.workflow),
+    mode: nullableString(block.mode),
+  }
+  const duration = formatSpan(block.startedAt, block.finishedAt)
+  if (duration !== null) lastRun.duration = duration
+  lastRun.phases = phases
+  return lastRun
+}
+
+// The lastRun key: the newest run record carrying a usable run block.
+//
+// It reads the concept list and never timeline.events. A repository whose last run fell out of
+// the window still has a last run, and a key that vanished when a reader narrowed the window
+// would be a bug the window control could produce at will. lastRun is not a windowed concept
+// and no selection is applied to it.
+//
+// The ordering is the timeline's ordering. Candidates carry the same instant runRecordAt gives
+// the timeline's run events and are sorted by the same byNewest, with seq taken from the
+// concept walk, which is path sorted. Two runs recorded in the same second therefore resolve
+// the same way here and in the timeline, and they resolve the same way on every machine.
+//
+// Returns null when no record carries a block, and the caller then omits the key entirely, so
+// a repository with no producer keeps the honest empty state the dashboard already draws and
+// nothing needs migrating.
+function buildLastRun(concepts) {
+  const candidates = []
+  for (const concept of concepts) {
+    if (!isRunRecord(concept)) continue
+    if (concept.frontmatter.run === undefined) continue
+    candidates.push({ seq: candidates.length, ms: toMillis(runRecordAt(concept)), concept })
+  }
+  candidates.sort(byNewest)
+  for (const candidate of candidates) {
+    const lastRun = readRunBlock(candidate.concept)
+    if (lastRun !== null) return lastRun
+  }
+  return null
+}
+
+// ---------------------------------------------------------------------------------------
 // the snapshot
 
 // The whole computation, and the only place it lives. The server calls this per request; the
@@ -796,7 +953,7 @@ function buildSnapshot(options) {
   const concepts = collectConcepts(persistenceRoot)
   const knowledge = buildKnowledge(persistenceRoot, concepts)
 
-  return {
+  const snapshot = {
     generatedAt,
     config,
     git: collectGit(repoRoot, selection),
@@ -804,6 +961,13 @@ function buildSnapshot(options) {
     decisions: buildDecisions(knowledge.files),
     timeline: buildTimeline(collectEvents(persistenceRoot, concepts), selection),
   }
+
+  // lastRun is added only when a run record carries a run block. It is read from the concepts
+  // rather than from the timeline, so the window never decides whether the key exists.
+  const lastRun = buildLastRun(concepts)
+  if (lastRun !== null) snapshot.lastRun = lastRun
+
+  return snapshot
 }
 
 // The body of one concept, addressed by the id buildKnowledge minted for it (D43 point 8).
