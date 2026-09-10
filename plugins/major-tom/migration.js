@@ -253,7 +253,7 @@ const MAP = [
     id: 'bundle-index',
     paths: ['<persistence.root>/index.md'],
     kind: 'knowledge',
-    writtenBy: 'workflows/onboard.js, Execute step 3; created and appended to by skills/think/scripts/record-intent.js; appended to by Finalize step 5',
+    writtenBy: 'workflows/onboard.js, Execute step 3; created and appended to by skills/think/scripts/record-intent.js; appended to by Finalize step 4',
     tracked: 'tracked',
     shared: false,
     instance: 'single',
@@ -266,7 +266,7 @@ const MAP = [
     id: 'run-record-onboard',
     paths: ['<persistence.root>/runs/onboard-*.md'],
     kind: 'knowledge',
-    writtenBy: 'workflows/onboard.js, Finalize step 4',
+    writtenBy: 'workflows/onboard.js, Finalize step 3; its run block is assembled by the workflow script and completed by that same step (D57)',
     tracked: 'tracked',
     shared: false,
     instance: 'set',
@@ -277,7 +277,7 @@ const MAP = [
       { type: 'pattern', source: 'by:\\s*major-tom-onboard', flags: '' },
     ],
     since: '0.9.0',
-    note: 'One per onboard run. Re-onboarding adds a record, never replaces one.',
+    note: 'One per onboard run. Re-onboarding adds a record, never replaces one. The evidence proves the file is an onboard run record and says nothing about the run block on purpose, because a record written before D57 is just as much ours and a predicate for the block would report years of true history as UNRECOGNISED with no remedy available, since a past run record is never rewritten. Where the block is absent is reported by the run-block transition instead.',
   },
   {
     id: 'intents-log',
@@ -513,9 +513,10 @@ const MAP = [
 //   value    A value inside a file we own is wrong under the current design and the
 //            right value is derivable. The file is still ours, so --verify must not
 //            call it unrecognised; re-running the onboard rewrites it.
-//   gap      The current design requires something an older version never wrote, and
-//            the right value is not derivable from anything on disk. It needs the
-//            interview, which means a human.
+//   gap      The current design requires something an older version never wrote, and the
+//            right value is not derivable from anything on disk. What supplies it differs
+//            per gap, which is what `remedy` says. A value nobody can compute needs the
+//            interview, and a block only a run can produce needs a run.
 //
 // since     A config whose onboard.pluginVersion is BELOW this needs the transition.
 // detect    Whether it actually applies to this repository. The version alone
@@ -533,7 +534,14 @@ const MAP = [
 //           the same name. Detection says a path is occupied; evidence says by whom, and
 //           only the second one may authorise a move. When it fails, the honest act is to
 //           report and stop, which is what both --plan and --quarantine do.
-// remedy    quarantine | rewrite | interview. What closes the transition.
+// remedy    quarantine | rewrite | interview | next-run. What closes the transition, and
+//           the four differ in what they touch. A quarantine renames a file. A rewrite
+//           replaces a value inside an artifact that is already there. An interview asks a
+//           human for a value nothing on disk can supply. A next-run closes the transition
+//           by writing the next artifact of its kind and changes nothing already written,
+//           which is the only honest answer where the artifact is a record of something
+//           that already happened. --check reads this vocabulary, so a fifth name is a
+//           declaration error rather than a word the reader has to interpret.
 // remedyBy  The mechanism that performs the remedy, named concretely enough to run.
 // ---------------------------------------------------------------------------
 
@@ -689,6 +697,35 @@ const TRANSITIONS = [
     remedyBy: 're-run /major-tom:onboard: the interview asks both questions from the schema descriptions, which carry the range and the proposed default',
     detect(ctx) {
       return isObject(ctx.config.snapshot) ? [] : ['config carries no snapshot block']
+    },
+  },
+  {
+    id: 'run-block',
+    species: 'gap',
+    since: '0.29.0',
+    decision: 'D57',
+    subject: { entry: 'run-record-onboard', key: 'run' },
+    describe:
+      'The onboard run record carries a structured run block in its frontmatter now: the run id, the workflow, the working model, the span of the run, and one entry per phase with its artifact, its status and its stamps. That block is what the dashboard reads into lastRun. A record written before it is a complete record all the same, still type run, still an OKF concept, still the one timeline event it always was, and --verify calls it ok. What a repository holding only such records lacks is lastRun on the dashboard, which draws its empty state instead. Nothing repairs a record already written and nothing should, because it states what one run did, the phase timings of a run that has finished were never measured, and a block backfilled into it would put an invented reading into the knowledge base.',
+    remedy: 'next-run',
+    remedyBy:
+      're-run /major-tom:onboard. Finalize writes a run record on every run and the next one carries the block, which is all the dashboard needs, since it reads the newest record that has one. Every record already on disk stays exactly as it is.',
+    detect(ctx) {
+      const pattern = ctx.resolve('<persistence.root>/runs/onboard-*.md')
+      const records = expandGlob(ctx.repo, pattern)
+      // No record at all is an absence, and --verify already reports that against the entry.
+      // Repeating it here would name a remedy for a defect that has a different one.
+      if (records.length === 0) return []
+      // The frontmatter scanner reads top-level keys, so this proves the record declares a run
+      // block and not that the block parses into phases. snapshot.js is what decides usable,
+      // and a declared block that is unusable is a defect of that one record rather than the
+      // version gap this transition is about.
+      const withBlock = records.filter((rel) => {
+        const front = frontmatter(readText(path.join(ctx.repo, rel)))
+        return front !== null && 'run' in front
+      })
+      if (withBlock.length > 0) return []
+      return [records.length + ' onboard run record(s) matching ' + pattern + ', none of them carrying a run block']
     },
   },
 ]
@@ -1247,6 +1284,12 @@ function check() {
     }
     if (parseVersion(transition.since) === null) problems.push(transition.id + ': since is not a version')
     if (typeof transition.detect !== 'function') problems.push(transition.id + ': no detect')
+    // The remedy vocabulary, gated for every species. --plan prints this word ahead of the
+    // sentence that explains it, and a consumer groups on it, so a name outside the four is a
+    // word nobody can act on.
+    if (['quarantine', 'rewrite', 'interview', 'next-run'].indexOf(transition.remedy) === -1) {
+      problems.push(transition.id + ': unknown remedy ' + JSON.stringify(transition.remedy))
+    }
     if (transition.subject.entry && !ids.has(transition.subject.entry)) {
       problems.push(transition.id + ': subject names an entry that is not in the map, ' + transition.subject.entry)
     }
