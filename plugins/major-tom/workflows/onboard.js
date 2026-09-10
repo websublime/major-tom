@@ -19,11 +19,32 @@ export const meta = {
 // is not a question Execute asks: between the two stages is the only place in this design
 // where a human can be asked anything at all.
 
+// Every agent report carries two clock readings, and the run record's phase spans are reduced
+// from them (D57). The script cannot measure anything itself, because the runtime makes every
+// clock a script could reach throw, so the only honest timestamps in a workflow are the ones an
+// agent read and reported.
+//
+// The pattern earns its place. The reduction compares these strings directly, and that is sound
+// only while every stamp shares one fixed-width UTC format; the runtime validates structured
+// output against this schema and retries an agent that answers in another shape. The reader of
+// the record applies the same rule (app/snapshot.js, RUN_STAMP_PATTERN), and a test holds the
+// two literals equal, since neither file can import the other.
+const STAMP = { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$' }
+
+// The clock instruction is written once here and appended to every prompt that asks for a
+// report.
+const STAMPS = [
+  'Run `date -u +%Y-%m-%dT%H:%M:%SZ` as your first action and run it again as your last action.',
+  'Report the first reading as startedAt and the second as finishedAt, exactly as the command printed them. Read a real clock for both; never compute, round, adjust or invent either one.',
+].join('\n')
+
 const PRECONDITIONS = {
   type: 'object',
   additionalProperties: false,
-  required: ['isGitRepo', 'hasExistingConfig', 'existingConfig', 'codebaseMemoryMcpAvailable', 'pluginRoot', 'pluginAssetsPresent', 'projectTypeGuess', 'residuePlan', 'notes'],
+  required: ['isGitRepo', 'hasExistingConfig', 'existingConfig', 'codebaseMemoryMcpAvailable', 'pluginRoot', 'pluginAssetsPresent', 'projectTypeGuess', 'residuePlan', 'notes', 'startedAt', 'finishedAt'],
   properties: {
+    startedAt: STAMP,
+    finishedAt: STAMP,
     isGitRepo: { type: 'boolean' },
     hasExistingConfig: { type: 'boolean' },
     existingConfig: { type: ['object', 'null'] },
@@ -62,7 +83,10 @@ const PRECONDITIONS = {
 // script threads that path into every prompt that needs the schema or a template (D23).
 function runPreconditions(phaseTitle) {
   return agent(
-    'Run every check your role defines for the target repository (current working directory) and return the structured result.',
+    [
+      'Run every check your role defines for the target repository (current working directory) and return the structured result.',
+      STAMPS,
+    ].join('\n'),
     { label: 'preconditions', phase: phaseTitle, schema: PRECONDITIONS, agentType: 'major-tom:onboard-check' }
   )
 }
@@ -84,8 +108,10 @@ function blockedOnAssets(pre) {
 const SCAN = {
   type: 'object',
   additionalProperties: false,
-  required: ['stack', 'devops', 'topologyGuess', 'namespaceGuess', 'units', 'specialistCandidates', 'evidence'],
+  required: ['stack', 'devops', 'topologyGuess', 'namespaceGuess', 'units', 'specialistCandidates', 'evidence', 'startedAt', 'finishedAt'],
   properties: {
+    startedAt: STAMP,
+    finishedAt: STAMP,
     stack: {
       type: 'object',
       additionalProperties: false,
@@ -143,8 +169,10 @@ const SCAN = {
 const VALIDATION = {
   type: 'object',
   additionalProperties: false,
-  required: ['valid', 'errors'],
+  required: ['valid', 'errors', 'startedAt', 'finishedAt'],
   properties: {
+    startedAt: STAMP,
+    finishedAt: STAMP,
     valid: { type: 'boolean' },
     errors: { type: 'array', items: { type: 'string' } },
   },
@@ -156,8 +184,10 @@ const VALIDATION = {
 const WRITE_REPORT = {
   type: 'object',
   additionalProperties: false,
-  required: ['written', 'failures', 'notes'],
+  required: ['written', 'failures', 'notes', 'startedAt', 'finishedAt'],
   properties: {
+    startedAt: STAMP,
+    finishedAt: STAMP,
     written: { type: 'array', items: { type: 'string' } },
     failures: { type: 'array', items: { type: 'string' } },
     notes: { type: 'string' },
@@ -185,8 +215,10 @@ const WRITE_REPORT = {
 const QUARANTINE_REPORT = {
   type: 'object',
   additionalProperties: false,
-  required: ['quarantined', 'skipped', 'failed', 'notes'],
+  required: ['quarantined', 'skipped', 'failed', 'notes', 'startedAt', 'finishedAt'],
   properties: {
+    startedAt: STAMP,
+    finishedAt: STAMP,
     quarantined: { type: 'array', items: { type: 'string' } },
     skipped: { type: 'array', items: { type: 'string' } },
     failed: { type: 'array', items: { type: 'string' } },
@@ -197,8 +229,10 @@ const QUARANTINE_REPORT = {
 const RENDER_REPORT = {
   type: 'object',
   additionalProperties: false,
-  required: ['written', 'failures', 'notes'],
+  required: ['written', 'failures', 'notes', 'startedAt', 'finishedAt'],
   properties: {
+    startedAt: STAMP,
+    finishedAt: STAMP,
     written: { type: 'array', items: { type: 'string' } },
     failures: { type: 'array', items: { type: 'string' } },
     notes: { type: 'string' },
@@ -208,8 +242,10 @@ const RENDER_REPORT = {
 const INSTALL_REPORT = {
   type: 'object',
   additionalProperties: false,
-  required: ['installed', 'skipped', 'notes'],
+  required: ['installed', 'skipped', 'notes', 'startedAt', 'finishedAt'],
   properties: {
+    startedAt: STAMP,
+    finishedAt: STAMP,
     installed: {
       type: 'array',
       items: {
@@ -235,8 +271,10 @@ const INSTALL_REPORT = {
 const FINALIZE_REPORT = {
   type: 'object',
   additionalProperties: false,
-  required: ['revalidated', 'mapVerified', 'runRecordPath', 'problems'],
+  required: ['revalidated', 'mapVerified', 'runRecordPath', 'problems', 'startedAt', 'finishedAt'],
   properties: {
+    startedAt: STAMP,
+    finishedAt: STAMP,
     revalidated: { type: 'boolean' },
     mapVerified: { type: 'boolean' },
     runRecordPath: { type: 'string' },
@@ -291,6 +329,7 @@ if (!input || input.stage !== 'execute') {
       '- namespaceGuess: the org scope if visible, e.g. the @scope of package names or publishConfig.',
       '- units: for mono-repo, each package/service with name and relative path, plus dependsOn edges derivable from internal manifest dependencies. For single topology return an empty array.',
       '- specialistCandidates: query the authorized specialist source (D24), https://sub-agents.directory/api, and propose one candidate per detected stack element that has a match. name is the agent slug, source is "sub-agents.directory", reason states which stack element it matches and whether the match is exact or a closest fit (e.g. "closest fit for express: no dedicated express agent upstream"). Never silently substitute: an inexact match must say so in reason. If the source is unreachable, return an empty array and record that in evidence.',
+      STAMPS,
     ].join('\n'),
     { label: 'scan', schema: SCAN }
   )
@@ -344,6 +383,7 @@ const validation = await agent(
     'Do not write any file into the target repository. Report valid plus the full ajv error list when invalid.',
     'Config to validate:',
     cfgJson,
+    STAMPS,
   ].join('\n'),
   { label: 'validate config', schema: VALIDATION }
 )
@@ -377,6 +417,7 @@ const write = await agent(
     'Report every path you wrote or changed in written, every failure in failures, and everything else you have to say in notes: what you found already in place and left alone, the entries you added to an index that already existed, a directory that was already populated, or a deviation you judged necessary and why.',
     'The failures list has one meaning and one only: a step that did not achieve its goal, such as a script exiting non-zero or a file that could not be written. Any entry in it halts the whole onboard, before the templates are rendered, the specialists are installed and the run record is written. It is not a place for notes, caveats, deviations or observations about pre-existing files. If every step above achieved its goal, failures must be an empty array, even when a file already existed or a directory was already populated.',
     'Change nothing else.',
+    STAMPS,
   ].join('\n'),
   { label: 'write config + knowledge root', schema: WRITE_REPORT }
 )
@@ -415,6 +456,7 @@ if (quarantineAuthorised) {
       'A skip is the mechanism working and not a fault: a destination that already exists, or evidence that did not prove the file is ours, is precisely the case the script exists to refuse, and it still exits 0.',
       'A failed rename does not stop this onboard and is not yours to work around. Report it and stop there: do not retry it, do not change permissions, do not move the file some other way, and delete nothing. The file stays where it is, and the Finalize phase, which reports what is actually on disk, is what says so.',
       'Change nothing else in the repository.',
+      STAMPS,
     ].join('\n'),
     { label: 'quarantine residue', phase: 'Execute', schema: QUARANTINE_REPORT }
   )
@@ -433,6 +475,7 @@ const [render, install] = await parallel([
         'That is the whole of this step. Render nothing else. In particular, do not build a dashboard and do not run the snapshot script: the dashboard is no longer generated at onboard time at all (D43), the server computes its data on demand from the repository, and no dashboard artifact is written anywhere in the target project.',
         'You compute nothing in this step: you run the two commands and report what they did.',
         'Report the files written, failures, and notes.',
+        STAMPS,
       ].join('\n'),
       { label: 'render context templates', phase: 'Execute', schema: RENDER_REPORT }
     ),
@@ -445,6 +488,7 @@ const [render, install] = await parallel([
         'Derive each installed agent\'s tools frontmatter by the tool policy your role defines (D52), never from the upstream libs field: the read-only built-ins Read, Glob, Grep, plus one mcp__<server>__* entry per server in this project\'s mcp config list, in this order:',
         JSON.stringify(cfg.mcp || [], null, 2),
         'If the list is empty, install nothing and say so in notes. Report every entry actually installed as {name, source}, and anything skipped or failed with the reason in skipped/notes.',
+        STAMPS,
       ].join('\n'),
       { label: 'install specialists', phase: 'Execute', schema: INSTALL_REPORT, agentType: 'major-tom:agent-installer' }
     ),
@@ -513,6 +557,60 @@ if (ineligibleResidue.length > 0) {
   )
 }
 
+// A phase's span is the earliest startedAt and the latest finishedAt across the agents that ran
+// in it (D57). That is the reduction Execute needs, where the agents run concurrently and one of
+// them is conditional, and it is exact on these strings because the schema pins one fixed-width
+// UTC format. The script reads no clock of its own and cannot, because the runtime makes every
+// clock throw, so the only timestamps here are the ones the agents reported.
+function span(reports) {
+  const started = []
+  const finished = []
+  for (const report of reports) {
+    if (!report) continue
+    if (report.startedAt) started.push(report.startedAt)
+    if (report.finishedAt) finished.push(report.finishedAt)
+  }
+  started.sort()
+  finished.sort()
+  const result = {}
+  if (started.length > 0) result.startedAt = started[0]
+  if (finished.length > 0) result.finishedAt = finished[finished.length - 1]
+  return result
+}
+
+// Execute's own agent reports, in one list, because the span and the status are both taken over
+// the phase's agents and must never disagree about which those are. The precondition re-check
+// belongs here because runPreconditions('Execute') ran it in this phase. The quarantine belongs
+// here only when the user authorised it, since a step that never ran did not fail.
+const executeReports = quarantineAuthorised
+  ? [pre2, validation, write, quarantine, render, install]
+  : [pre2, validation, write, render, install]
+
+const executeSpan = span(executeReports)
+
+// The onboard does not halt when the render or the install agent returns nothing. It finishes
+// and reports the gap to the session, so the record is the only place that can state it. Left
+// as done, the record would claim a finished phase, with a measured elapsed, over templates
+// that were never rendered.
+const executeStatus = executeReports.every(Boolean) ? 'done' : 'failed'
+
+// Check and Prepare are listed and carry no stamps. They ran in stage 1, which is a separate run
+// of this script, and the only channel between the two stages is args, which carries the config
+// and the quarantine consent (D21). Their reports never reach here, so the record states that
+// the phases happened and claims no timing for them.
+const runPhases = [
+  { name: 'Check', status: 'done' },
+  { name: 'Prepare', status: 'done' },
+  Object.assign({ name: 'Execute', artifact: '.claude/major-tom.json', status: executeStatus }, executeSpan),
+]
+
+const runBlock = { workflow: 'onboard' }
+// mode is the working model the target runs under. The config validated before anything was
+// written, so the key is there; an absent one is left out rather than written empty (D28).
+if (cfg.execution && cfg.execution.workingModel) runBlock.mode = cfg.execution.workingModel
+if (executeSpan.startedAt) runBlock.startedAt = executeSpan.startedAt
+runBlock.phases = runPhases
+
 phase('Finalize')
 const finalize = await agent(
   [
@@ -526,6 +624,17 @@ const finalize = await agent(
       : 'The installer agent did not complete, so its outcome is unknown. Reconcile from disk: for each entry in the specialists list already in .claude/major-tom.json, check whether .claude/agents/<name>.md exists; keep the entries that do, drop the ones that do not, and record the reconciliation in problems.',
     `2. Re-read .claude/major-tom.json and re-validate it against the schema at ${schemaPath} (same ajv setup as validation: draft-07, strict, strictRequired disabled, temporary install, nothing added to the target repo). This step stays with you and is not covered by step 3: schema validation is draft-07 conformance over the whole document, which needs ajv and a temporary install, and the artifact map ships with zero dependencies and deliberately does not re-implement it. The map checks that the config is there and is ours; only ajv checks that it is valid.`,
     `3. Write the run record: a markdown file in ${cfg.persistence.root}/runs/ named onboard-<UTC timestamp>.md summarizing this onboard (config keys written, files rendered, specialists installed, problems). Use the current UTC time. The record is an OKF v0.2 concept (D28): YAML frontmatter with type: run, a title, and generated: {by: major-tom-onboard, at: <the same UTC time>}.`,
+    [
+      'That frontmatter carries one more block, run, the structured timing of this onboard (D57). Nothing else about the record changes. type: run, the title, generated and the prose body stay exactly as they are, so the timeline event this file already produces is the same single event and no second one appears.',
+      'Write these keys under run, exactly as given, adding nothing and dropping nothing:',
+      JSON.stringify(runBlock, null, 2),
+      'Then complete the block with the three values only you can know:',
+      '- id: the file name of the record you are writing, without the .md.',
+      '- finishedAt: your own first clock reading. It is the last stamp that exists at the moment the record is written, because the phase writing it is still running.',
+      '- one more entry at the end of phases, for yourself: name Finalize, artifact the path of this record, status active, startedAt your own first clock reading, and no finishedAt at all. This phase is writing the record it appears in, so it is active and its end cannot be known here.',
+      'Write a field only where you have a true value for it (D28). A phase with no stamps carries none: no empty strings, no zeroes, no estimates. Check and Prepare are listed without stamps because they ran in stage 1 of this workflow, a separate run whose reports do not reach this one, and a timing nobody measured is worse than an absent field.',
+      'Write each status exactly as the block above states it and never substitute your own. done, failed and active are the whole vocabulary. Execute reads failed when one of its agents did not complete, which is a run that finished with work missing, and the record says so rather than claiming the work happened. Your own entry is active, because you are writing the record while the phase is still running.',
+    ].join('\n'),
     residueLines.length > 0
       ? residueLines.join('\n')
       : 'This repository carried no residue from an older plugin version when this run started, so there is nothing about a quarantine to record.',
@@ -536,6 +645,7 @@ const finalize = await agent(
     'Do not re-assert in prose anything the map covers, and do not judge its output. Copy every MISSING, UNRECOGNISED, UNEXPECTED and RETIRED line into problems verbatim, and set mapVerified true only when the script exits 0. An absent line is not a problem and never goes into problems. If migration.js is not there or does not run, set mapVerified false and say so in problems; never substitute file-existence checks of your own for it.',
     'Nothing else of this phase moved into the map, and the split is deliberate: steps 1, 3 and 4 are writes rather than assertions, and step 2 is the one assertion the map cannot make. Every file-existence and managed-content assertion this phase used to state in prose is now in the map and is made by step 5.',
     'Report revalidated, mapVerified, the run record path, and every problem found.',
+    STAMPS,
   ].join('\n'),
   { label: 'finalize + run record', schema: FINALIZE_REPORT }
 )
