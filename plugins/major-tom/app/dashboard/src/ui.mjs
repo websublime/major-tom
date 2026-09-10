@@ -11,7 +11,9 @@ export function esc(s) {
 // Every status word collapses to one of three states, and the word this returns is both the
 // token name and the class stem: `sq done`, `fg-active`, a bar fill of `idle`.
 function uiStatusKey(st) {
-  return st === 'done' ? 'done' : st === 'active' ? 'active' : 'idle'
+  if (st === 'done') return 'done'
+  if (st === 'active') return 'active'
+  return st === 'failed' ? 'neg' : 'idle'
 }
 
 // The overview's git brief renders one commit per row. The full log has its own row in
