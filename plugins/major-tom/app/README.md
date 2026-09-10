@@ -308,13 +308,14 @@ byte-identical JSON except for `generatedAt`. Every sort is total, every directo
 in sorted order, and `generatedAt` is read once and is the single clock every window is
 measured from.
 
-Six required keys: `generatedAt` (ISO), `config` (the validated `.claude/major-tom.json`
+Six required keys, `generatedAt` (ISO), `config` (the validated `.claude/major-tom.json`
 object, the `snapshot` block this window is read from included), `git`, `knowledge`,
-`decisions` and `timeline`. Two optional keys with no producer
-yet, omitted entirely rather than emitted empty, for which the dashboard shows honest empty
-states: `lastRun` (`{id, workflow, mode, duration, phases: [{name, artifact, status,
-elapsed}]}`) and `roadmap` (`{milestones: [{title, version, status, pct, tasks: [{ref,
-title, status, owner}]}]}`).
+`decisions` and `timeline`. Two optional keys sit beside them, omitted entirely rather than
+emitted empty, and the dashboard renders an honest empty state for each where it is absent.
+`lastRun` (`{id, workflow, mode, duration, phases: [{name, artifact, status, elapsed}]}`) has a
+producer since D57 and is present whenever a run record carries a usable block. `roadmap`
+(`{milestones: [{title, version, status, pct, tasks: [{ref, title, status, owner}]}]}`) has none
+and is never emitted.
 
 ### The window (D45)
 
@@ -439,6 +440,85 @@ page presents.
   `knowledge.files[].updated`. The fallback exists because no producer writes a `date`
   frontmatter key today.
 
+### `lastRun`
+
+`{id, workflow, mode, duration, phases: [{name, artifact, status, elapsed}]}` (D57), the run the
+overview's lifecycle strip draws. Absent when nothing produces it, and the strip then renders its
+empty state.
+
+**Source.** The newest run record under `runs/` whose frontmatter declares `type: run` and
+carries a `run` block. The block is written by the onboard's Finalize phase into the record it
+already wrote (`runs/onboard-<UTC>.md`), so no new file and no new key of the persistence root is
+involved. A run record is recognised exactly as the timeline recognises one, a concept under
+`runs/` outside `runs/intents/` declaring `type: run`, and it is dated exactly as the timeline
+dates one, from `generated.at`, else a plain `generated` string, else the file mtime. The two
+readers share both rules, so they cannot disagree about which files are runs or which run is
+newest, and two records recorded in the same second break the tie the same way here and there.
+
+**The reader takes the newest record carrying a usable block, not simply the newest record.**
+Candidates are ordered newest first and the first one whose block parses wins. A usable block is a
+mapping whose `phases` is an array holding at least one mapping; anything less is skipped the way
+an unparseable concept is skipped, so a malformed block never fails the snapshot and never shadows
+the sound older run behind it. Above that bar the block is read leniently, a missing scalar
+becoming `null`, because a run that did not state its mode is a fact about the record rather than
+a reason to discard it.
+
+**It reads the unwindowed concept list and never `timeline.events`.** A repository whose last run
+is older than the horizon still has a last run, and reading the windowed list would make the key
+vanish whenever a reader narrowed the window, a defect the header control could produce at will.
+No selection of any kind is applied to `lastRun`.
+
+| Field | Meaning |
+|---|---|
+| `id` | `run.id`, the record's own basename without `.md`, falling back to the concept path |
+| `workflow` | `run.workflow`, the workflow that ran; `null` when the block omits it |
+| `mode` | `run.mode`, the target's `execution.workingModel`; `null` when the block omits it |
+| `duration` | The span from `run.startedAt` to `run.finishedAt`, formatted; omitted when no such span exists |
+| `phases[]` | One entry per phase the record lists, in the record's order |
+| `phases[].name`, `phases[].artifact` | As the record states them, `null` when it omits them |
+| `phases[].status` | `done`, `active` or `failed` when the record says exactly one of those, and `pending` otherwise |
+| `phases[].elapsed` | The span from that phase's `startedAt` to its `finishedAt`, formatted; omitted when no such span exists |
+
+ and nothing else, so a value with an offset, a
+value without the `Z`, a value carrying milliseconds and a value that is not a string all yield
+no span. A wider form would be parsed against whatever timezone the reader runs in, and one
+repository would then report different spans on different machines, which breaks the
+byte-identical guarantee this file makes. `onboard.js` pins the same pattern on every report
+schema. The workflow runtime lets neither file import the other, so a test in
+`tests/snapshot.test.js` holds the two literals equal instead. An end that precedes its start is
+not a span either and yields nothing.
+
+**Elapsed formatting, which lives here so the view stores no arithmetic** (D18, the runs area
+being the source of truth and the page a view over it). The record stores instants and
+`snapshot.js` turns a pair of them into the string the strip prints.
+
+| Span | Spelling | Example |
+|---|---|---|
+| under a minute | seconds with one decimal | `0.0s`, `12.0s` |
+| a minute and over | whole minutes and whole seconds | `1m 13s` |
+| an hour and over | whole hours and whole minutes | `1h 2m` |
+
+Every stamp is a whole second, so the decimal place is always a zero. The seconds go at an hour
+because they are noise beside a total that large and the phase cell is one narrow line. The branch
+is chosen on the rounded value rather than the raw one, so 60 seconds reads as `1m 0s` and never
+as `60.0s`. No clock is read while formatting, both instants coming from the record, which is
+what keeps two runs over an unchanged repository byte identical.
+
+**What the timings measure, and what they do not.** Each stamp is a clock an agent read and
+reported, and nothing verifies it. A phase span covers that phase's own agents from the earliest
+start to the latest finish, so runtime the workflow spends between two agents of one phase falls
+inside it. An onboard record carries stamps for Execute alone, because Check and Prepare run in a
+separate workflow run whose reports never reach the one that writes the record, and Finalize has a
+start but no end while it is writing that record. A record written by a resumed run can carry
+stamps from an earlier attempt, since a replayed agent result replays its stamps, and nothing in
+the snapshot marks that.
+
+**`failed` is a status the onboard really writes.** The run does not halt when its render or
+install agent returns nothing, so Execute is recorded `failed` whenever one of its agents did not
+complete, and the phase keeps the span its remaining agents measured. Left `done`, the record
+would claim a finished phase over templates that were never rendered. The reader passes `failed`
+through untouched rather than softening it to `pending`.
+
 ### `timeline`
 
 `{events, window, omitted}` (D41), the event index the `#timeline` view and the overview
@@ -489,7 +569,12 @@ why both windows carry the same limits (D42).
 `tests/snapshot.test.js` drives the CLI and the module over throwaway fixture repositories,
 covers the window (the configured default, an override winning over it, both bounds of both
 parameters refused at both ends, a bad configured default, a missing `snapshot` block, and a
-narrower window dropping commits and events in step), and also walks every vendored file, the
+narrower window dropping commits and events in step), covers `lastRun` (a record with a block
+producing the key, a repository without one omitting it, an unusable block skipped without
+failing the snapshot, a phase with no stamps carrying no elapsed, the three elapsed formats,
+two runs in the same second resolving the way the timeline resolves them, and a window narrow
+enough to drop the run from `timeline.events` never dropping the key), and also walks every
+vendored file, the
 js-yaml bundle and the four font faces alike, asserting the byte size and SHA-256 each one is
 pinned to, so a swapped vendor file fails the suite. `tests/server.test.js` starts the real
 server as a child process on a real socket and asserts the route contract, the JSON error
